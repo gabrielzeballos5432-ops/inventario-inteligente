@@ -1,0 +1,54 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+*.pt
+*.pkl
+*.db
+
+# Backend old root files (nueva estructura usa app/)
+backend/main.py
+backend/models.py
+backend/schemas.py
+backend/settings.py
+backend/database.py
+backend/routes/
+backend/services/
+backend/ai/
+backend/capturas/
+backend/test_*.py
+backend/inventario_db
+backend/yolov8n.pt
+
+# Flutter / mobile
+mobile/inventario_app/build/
+mobile/inventario_app/.dart_tool/
+mobile/inventario_app/.packages
+mobile/inventario_app/.flutter-plugins
+mobile/inventario_app/.flutter-plugins-dependencies
+mobile/inventario_app/pubspec.lock
+mobile/inventario_app/android/.gradle/
+mobile/inventario_app/android/app/build/
+mobile/inventario_app/ios/Pods/
+mobile/inventario_app/ios/.symlinks/
+mobile/inventario_app/ios/Flutter/Flutter.framework/
+mobile/inventario_app/ios/Flutter/Flutter.podspec
+mobile/inventario_app/ios/Runner.xcworkspace/xcuserdata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+pgdata/
+
+# Dataset (imagenes de entrenamiento)
+dataset/
+
+# OS
+.DS_Store
+Thumbs.db
