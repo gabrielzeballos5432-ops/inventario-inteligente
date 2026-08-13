@@ -1,5 +1,6 @@
 import io
 import logging
+from pathlib import Path
 from typing import Optional
 
 import cv2
@@ -29,6 +30,10 @@ class InferenceService:
 
     def cargar_modelo(self) -> None:
         ruta = settings.YOLO_MODEL_PATH
+        if not Path(ruta).exists():
+            logger.warning("Modelo YOLO no encontrado en %s. Desactivando deteccion.", ruta)
+            self._modelo = None
+            return
         logger.info("Cargando modelo YOLO desde %s", ruta)
         self._modelo = YOLO(ruta)
         logger.info("Modelo YOLO cargado exitosamente")
@@ -40,6 +45,11 @@ class InferenceService:
         return self._modelo
 
     def detectar(self, image_bytes: bytes) -> list[dict]:
+        if self._modelo is None:
+            self.cargar_modelo()
+        if self._modelo is None:
+            raise RuntimeError("Modelo YOLO no disponible: no se encontro el archivo de pesos")
+
         imagen = Image.open(io.BytesIO(image_bytes))
         img_array = np.array(imagen)
         if img_array.shape[-1] == 4:
