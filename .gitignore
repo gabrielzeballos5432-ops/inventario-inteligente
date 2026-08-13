@@ -46,9 +46,6 @@ mobile/inventario_app/ios/Runner.xcworkspace/xcuserdata/
 # Docker
 pgdata/
 
-# Backups de base de datos
-backups/
-
 # Dataset (imagenes de entrenamiento)
 dataset/
 
