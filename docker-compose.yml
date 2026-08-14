@@ -5,13 +5,13 @@ services:
     environment:
       POSTGRES_USER: zoom_user
       POSTGRES_PASSWORD: zoom_password
-      POSTGRES_DB: inventario_zoom
+      POSTGRES_DB: inventario_db
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zoom_user -d inventario_zoom"]
+      test: ["CMD-SHELL", "pg_isready -U zoom_user -d inventario_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     container_name: inventario_backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -31,8 +31,10 @@ services:
       DB_PORT: 5432
       DB_USER: zoom_user
       DB_PASSWORD: zoom_password
-      DB_NAME: inventario_zoom
+      DB_NAME: inventario_db
       SECRET_KEY: cambiar_esta_clave_en_produccion
+      DEFAULT_ADMIN_EMAIL: admin@zoom.com
+      DEFAULT_ADMIN_PASSWORD: Admin12345
     volumes:
       - ./backend/app/models:/app/app/models
 

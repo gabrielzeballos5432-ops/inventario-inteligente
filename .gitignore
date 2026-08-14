@@ -2,25 +2,12 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .env
+.env.prod
 venv/
 .venv/
 *.pt
 *.pkl
 *.db
-
-# Backend old root files (nueva estructura usa app/)
-backend/main.py
-backend/models.py
-backend/schemas.py
-backend/settings.py
-backend/database.py
-backend/routes/
-backend/services/
-backend/ai/
-backend/capturas/
-backend/test_*.py
-backend/inventario_db
-backend/yolov8n.pt
 
 # Flutter / mobile
 mobile/inventario_app/build/
@@ -48,6 +35,13 @@ pgdata/
 
 # Dataset (imagenes de entrenamiento)
 dataset/
+
+# Backups de base de datos (dumps SQL con datos reales)
+backups/
+
+# Documentacion del proyecto (perfil y revision sistematica, fuera del control de versiones)
+tecnico y original/
+revision-sistematica/
 
 # OS
 .DS_Store

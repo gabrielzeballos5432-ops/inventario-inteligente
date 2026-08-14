@@ -9,9 +9,9 @@ class Settings(BaseSettings):
 
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
-    DB_USER: str = "zoom_user"
-    DB_PASSWORD: str = "zoom_password"
-    DB_NAME: str = "inventario_zoom"
+    DB_USER: str = "admin_user"
+    DB_PASSWORD: str = "admin_password"
+    DB_NAME: str = "inventario_db"
 
     @property
     def DATABASE_URL(self) -> str:
@@ -26,8 +26,13 @@ class Settings(BaseSettings):
 
     YOLO_MODEL_PATH: str = "app/models/best.pt"
     YOLO_CONFIDENCE_THRESHOLD: float = 0.5
+    YOLO_CLASS_MAP: dict[int, int] = {}
 
-    CORS_ORIGINS: list[str] = ["*"]
+    DEFAULT_ADMIN_USERNAME: str = "admin"
+    DEFAULT_ADMIN_EMAIL: str = "admin@zoom.com"
+    DEFAULT_ADMIN_PASSWORD: str = "Admin12345"
+
+    CORS_ORIGINS: list[str] = ["http://localhost:4200", "http://127.0.0.1:4200"]
 
     class Config:
         env_file = ".env"

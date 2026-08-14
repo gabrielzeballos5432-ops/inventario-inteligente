@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: inventario_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-zoom_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-zoom_password}
+      POSTGRES_DB: inventario_db
+    # En produccion la BD no se expone a la red externa
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-zoom_user} -d inventario_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inventario_backend
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-zoom_user}
+      DB_PASSWORD: ${DB_PASSWORD:-zoom_password}
+      DB_NAME: inventario_db
+      SECRET_KEY: ${SECRET_KEY:?Debes definir SECRET_KEY en el archivo .env.prod}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@zoom.com}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-Admin12345}
+      DEBUG: "False"
+    # Volumen para colocar el modelo entrenado sin reconstruir la imagen
+    volumes:
+      - ./backend/app/models:/app/app/models
+
+volumes:
+  pgdata:
