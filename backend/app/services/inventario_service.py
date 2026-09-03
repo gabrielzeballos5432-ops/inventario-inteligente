@@ -1,5 +1,7 @@
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.movimiento_repository import MovimientoRepository
+from app.repositories.sesion_repository import SesionRepository
+from app.repositories.deteccion_repository import DeteccionRepository
 from app.yolo.inference_service import InferenceService
 from app.schemas.inferencia import InferenciaResponse, DeteccionOut
 from app.schemas.movimiento import MovimientoOut
@@ -12,15 +14,31 @@ class InventarioService:
         producto_repo: ProductoRepository,
         movimiento_repo: MovimientoRepository,
         yolo: InferenceService,
+        sesion_repo: SesionRepository | None = None,
+        deteccion_repo: DeteccionRepository | None = None,
     ):
         self.producto_repo = producto_repo
         self.movimiento_repo = movimiento_repo
         self.yolo = yolo
+        self.sesion_repo = sesion_repo
+        self.deteccion_repo = deteccion_repo
 
     async def procesar_inferencia(
-        self, image_bytes: bytes, usuario_id: int
+        self,
+        image_bytes: bytes,
+        usuario_id: int,
+        imagen_url: str | None = None,
+        tipo_operacion: str = "entrada",
     ) -> InferenciaResponse:
         detecciones_raw = self.yolo.detectar(image_bytes)
+
+        tipo_movimiento = "entrada" if tipo_operacion == "entrada" else "salida"
+
+        sesion_id = None
+        if self.sesion_repo is not None and detecciones_raw:
+            sesion = await self.sesion_repo.crear(usuario_id, tipo_operacion)
+            sesion_id = sesion.id
+
         detecciones_out: list[DeteccionOut] = []
         movimientos_creados = 0
 
@@ -40,33 +58,59 @@ class InventarioService:
                 )
             )
 
+            if self.deteccion_repo is not None and sesion_id is not None:
+                await self.deteccion_repo.crear(
+                    sesion_id=sesion_id,
+                    producto_id=det["producto_id"],
+                    confianza=det["confianza"],
+                    imagen_url=imagen_url,
+                )
+
             await self.movimiento_repo.crear_movimiento(
                 producto_id=det["producto_id"],
                 usuario_id=usuario_id,
-                tipo="salida",
+                tipo=tipo_movimiento,
                 cantidad=det["cantidad"],
                 origen="ia",
+                sesion_id=sesion_id,
             )
             movimientos_creados += 1
+
+        if sesion_id is not None and self.sesion_repo is not None:
+            await self.sesion_repo.incrementar_detectados(sesion_id, movimientos_creados)
 
         return InferenciaResponse(
             detecciones=detecciones_out,
             total_productos=len(detecciones_out),
             movimientos_creados=movimientos_creados,
+            sesion_id=sesion_id,
         )
 
     async def obtener_inventario(self) -> list[ProductoStockOut]:
         datos = await self.producto_repo.listar_con_stock()
-        return [
-            ProductoStockOut(
-                **{
-                    **d["producto"].__dict__,
-                    "stock_actual": d["stock_actual"],
-                    "stock_bajo": d["stock_bajo"],
-                }
+        resultado = []
+        for d in datos:
+            prod = d["producto"]
+            resultado.append(
+                ProductoStockOut(
+                    id=prod.id,
+                    sku=prod.sku,
+                    codigo_barras=prod.codigo_barras,
+                    nombre=prod.nombre,
+                    descripcion=prod.descripcion,
+                    categoria_id=prod.categoria_id,
+                    categoria=prod.categoria,
+                    marca_id=prod.marca_id,
+                    proveedor_id=prod.proveedor_id,
+                    precio_compra=prod.precio_compra,
+                    precio_venta=prod.precio_venta,
+                    stock_minimo=prod.stock_minimo,
+                    activo=prod.activo,
+                    stock_actual=d["stock_actual"],
+                    stock_bajo=d["stock_bajo"],
+                )
             )
-            for d in datos
-        ]
+        return resultado
 
     async def obtener_historial(
         self, limite: int = 50
@@ -79,7 +123,9 @@ class InventarioService:
                 producto_nombre=m.producto.nombre if m.producto else None,
                 usuario_id=m.usuario_id,
                 usuario_nombre=m.usuario.nombre if m.usuario else None,
+                sesion_id=m.sesion_id,
                 tipo=m.tipo,
+                cantidad_anterior=m.cantidad_anterior,
                 cantidad=m.cantidad,
                 stock_resultante=m.stock_resultante,
                 origen=m.origen,

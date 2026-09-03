@@ -12,12 +12,20 @@ class ProductoRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def listar_todos(self) -> list[Producto]:
-        result = await self.db.execute(
-            select(Producto)
-            .options(joinedload(Producto.categoria))
-            .where(Producto.activo == True)
-        )
+    async def listar_todos(
+        self,
+        incluir_inactivos: bool = False,
+        texto: Optional[str] = None,
+        categoria_id: Optional[int] = None,
+    ) -> list[Producto]:
+        query = select(Producto).options(joinedload(Producto.categoria))
+        if not incluir_inactivos:
+            query = query.where(Producto.activo == True)
+        if texto:
+            query = query.where(Producto.nombre.ilike(f"%{texto}%"))
+        if categoria_id is not None:
+            query = query.where(Producto.categoria_id == categoria_id)
+        result = await self.db.execute(query)
         return list(result.scalars().unique().all())
 
     async def obtener_por_id(self, producto_id: int) -> Optional[Producto]:
@@ -27,6 +35,15 @@ class ProductoRepository:
             .where(Producto.id == producto_id)
         )
         return result.scalar_one_or_none()
+
+    async def crear(self, producto: Producto) -> Producto:
+        self.db.add(producto)
+        await self.db.commit()
+        return await self.obtener_por_id(producto.id)
+
+    async def guardar(self, producto: Producto) -> Producto:
+        await self.db.commit()
+        return await self.obtener_por_id(producto.id)
 
     async def obtener_stock(self, producto_id: int) -> int:
         result = await self.db.execute(

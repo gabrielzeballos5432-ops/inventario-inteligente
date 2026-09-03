@@ -3,7 +3,8 @@ from fastapi import HTTPException, status
 from app.core.security import hash_password, verify_password, create_access_token
 from app.models.usuario import Usuario
 from app.repositories.usuario_repository import UsuarioRepository
-from app.schemas.auth import TokenResponse, UsuarioCreate
+from app.schemas.auth import TokenResponse
+from app.schemas.usuario import UsuarioCreate
 
 
 class AuthService:
@@ -23,13 +24,13 @@ class AuthService:
                 detail="Usuario desactivado",
             )
         token = create_access_token(
-            data={"sub": str(usuario.id), "rol": usuario.rol}
+            data={"sub": str(usuario.id), "rol": usuario.rol.nombre}
         )
         return TokenResponse(
             access_token=token,
             usuario_id=usuario.id,
             nombre=usuario.nombre,
-            rol=usuario.rol,
+            rol=usuario.rol.nombre,
         )
 
     async def registrar(self, data: UsuarioCreate) -> Usuario:
@@ -39,10 +40,19 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El email ya esta registrado",
             )
+
+        rol = await self.repo.obtener_rol_por_id(data.rol_id)
+        if rol is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Rol invalido",
+            )
+
         usuario = Usuario(
             nombre=data.nombre,
             email=data.email,
             password_hash=hash_password(data.password),
-            rol=data.rol,
+            rol_id=rol.id,
+            activo=data.activo,
         )
         return await self.repo.crear(usuario)

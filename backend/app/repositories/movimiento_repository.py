@@ -18,28 +18,38 @@ class MovimientoRepository:
         usuario_id: int,
         tipo: str,
         cantidad: int,
-        origen: str = "app",
+        origen: str = "manual",
+        sesion_id: Optional[int] = None,
     ) -> Movimiento:
         inventario = await self.db.execute(
             select(Inventario).where(Inventario.producto_id == producto_id)
         )
         inv = inventario.scalar_one_or_none()
-        if inv is None:
-            inv = Inventario(producto_id=producto_id, cantidad=0)
-            self.db.add(inv)
-            await self.db.flush()
+        cantidad_anterior = inv.cantidad if inv else 0
 
         if tipo == "entrada":
-            inv.cantidad += cantidad
+            stock_resultante = cantidad_anterior + cantidad
         elif tipo == "salida":
-            inv.cantidad = max(0, inv.cantidad - cantidad)
+            stock_resultante = max(0, cantidad_anterior - cantidad)
+        elif tipo == "ajuste":
+            stock_resultante = cantidad
+        else:
+            stock_resultante = cantidad_anterior
+
+        if inv is None:
+            inv = Inventario(producto_id=producto_id, cantidad=stock_resultante)
+            self.db.add(inv)
+        else:
+            inv.cantidad = stock_resultante
 
         mov = Movimiento(
             producto_id=producto_id,
             usuario_id=usuario_id,
+            sesion_id=sesion_id,
             tipo=tipo,
+            cantidad_anterior=cantidad_anterior,
             cantidad=cantidad,
-            stock_resultante=inv.cantidad,
+            stock_resultante=stock_resultante,
             origen=origen,
         )
         self.db.add(mov)
