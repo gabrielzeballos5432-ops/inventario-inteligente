@@ -13,3 +13,4 @@ class InferenciaResponse(BaseModel):
     detecciones: list[DeteccionOut]
     total_productos: int
     movimientos_creados: int = 0
+    sesion_id: Optional[int] = None

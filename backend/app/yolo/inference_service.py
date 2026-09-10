@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 MAPA_CLASES_YOLO: dict[int, int] = {
     # key: id de clase del modelo YOLO (entrenado)
     # value: id del producto en la BD
+    # Se puede sobreescribir via la variable de entorno YOLO_CLASS_MAP
     # EJEMPLO -- el usuario debe ajustar segun su modelo entrenado
     0: 1,  # tinte negro -> producto_id=1
     1: 2,  # tinte marron -> producto_id=2
@@ -28,10 +29,20 @@ MAPA_CLASES_YOLO: dict[int, int] = {
 class InferenceService:
     _modelo: Optional[YOLO] = None
 
+    @property
+    def mapa_clases(self) -> dict[int, int]:
+        if settings.YOLO_CLASS_MAP:
+            return settings.YOLO_CLASS_MAP
+        return MAPA_CLASES_YOLO
+
     def cargar_modelo(self) -> None:
         ruta = settings.YOLO_MODEL_PATH
         if not Path(ruta).exists():
-            logger.warning("Modelo YOLO no encontrado en %s. Desactivando deteccion.", ruta)
+            logger.warning(
+                "Modelo YOLO no encontrado en %s. La deteccion quedara desactivada. "
+                "Coloca tu modelo entrenado en esa ruta o ajusta YOLO_MODEL_PATH.",
+                ruta,
+            )
             self._modelo = None
             return
         logger.info("Cargando modelo YOLO desde %s", ruta)
@@ -48,7 +59,10 @@ class InferenceService:
         if self._modelo is None:
             self.cargar_modelo()
         if self._modelo is None:
-            raise RuntimeError("Modelo YOLO no disponible: no se encontro el archivo de pesos")
+            raise RuntimeError(
+                "Modelo YOLO no disponible: no se encontro el archivo de pesos en "
+                f"{settings.YOLO_MODEL_PATH}"
+            )
 
         imagen = Image.open(io.BytesIO(image_bytes))
         img_array = np.array(imagen)
@@ -57,8 +71,8 @@ class InferenceService:
 
         resultados = self.modelo(img_array, conf=settings.YOLO_CONFIDENCE_THRESHOLD)
 
-        detecciones: list[dict] = []
-        conteo: dict[int, int] = {}
+        detecciones_por_producto: dict[int, dict] = {}
+        mapa = self.mapa_clases
 
         for r in resultados:
             if r.boxes is None:
@@ -66,17 +80,19 @@ class InferenceService:
             for box in r.boxes:
                 cls_id = int(box.cls[0].item())
                 confianza = float(box.conf[0].item())
-                producto_id = MAPA_CLASES_YOLO.get(cls_id)
+                producto_id = mapa.get(cls_id)
                 if producto_id is None:
                     logger.warning("Clase YOLO %d no mapeada a producto", cls_id)
                     continue
-                conteo[producto_id] = conteo.get(producto_id, 0) + 1
+                actual = detecciones_por_producto.get(producto_id)
+                if actual is None:
+                    detecciones_por_producto[producto_id] = {
+                        "producto_id": producto_id,
+                        "cantidad": 1,
+                        "confianza": confianza,
+                    }
+                else:
+                    actual["cantidad"] += 1
+                    actual["confianza"] = max(actual["confianza"], confianza)
 
-        for producto_id, cantidad in conteo.items():
-            detecciones.append({
-                "producto_id": producto_id,
-                "cantidad": cantidad,
-                "confianza": confianza,
-            })
-
-        return detecciones
+        return list(detecciones_por_producto.values())

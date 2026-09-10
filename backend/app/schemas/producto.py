@@ -1,11 +1,12 @@
 from pydantic import BaseModel
 from typing import Optional
+from decimal import Decimal
 
 
 class CategoriaOut(BaseModel):
     id: int
     nombre: str
-    descripcion: Optional[str] = None
+    padre_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -13,13 +14,16 @@ class CategoriaOut(BaseModel):
 
 class ProductoOut(BaseModel):
     id: int
+    sku: Optional[str] = None
     codigo_barras: Optional[str] = None
     nombre: str
     descripcion: Optional[str] = None
-    precio_venta: float
-    precio_costo: Optional[float] = None
     categoria_id: Optional[int] = None
     categoria: Optional[CategoriaOut] = None
+    marca_id: Optional[int] = None
+    proveedor_id: Optional[int] = None
+    precio_compra: Decimal
+    precio_venta: Decimal
     stock_minimo: int
     activo: bool
 
@@ -28,13 +32,30 @@ class ProductoOut(BaseModel):
 
 
 class ProductoCreate(BaseModel):
+    sku: Optional[str] = None
     codigo_barras: Optional[str] = None
     nombre: str
     descripcion: Optional[str] = None
-    precio_venta: float
-    precio_costo: Optional[float] = None
     categoria_id: Optional[int] = None
+    marca_id: Optional[int] = None
+    proveedor_id: Optional[int] = None
+    precio_compra: Decimal = 0
+    precio_venta: Decimal = 0
     stock_minimo: int = 5
+
+
+class ProductoUpdate(BaseModel):
+    sku: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    categoria_id: Optional[int] = None
+    marca_id: Optional[int] = None
+    proveedor_id: Optional[int] = None
+    precio_compra: Optional[Decimal] = None
+    precio_venta: Optional[Decimal] = None
+    stock_minimo: Optional[int] = None
+    activo: Optional[bool] = None
 
 
 class ProductoStockOut(ProductoOut):

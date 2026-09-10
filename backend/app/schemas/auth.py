@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 
 class LoginRequest(BaseModel):
@@ -23,10 +24,3 @@ class UsuarioCreado(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class UsuarioCreate(BaseModel):
-    nombre: str
-    email: EmailStr
-    password: str
-    rol: str = "vendedor"

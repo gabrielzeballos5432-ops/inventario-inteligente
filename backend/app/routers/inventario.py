@@ -8,7 +8,7 @@ from app.repositories.movimiento_repository import MovimientoRepository
 from app.services.inventario_service import InventarioService
 from app.yolo.inference_service import InferenceService
 from app.schemas.producto import ProductoStockOut
-from app.schemas.movimiento import MovimientoOut
+from app.schemas.movimiento import MovimientoCreate, MovimientoOut
 
 router = APIRouter(prefix="/api/inventario", tags=["Inventario"])
 
@@ -52,3 +52,36 @@ async def obtener_stock_bajo(
     )
     inventario = await service.obtener_inventario()
     return [p for p in inventario if p.stock_bajo]
+
+
+@router.post("/movimiento", response_model=MovimientoOut, status_code=201)
+async def registrar_movimiento(
+    body: MovimientoCreate,
+    db: AsyncSession = Depends(get_db),
+    usuario_id: int = Depends(get_current_user_id),
+):
+    movimiento_repo = MovimientoRepository(db)
+    movimiento = await movimiento_repo.crear_movimiento(
+        producto_id=body.producto_id,
+        usuario_id=usuario_id,
+        tipo=body.tipo,
+        cantidad=body.cantidad,
+        origen=body.origen,
+        sesion_id=body.sesion_id,
+    )
+
+    producto_repo = ProductoRepository(db)
+    producto = await producto_repo.obtener_por_id(body.producto_id)
+    return MovimientoOut(
+        id=movimiento.id,
+        producto_id=movimiento.producto_id,
+        producto_nombre=producto.nombre if producto else None,
+        usuario_id=movimiento.usuario_id,
+        sesion_id=movimiento.sesion_id,
+        tipo=movimiento.tipo,
+        cantidad_anterior=movimiento.cantidad_anterior,
+        cantidad=movimiento.cantidad,
+        stock_resultante=movimiento.stock_resultante,
+        origen=movimiento.origen,
+        creado_en=movimiento.creado_en,
+    )
