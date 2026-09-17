@@ -50,6 +50,15 @@ class ApiClient {
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
 
+  Future<String> getRaw(String path) async {
+    final response = await _httpClient.get(
+      _buildUri(path),
+      headers: _buildHeaders(includeJson: false),
+    );
+    _ensureSuccess(response);
+    return utf8.decode(response.bodyBytes);
+  }
+
   Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
     final response = await _httpClient.post(
       _buildUri(path),
@@ -82,16 +91,32 @@ class ApiClient {
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
 
+  Future<dynamic> patchJson(String path, Map<String, dynamic> body) async {
+    final response = await _httpClient.patch(
+      _buildUri(path),
+      headers: _buildHeaders(),
+      body: jsonEncode(body),
+    );
+    _ensureSuccess(response);
+    if (response.body.isEmpty) return null;
+    return jsonDecode(utf8.decode(response.bodyBytes));
+  }
+
   Future<dynamic> postMultipart(
     String path, {
     required String fieldName,
-    required String filePath,
+    required String fileName,
+    required List<int> bytes,
     Map<String, String>? fields,
   }) async {
     final request = http.MultipartRequest('POST', _buildUri(path));
     request.headers.addAll(_buildHeaders(includeJson: false));
     request.fields.addAll(fields ?? {});
-    request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+    request.files.add(http.MultipartFile.fromBytes(
+      fieldName,
+      bytes,
+      filename: fileName,
+    ));
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     _ensureSuccess(response);

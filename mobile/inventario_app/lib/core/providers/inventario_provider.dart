@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 
 import '../models/product.dart';
@@ -33,6 +31,7 @@ class InventarioProvider extends ChangeNotifier {
   ResultadoInferencia? get ultimaInferencia => _ultimaInferencia;
   bool get cargando => _cargando;
   String? get error => _error;
+  ProductService get productService => _productService;
 
   Future<void> cargarInventario() async {
     _cargando = true;
@@ -53,7 +52,8 @@ class InventarioProvider extends ChangeNotifier {
             .toList(),
       );
       _error = null;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('cargarInventario FALLA: $e | $st');
       final cache = await _localDb.obtenerCacheInventario();
       _productos = cache
           .map((c) => ProductoConStock(
@@ -61,6 +61,7 @@ class InventarioProvider extends ChangeNotifier {
                 nombre: c['nombre'] as String,
                 stockActual: c['stock_actual'] as int,
                 stockMinimo: c['stock_minimo'] as int,
+                precioCompra: 0,
                 precioVenta: (c['precio_venta'] as num).toDouble(),
                 stockBajo: (c['stock_bajo'] as int) == 1,
                 activo: true,
@@ -83,23 +84,20 @@ class InventarioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> enviarImagen(String imagePath) async {
+  Future<bool> enviarImagen(List<int> bytes, String fileName) async {
     _cargando = true;
     notifyListeners();
 
     try {
-      _ultimaInferencia = await _detectionService.detectFromUpload(imagePath);
+      _ultimaInferencia =
+          await _detectionService.detectFromUpload(bytes, fileName);
       _error = null;
       _cargando = false;
       notifyListeners();
       await cargarInventario();
       return true;
     } catch (e) {
-      final file = File(imagePath);
-      if (await file.exists()) {
-        await _localDb.encolarMovimiento(0, 'salida_ia', 1);
-      }
-      _error = 'Sin conexion. Movimiento encolado para sincronizar.';
+      _error = 'Sin conexion. No se pudo procesar la deteccion.';
       _cargando = false;
       notifyListeners();
       return false;
@@ -112,5 +110,77 @@ class InventarioProvider extends ChangeNotifier {
       await cargarInventario();
     }
     return count;
+  }
+
+  Future<bool> crearProducto(Map<String, dynamic> payload) async {
+    try {
+      await _productService.createProduct(payload);
+      await cargarInventario();
+      return true;
+    } catch (e) {
+      _error = 'No se pudo registrar el producto';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> actualizarProducto(
+      int id, Map<String, dynamic> payload) async {
+    try {
+      await _productService.updateProduct(id, payload);
+      await cargarInventario();
+      return true;
+    } catch (e) {
+      _error = 'No se pudo actualizar el producto';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> desactivarProducto(int id) async {
+    try {
+      await _productService.deactivateProduct(id);
+      await cargarInventario();
+      return true;
+    } catch (e) {
+      _error = 'No se pudo dar de baja el producto';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> actualizarStockMinimo(int id, int stockMinimo) async {
+    try {
+      await _productService.updateStockMinimo(id, stockMinimo);
+      await cargarInventario();
+      return true;
+    } catch (e) {
+      _error = 'No se pudo actualizar el stock minimo';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> registrarMovimiento({
+    required int productoId,
+    required String tipo,
+    required int cantidad,
+    String origen = 'manual',
+  }) async {
+    try {
+      await _productService.registrarMovimiento(
+        productoId: productoId,
+        tipo: tipo,
+        cantidad: cantidad,
+        origen: origen,
+      );
+      await cargarInventario();
+      await cargarHistorial();
+      return true;
+    } catch (e) {
+      _error = 'No se pudo registrar el movimiento';
+      notifyListeners();
+      return false;
+    }
   }
 }

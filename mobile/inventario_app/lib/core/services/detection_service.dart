@@ -16,11 +16,15 @@ class DetectionService {
         .toList();
   }
 
-  Future<ResultadoInferencia> detectFromUpload(String imagePath) async {
+  Future<ResultadoInferencia> detectFromUpload(
+    List<int> bytes,
+    String fileName,
+  ) async {
     final json = await _apiClient.postMultipart(
       ApiConfig.inferencia,
       fieldName: 'imagen',
-      filePath: imagePath,
+      fileName: fileName,
+      bytes: bytes,
     );
     return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
   }

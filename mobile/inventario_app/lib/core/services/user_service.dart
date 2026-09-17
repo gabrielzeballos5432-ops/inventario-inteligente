@@ -1,5 +1,3 @@
-import '../config/api_config.dart';
-import '../models/branch_option.dart';
 import '../models/role_option.dart';
 import '../models/user_account.dart';
 import '../network/api_client.dart';
@@ -25,16 +23,8 @@ class UserService {
         .toList();
   }
 
-  Future<List<BranchOption>> fetchBranches() async {
-    final json =
-        await _apiClient.getJson('/api/usuarios/sucursales') as List<dynamic>;
-    return json
-        .map((item) => BranchOption.fromJson(item as Map<String, dynamic>))
-        .toList();
-  }
-
   Future<UserAccount> createUser(Map<String, dynamic> payload) async {
-    final json = await _apiClient.postJson('/api/auth/registro', payload);
+    final json = await _apiClient.postJson('/api/usuarios/', payload);
     return UserAccount.fromJson(json as Map<String, dynamic>);
   }
 

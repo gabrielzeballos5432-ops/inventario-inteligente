@@ -1,3 +1,5 @@
+import 'json_utils.dart';
+
 class Deteccion {
   final int productoId;
   final String productoNombre;
@@ -15,7 +17,7 @@ class Deteccion {
     return Deteccion(
       productoId: json['producto_id'] as int,
       productoNombre: json['producto_nombre'] as String? ?? '',
-      confianza: (json['confianza'] as num?)?.toDouble() ?? 0,
+      confianza: parseDouble(json['confianza']),
       cantidad: json['cantidad'] as int? ?? 1,
     );
   }
@@ -90,7 +92,7 @@ class Movimiento {
       'producto_id': productoId,
       'tipo': tipo,
       'cantidad': cantidad,
-      'origen': origen ?? 'offline',
+      'origen': origen ?? 'manual',
     };
   }
 }
