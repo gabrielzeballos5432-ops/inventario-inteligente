@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,6 +19,12 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> {
   int _currentIndex = 0;
 
+  // Solo celular (Android/iOS nativo) tiene camara; laptop y web usan archivo.
+  bool get _esDispositivoMovil =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
   List<_ShellTab> _buildTabs() {
     final auth = context.read<AuthProvider>();
     final tabs = <_ShellTab>[
@@ -37,15 +44,16 @@ class _ShellPageState extends State<ShellPage> {
           label: 'Productos',
         ),
       ),
-      const _ShellTab(
+      _ShellTab(
         title: 'Deteccion',
-        page: DetectionPage(),
+        page: const DetectionPage(),
         destination: NavigationDestination(
-          icon: Icon(Icons.photo_camera_back_outlined),
+          icon: Icon(_esDispositivoMovil
+              ? Icons.photo_camera_back_outlined
+              : Icons.image_search_outlined),
           label: 'Deteccion',
         ),
-      ),
-      const _ShellTab(
+      ),      const _ShellTab(
         title: 'Historial',
         page: HistoryPage(),
         destination: NavigationDestination(

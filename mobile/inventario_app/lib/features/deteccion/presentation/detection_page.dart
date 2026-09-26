@@ -1,8 +1,6 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/inventario_provider.dart';
@@ -19,7 +17,13 @@ class _DetectionPageState extends State<DetectionPage> {
   final _picker = ImagePicker();
 
   bool _capturando = false;
-  XFile? _capturedImage;
+  Uint8List? _imageBytes;
+
+  // Solo celular tiene camara; en laptop y web se selecciona un archivo.
+  bool get _soportaCamara =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   Future<void> _captureAndDetect() async {
     setState(() {
@@ -28,7 +32,7 @@ class _DetectionPageState extends State<DetectionPage> {
 
     try {
       final image = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: _soportaCamara ? ImageSource.camera : ImageSource.gallery,
         imageQuality: 85,
         maxWidth: 1920,
         maxHeight: 1920,
@@ -38,9 +42,10 @@ class _DetectionPageState extends State<DetectionPage> {
         return;
       }
 
-      setState(() => _capturedImage = image);
+      final bytes = await image.readAsBytes();
+      setState(() => _imageBytes = bytes);
 
-      await context.read<InventarioProvider>().enviarImagen(image.path);
+      await context.read<InventarioProvider>().enviarImagen(bytes, image.name);
 
       if (!mounted) return;
       setState(() => _capturando = false);
@@ -65,9 +70,11 @@ class _DetectionPageState extends State<DetectionPage> {
           style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Toma una foto para detectar productos y registrar salida de inventario.',
-          style: TextStyle(color: Colors.white70),
+        Text(
+          _soportaCamara
+              ? 'Toma una foto para detectar productos y registrar entrada de inventario.'
+              : 'Selecciona una imagen de los productos para detectarlos y registrar la entrada de inventario. La captura con camara esta disponible en la aplicacion movil.',
+          style: const TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 20),
         SectionCard(
@@ -83,20 +90,26 @@ class _DetectionPageState extends State<DetectionPage> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.camera_alt_outlined),
-                  label: Text(_capturando ? 'Procesando...' : 'Tomar foto y detectar'),
+                      : Icon(_soportaCamara
+                          ? Icons.camera_alt_outlined
+                          : Icons.image_outlined),
+                  label: Text(_capturando
+                      ? 'Procesando...'
+                      : (_soportaCamara
+                          ? 'Tomar foto y detectar'
+                          : 'Seleccionar imagen y detectar')),
                 ),
               ),
             ],
           ),
         ),
-        if (_capturedImage != null) ...[
+        if (_imageBytes != null) ...[
           const SizedBox(height: 16),
           SectionCard(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
-              child: Image.file(
-                File(_capturedImage!.path),
+              child: Image.memory(
+                _imageBytes!,
                 height: 240,
                 fit: BoxFit.cover,
               ),
@@ -154,7 +167,7 @@ class _DetectionPageState extends State<DetectionPage> {
           if (resultado.movimientosCreados > 0)
             SectionCard(
               child: Text(
-                '${resultado.movimientosCreados} movimiento(s) de salida registrado(s) automaticamente.',
+                '${resultado.movimientosCreados} movimiento(s) de entrada registrado(s) automaticamente.',
                 style: const TextStyle(color: Colors.green),
               ),
             ),

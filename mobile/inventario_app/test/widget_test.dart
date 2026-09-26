@@ -1,9 +1,46 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
 import 'package:inventario_app/app/inventario_app.dart';
+import 'package:inventario_app/core/network/api_client.dart';
+import 'package:inventario_app/core/providers/auth_provider.dart';
+import 'package:inventario_app/core/providers/inventario_provider.dart';
+import 'package:inventario_app/core/services/auth_service.dart';
+import 'package:inventario_app/core/services/detection_service.dart';
+import 'package:inventario_app/core/services/local_db_service.dart';
+import 'package:inventario_app/core/services/product_service.dart';
+import 'package:inventario_app/core/services/sync_service.dart';
 
 void main() {
-  testWidgets('renderiza la app principal', (WidgetTester tester) async {
-    await tester.pumpWidget(const InventarioApp());
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
+  testWidgets('muestra la pantalla de login sin sesion', (tester) async {
+    final apiClient = ApiClient();
+    final localDb = LocalDbService();
+    final syncService = SyncService(apiClient, localDb);
+    final inventarioProvider = InventarioProvider(
+      ProductService(apiClient),
+      DetectionService(apiClient),
+      localDb,
+      syncService,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => AuthProvider(AuthService(apiClient))..tryAutoLogin(),
+          ),
+          ChangeNotifierProvider.value(value: inventarioProvider),
+        ],
+        child: const InventarioApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Iniciar sesion'), findsOneWidget);
   });
 }
