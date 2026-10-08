@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/auth_provider.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -128,6 +129,14 @@ class _LoginPageState extends State<LoginPage> {
                               style: const TextStyle(color: Colors.redAccent),
                             ),
                           ],
+                          const SizedBox(height: 8),
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: () => mostrarDialogoServidor(context),
+                              icon: const Icon(Icons.dns_outlined, size: 18),
+                              label: const Text('Configurar servidor'),
+                            ),
+                          ),
                         ],
                       ),
                     ),

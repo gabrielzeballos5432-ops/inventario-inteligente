@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'app/inventario_app.dart';
+import 'core/config/api_config.dart';
 import 'core/db/db_bootstrap.dart'
     if (dart.library.io) 'core/db/db_bootstrap_io.dart';
 import 'core/providers/auth_provider.dart';
@@ -14,8 +15,11 @@ import 'core/services/product_service.dart';
 import 'core/services/detection_service.dart';
 import 'core/services/connectivity_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Servidor configurado desde la app (si cambia la IP del PC no hay que recompilar).
+  await ApiConfig.init();
 
   // Escritorio: SQLite via FFI. Web: no-op (BD local en memoria).
   initLocalDatabase();

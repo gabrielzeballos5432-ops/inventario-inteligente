@@ -17,8 +17,8 @@ El entorno activo es **100% local**, no Docker:
 - **BD principal**: servicio de Windows `postgresql-x64-18` (PostgreSQL 18) en `localhost:5432`, BD `inventario_db`, usuario `admin_user`/`admin_password` (ver `backend/.env.example`); esquema canónico en `backend/app/db/inventario_db.sql`. pgAdmin 4 viene con la instalación de PostgreSQL.
 - **`docker-compose.yml` usa el MISMO puerto 5432** con credenciales distintas (`zoom_user`): **nunca** correr la BD de Docker junto con la local. Docker queda solo como alternativa/respaldo; `scripts/backup.ps1` usa `pg_dump` de Windows (`C:\Program Files\PostgreSQL\18\bin`), no Docker.
 - Lanzador único: `.\start-dev.ps1` (verifica PG, arranca backend + app). Flags: `-Web` (navegador), `-Windows` (escritorio), `-SinApp`, `-Detener`.
-- Backend en local: `cd backend; .\venv\Scripts\Activate; python -m alembic -c alembic.ini upgrade head; uvicorn app.main:app --reload --port 8001`. El arranque también crea tablas y siembra datos (roles, categorías, marcas, admin).
-- **El backend va en el puerto 8001, NO 8000**: el 8000 lo ocupa Laravel Herd (PHP) del usuario, que lo necesita para otro proyecto. Si el 8001 aparece ocupado, buscar el proceso con `netstat -ano | findstr :8001`.
+- Backend en local: `cd backend; .\venv\Scripts\Activate; python -m alembic -c alembic.ini upgrade head; uvicorn app.main:app --reload --port 8000`. El arranque también crea tablas y siembra datos (roles, categorías, marcas, admin). Para **celular físico** hace falta `--host 0.0.0.0` (si no, solo escucha en 127.0.0.1 y el celular no conecta).
+- **El backend va en el puerto 8000** (puerto estándar de FastAPI). Si aparece ocupado, casi siempre es otro servidor local (por ejemplo Laravel Herd): identificar el proceso con `netstat -ano | findstr :8000`. Para no detener ese servicio, se puede levantar el backend en otro puerto y usar `--dart-define=API_BASE_URL=http://10.0.2.2:<PUERTO>` en la app.
 
 ## Comandos de verificación
 
@@ -26,7 +26,7 @@ Backend **no tiene tests ni linter** (solo `requirements.txt`, sin ruff/mypy/pyp
 
 ```powershell
 # login (creado por el seed)
-POST http://localhost:8001/api/auth/login  {"email":"admin@zoom.com","password":"Admin12345"}
+POST http://localhost:8000/api/auth/login  {"email":"admin@zoom.com","password":"Admin12345"}
 ```
 
 Flutter (barra: **0 errores**; hay ~27 issues info/warning preexistentes, el CI los tolera):
@@ -34,7 +34,7 @@ Flutter (barra: **0 errores**; hay ~27 issues info/warning preexistentes, el CI 
 ```powershell
 cd mobile/inventario_app
 flutter analyze --no-fatal-infos --no-fatal-warnings   # igual que CI
-flutter test                                           # 1 widget test (login)
+flutter test                                           # 4 tests (3 de modelo + 1 widget de login)
 flutter build web                                      # compila limpio
 ```
 
@@ -43,7 +43,8 @@ Orden recomendado tras tocar la app: `flutter analyze` → `flutter test` → (s
 ## Peculiaridades de Flutter
 
 - `pubspec.lock` está **gitignored** (poco común): siempre `flutter pub get` tras clonar.
-- URL del API: `ApiConfig.baseUrl` decide en runtime (Android → `http://10.0.2.2:8001`, resto → `http://localhost:8001`); override con `--dart-define=API_BASE_URL=...`.
+- URL del API (`ApiConfig.baseUrl`), por prioridad: 1) valor guardado en `SharedPreferences` (`api_base_url`) desde el diálogo **"Configurar servidor"** (icono servidor en la barra superior y en el login) — sirve para cambiar la IP del PC **sin recompilar**; 2) `--dart-define=API_BASE_URL=...`; 3) default por plataforma (Android → `http://10.0.2.2:8000`, resto → `http://localhost:8000`).
+- **Celular físico (no emulador)**: `10.0.2.2` no existe fuera del emulador. La PC usa IP fija **192.168.100.43** (DHCP deshabilitado en el adaptador Wi-Fi, `netsh interface ipv4 set address ... static`), el backend debe correr con `--host 0.0.0.0 --port 8000`, y el APK se compila con `--dart-define=API_BASE_URL=http://192.168.100.43:8000`. Si algún día cambia la IP, no hay que recompilar: se cambia desde "Configurar servidor" en la app.
 - Multiplataforma: la **cámara solo existe en Android/iOS**; web y escritorio usan selector de archivos (`kIsWeb`/`defaultTargetPlatform` en `detection_page.dart` y `shell_page.dart`).
 - Importaciones condicionales — no romperlas:
   - `core/db/db_bootstrap.dart` (web, no-op) vs `db_bootstrap_io.dart` (desktop: sqflite FFI).

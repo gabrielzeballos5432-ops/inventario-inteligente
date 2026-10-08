@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/auth_provider.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import '../../deteccion/presentation/detection_page.dart';
 import '../../historial/presentation/history_page.dart';
@@ -99,6 +100,11 @@ class _ShellPageState extends State<ShellPage> {
                 style: const TextStyle(fontSize: 13, color: Colors.white70),
               ),
             ),
+          ),
+          IconButton(
+            tooltip: 'Configurar servidor',
+            onPressed: () => mostrarDialogoServidor(context),
+            icon: const Icon(Icons.dns_outlined),
           ),
           IconButton(
             tooltip: 'Cerrar sesion',
