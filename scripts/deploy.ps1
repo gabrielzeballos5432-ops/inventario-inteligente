@@ -49,11 +49,11 @@ $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
 
 Write-Host ""
 Write-Host "=== SISTEMA DESPLEGADO ===" -ForegroundColor Green
-Write-Host "API local:      http://localhost:8001"
-Write-Host "Docs Swagger:   http://localhost:8001/docs"
+Write-Host "API local:      http://localhost:8000"
+Write-Host "Docs Swagger:   http://localhost:8000/docs"
 if ($ips) {
-    Write-Host "API en la red:  http://$($ips[0]):8001  (usar esta IP en la app movil)"
+    Write-Host "API en la red:  http://$($ips[0]):8000  (usar esta IP en la app movil)"
 }
 Write-Host ""
 Write-Host "Para la app movil usa:"
-Write-Host "  flutter run --dart-define=API_BASE_URL=http://IP_DE_LA_LAPTOP:8001" -ForegroundColor Cyan
+Write-Host "  flutter run --dart-define=API_BASE_URL=http://IP_DE_LA_LAPTOP:8000" -ForegroundColor Cyan

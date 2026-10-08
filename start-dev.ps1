@@ -57,7 +57,7 @@ if (Test-Path '.\venv\Scripts\Activate.ps1') {
     & '.\venv\Scripts\Activate.ps1'
 }
 python -m alembic -c alembic.ini upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 "@
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCommand
 
@@ -67,7 +67,7 @@ $ready = $false
 for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 1
     try {
-        $null = Invoke-RestMethod -Uri "http://localhost:8001/api/auth/login" -Method Post -ContentType "application/json" -Body '{"email":"admin@zoom.com","password":"Admin12345"}' -TimeoutSec 2
+        $null = Invoke-RestMethod -Uri "http://localhost:8000/api/auth/login" -Method Post -ContentType "application/json" -Body '{"email":"admin@zoom.com","password":"Admin12345"}' -TimeoutSec 2
         $ready = $true
         break
     } catch {
@@ -78,8 +78,8 @@ for ($i = 0; $i -lt 30; $i++) {
 if (-not $ready) {
     Write-Host "El backend aun no responde. Revisa la ventana del backend para errores." -ForegroundColor Yellow
 } else {
-    Write-Host "Backend listo en http://localhost:8001" -ForegroundColor Green
-    Write-Host "Swagger: http://localhost:8001/docs" -ForegroundColor Green
+    Write-Host "Backend listo en http://localhost:8000" -ForegroundColor Green
+    Write-Host "Swagger: http://localhost:8000/docs" -ForegroundColor Green
 }
 
 # Iniciar la app (opcional)
@@ -100,7 +100,7 @@ flutter run -d chrome
         Write-Host "== Iniciando app movil (emulador Android) ==" -ForegroundColor Cyan
         $flutterCommand = @"
 Set-Location '$mobilePath'
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 "@
     }
     Start-Process powershell -ArgumentList "-NoExit", "-Command", $flutterCommand
@@ -109,13 +109,13 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
 Write-Host ""
 Write-Host "=== DESARROLLO INICIADO (local) ===" -ForegroundColor Green
 Write-Host "PostgreSQL local:  localhost:5432 (inventario_db)"
-Write-Host "Backend:           http://localhost:8001  |  /docs"
+Write-Host "Backend:           http://localhost:8000  |  /docs"
 if ($Windows) {
-    Write-Host "App:               Windows (localhost:8001)"
+    Write-Host "App:               Windows (localhost:8000)"
 } elseif ($Web) {
-    Write-Host "App:               Navegador (localhost:8001)"
+    Write-Host "App:               Navegador (localhost:8000)"
 } else {
-    Write-Host "App movil:         emulador Android (10.0.2.2:8001)"
+    Write-Host "App movil:         emulador Android (10.0.2.2:8000)"
 }
 Write-Host ""
 Write-Host "Para cerrar el backend: .\start-dev.ps1 -Detener" -ForegroundColor Cyan

@@ -25,7 +25,7 @@ services:
     container_name: inventario_backend
     restart: unless-stopped
     ports:
-      - "8001:8000"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy

@@ -38,10 +38,10 @@ La base `inventario_db` vive en el PostgreSQL de Windows (puerto 5432), usuario 
 cd backend
 .\venv\Scripts\Activate
 python -m alembic -c alembic.ini upgrade head
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --port 8000
 ```
 
-La API queda en `http://localhost:8001` y la documentacion Swagger en `http://localhost:8001/docs`.
+La API queda en `http://localhost:8000` y la documentacion Swagger en `http://localhost:8000/docs`.
 
 El esquema de base de datos de referencia es `backend/app/db/inventario_db.sql`. Al iniciar se aplican las migraciones Alembic y se siembran datos iniciales (roles, categorias, marcas y el usuario `admin@zoom.com` / `Admin12345`).
 
@@ -50,13 +50,13 @@ El esquema de base de datos de referencia es `backend/app/db/inventario_db.sql`.
 ```powershell
 cd mobile\inventario_app
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
 En un dispositivo real apunta a la IP del equipo donde corre el backend:
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8001
+flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8000
 ```
 
 ### 4. Aplicacion en Web (navegador)
@@ -68,11 +68,11 @@ cd mobile\inventario_app
 flutter run -d chrome
 ```
 
-La app abre en el navegador apuntando a `localhost:8001` (sin camara: la deteccion usa imagenes de disco).
+La app abre en el navegador apuntando a `localhost:8000` (sin camara: la deteccion usa imagenes de disco).
 
 ### 5. Aplicacion en Windows (laptop)
 
-Requiere Visual Studio con la carga "Desarrollo de escritorio con C++". La app corre en la laptop conectada al backend local (`localhost:8001` por defecto), sin el modulo de camara (la deteccion usa imagenes de disco):
+Requiere Visual Studio con la carga "Desarrollo de escritorio con C++". La app corre en la laptop conectada al backend local (`localhost:8000` por defecto), sin el modulo de camara (la deteccion usa imagenes de disco):
 
 ```powershell
 cd mobile\inventario_app

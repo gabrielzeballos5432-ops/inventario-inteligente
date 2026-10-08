@@ -17,20 +17,20 @@ Aplicacion Flutter del sistema de inventario inteligente para Salon de Belleza Z
 
 ```powershell
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
 En un dispositivo real apunta a la IP del backend:
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8001
+flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8000
 ```
 
-La variable `API_BASE_URL` es opcional en el emulador (`10.0.2.2:8001` es el default), en Windows y en web (`localhost:8001` es el default).
+La variable `API_BASE_URL` es opcional en el emulador (`10.0.2.2:8000` es el default), en Windows y en web (`localhost:8000` es el default).
 
 ## Ejecutar en Web (navegador)
 
-No requiere herramientas adicionales (sin Visual Studio). El backend debe estar corriendo en `localhost:8001`:
+No requiere herramientas adicionales (sin Visual Studio). El backend debe estar corriendo en `localhost:8000`:
 
 ```powershell
 flutter pub get
@@ -65,7 +65,7 @@ flutter pub get
 flutter run -d windows
 ```
 
-La app se conecta a `http://localhost:8001` por defecto (el backend debe estar corriendo en la misma laptop). Si el backend esta en otro equipo, usa `--dart-define=API_BASE_URL=http://IP_DEL_BACKEND:8001`.
+La app se conecta a `http://localhost:8000` por defecto (el backend debe estar corriendo en la misma laptop). Si el backend esta en otro equipo, usa `--dart-define=API_BASE_URL=http://IP_DEL_BACKEND:8000`.
 
 Diferencias respecto a Android:
 
@@ -75,7 +75,7 @@ Diferencias respecto a Android:
 ## Compilar APK de distribucion
 
 ```powershell
-flutter build apk --release --dart-define=API_BASE_URL=http://IP_DEL_BACKEND:8001
+flutter build apk --release --dart-define=API_BASE_URL=http://IP_DEL_BACKEND:8000
 ```
 
 El APK queda en `build/app/outputs/flutter-apk/app-release.apk`.
@@ -83,7 +83,7 @@ El APK queda en `build/app/outputs/flutter-apk/app-release.apk`.
 ## Compilar ejecutable de Windows
 
 ```powershell
-flutter build windows --release --dart-define=API_BASE_URL=http://IP_DEL_BACKEND:8001
+flutter build windows --release --dart-define=API_BASE_URL=http://IP_DEL_BACKEND:8000
 ```
 
 El ejecutable queda en `build\windows\x64\runner\Release\inventario_app.exe`.

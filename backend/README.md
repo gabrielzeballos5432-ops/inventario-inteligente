@@ -40,7 +40,7 @@ cd backend
 .\venv\Scripts\Activate
 pip install -r requirements.txt
 python -m alembic -c alembic.ini upgrade head
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --port 8000
 ```
 
 Al iniciar, la aplicacion siembra datos iniciales (roles `administrador`/`vendedor`, categorias y marcas base, y el usuario `admin@zoom.com` / `Admin12345`).
@@ -99,4 +99,4 @@ Copia `.env.example` a `.env` y ajusta:
 
 ## App movil
 
-El frontend movil esta en `mobile/inventario_app`. La app apunta por defecto a `http://10.0.2.2:8001` (emulador Android); usa `--dart-define=API_BASE_URL=http://IP_LOCAL:8001` en un dispositivo real.
+El frontend movil esta en `mobile/inventario_app`. La app apunta por defecto a `http://10.0.2.2:8000` (emulador Android); usa `--dart-define=API_BASE_URL=http://IP_LOCAL:8000` en un dispositivo real.
