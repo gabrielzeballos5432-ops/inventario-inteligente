@@ -61,3 +61,11 @@ class ProductoUpdate(BaseModel):
 class ProductoStockOut(ProductoOut):
     stock_actual: int = 0
     stock_bajo: bool = False
+
+
+class ValorizacionOut(BaseModel):
+    productos_activos: int = 0
+    unidades_totales: int = 0
+    productos_stock_bajo: int = 0
+    valorizado_costo: Decimal = Decimal("0")
+    valorizado_venta: Decimal = Decimal("0")
