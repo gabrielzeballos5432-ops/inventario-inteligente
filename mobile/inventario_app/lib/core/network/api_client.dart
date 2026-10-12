@@ -59,6 +59,16 @@ class ApiClient {
     return utf8.decode(response.bodyBytes);
   }
 
+  Future<List<int>> getBytes(String path,
+      {Map<String, String>? query}) async {
+    final response = await _httpClient.get(
+      _buildUri(path, query),
+      headers: _buildHeaders(includeJson: false),
+    );
+    _ensureSuccess(response);
+    return response.bodyBytes;
+  }
+
   Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
     final response = await _httpClient.post(
       _buildUri(path),

@@ -16,7 +16,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<InventarioProvider>().cargarInventario();
+      final provider = context.read<InventarioProvider>();
+      provider.cargarInventario();
+      provider.cargarValorizacion();
     });
   }
 
@@ -25,6 +27,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final inventario = context.watch<InventarioProvider>();
     final productos = inventario.productos;
     final stockBajo = productos.where((p) => p.stockBajo).toList();
+    final valorizacion = inventario.valorizacion;
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -56,8 +59,28 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               _MetricTile(label: 'Productos', value: '${productos.length}'),
               _MetricTile(label: 'Stock bajo', value: '${stockBajo.length}'),
+              _MetricTile(
+                label: 'Valorizado (costo)',
+                value: valorizacion == null
+                    ? '-'
+                    : 'Bs. ${valorizacion.valorizadoCosto.toStringAsFixed(2)}',
+              ),
+              _MetricTile(
+                label: 'Valorizado (venta)',
+                value: valorizacion == null
+                    ? '-'
+                    : 'Bs. ${valorizacion.valorizadoVenta.toStringAsFixed(2)}',
+              ),
             ],
           ),
+          if (valorizacion != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${valorizacion.productosActivos} productos activos, '
+              '${valorizacion.unidadesTotales} unidades en total.',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
           const SizedBox(height: 16),
           SectionCard(
             child: Column(

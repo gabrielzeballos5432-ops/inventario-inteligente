@@ -132,11 +132,18 @@ class ProductService {
         .toList();
   }
 
-  Future<String> exportarStock() async {
-    return _apiClient.getRaw(ApiConfig.exportarStock);
+  Future<List<int>> exportarStock({String formato = 'csv'}) async {
+    return _apiClient.getBytes(ApiConfig.exportarStock,
+        query: {'formato': formato});
   }
 
-  Future<String> exportarMovimientos() async {
-    return _apiClient.getRaw(ApiConfig.exportarMovimientos);
+  Future<List<int>> exportarMovimientos({String formato = 'csv'}) async {
+    return _apiClient.getBytes(ApiConfig.exportarMovimientos,
+        query: {'formato': formato});
+  }
+
+  Future<ValorizacionInventario> valorizacion() async {
+    final json = await _apiClient.getJson(ApiConfig.valorizacion);
+    return ValorizacionInventario.fromJson(json as Map<String, dynamic>);
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/product.dart';
 import '../models/detection_record.dart';
+import '../network/api_client.dart';
 import '../services/product_service.dart';
 import '../services/detection_service.dart';
 import '../services/local_db_service.dart';
@@ -16,6 +17,8 @@ class InventarioProvider extends ChangeNotifier {
   List<ProductoConStock> _productos = [];
   List<Movimiento> _historial = [];
   ResultadoInferencia? _ultimaInferencia;
+  ValorizacionInventario? _valorizacion;
+  bool? _yoloDisponible;
   bool _cargando = false;
   String? _error;
 
@@ -29,6 +32,8 @@ class InventarioProvider extends ChangeNotifier {
   List<ProductoConStock> get productos => _productos;
   List<Movimiento> get historial => _historial;
   ResultadoInferencia? get ultimaInferencia => _ultimaInferencia;
+  ValorizacionInventario? get valorizacion => _valorizacion;
+  bool? get yoloDisponible => _yoloDisponible;
   bool get cargando => _cargando;
   String? get error => _error;
   ProductService get productService => _productService;
@@ -96,12 +101,41 @@ class InventarioProvider extends ChangeNotifier {
       notifyListeners();
       await cargarInventario();
       return true;
+    } on ApiException catch (e) {
+      _error = e.statusCode == 503
+          ? 'El reconocimiento con IA aun no esta activo: falta el modelo '
+              'entrenado en el servidor. Puedes registrar el producto a mano '
+              'desde la pestaña Productos.'
+          : 'El servidor rechazo la peticion (HTTP ${e.statusCode}).';
+      _cargando = false;
+      notifyListeners();
+      return false;
     } catch (e) {
       _error = 'Sin conexion. No se pudo procesar la deteccion.';
       _cargando = false;
       notifyListeners();
       return false;
     }
+  }
+
+  Future<void> cargarValorizacion() async {
+    try {
+      _valorizacion = await _productService.valorizacion();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('cargarValorizacion FALLA: $e');
+    }
+  }
+
+  Future<void> consultarEstadoServidor() async {
+    try {
+      final json = await _detectionService.salud();
+      _yoloDisponible = json['yolo_disponible'] as bool?;
+    } catch (e) {
+      _yoloDisponible = null;
+      debugPrint('consultarEstadoServidor FALLA: $e');
+    }
+    notifyListeners();
   }
 
   Future<int> sincronizar() async {

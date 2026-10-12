@@ -28,4 +28,9 @@ class DetectionService {
     );
     return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
   }
+
+  Future<Map<String, dynamic>> salud() async {
+    final json = await _apiClient.getJson(ApiConfig.salud);
+    return json as Map<String, dynamic>;
+  }
 }

@@ -64,4 +64,6 @@ class ApiConfig {
   static const String reporteMovimientos = '/api/reportes/movimientos';
   static const String exportarStock = '/api/reportes/exportar-stock';
   static const String exportarMovimientos = '/api/reportes/exportar-movimientos';
+  static const String valorizacion = '/api/reportes/valorizacion';
+  static const String salud = '/api/health';
 }

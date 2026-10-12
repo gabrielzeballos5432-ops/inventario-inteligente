@@ -147,3 +147,29 @@ class ProductoConStock extends Product {
     );
   }
 }
+
+class ValorizacionInventario {
+  final int productosActivos;
+  final int unidadesTotales;
+  final int productosStockBajo;
+  final double valorizadoCosto;
+  final double valorizadoVenta;
+
+  ValorizacionInventario({
+    required this.productosActivos,
+    required this.unidadesTotales,
+    required this.productosStockBajo,
+    required this.valorizadoCosto,
+    required this.valorizadoVenta,
+  });
+
+  factory ValorizacionInventario.fromJson(Map<String, dynamic> json) {
+    return ValorizacionInventario(
+      productosActivos: json['productos_activos'] as int? ?? 0,
+      unidadesTotales: json['unidades_totales'] as int? ?? 0,
+      productosStockBajo: json['productos_stock_bajo'] as int? ?? 0,
+      valorizadoCosto: parseDouble(json['valorizado_costo']),
+      valorizadoVenta: parseDouble(json['valorizado_venta']),
+    );
+  }
+}
