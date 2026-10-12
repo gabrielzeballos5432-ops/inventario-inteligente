@@ -62,3 +62,14 @@ async def root():
         "version": settings.VERSION,
         "documentacion": "/docs",
     }
+
+
+@app.get("/api/health")
+async def health():
+    """Estado del servidor. yolo_disponible=false mientras no exista best.pt."""
+    return {
+        "estado": "ok",
+        "servidor": settings.APP_NAME,
+        "version": settings.VERSION,
+        "yolo_disponible": InferenceService().modelo_disponible,
+    }

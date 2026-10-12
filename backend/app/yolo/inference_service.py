@@ -35,6 +35,10 @@ class InferenceService:
             return settings.YOLO_CLASS_MAP
         return MAPA_CLASES_YOLO
 
+    @property
+    def modelo_disponible(self) -> bool:
+        return InferenceService._modelo is not None
+
     def cargar_modelo(self) -> None:
         ruta = settings.YOLO_MODEL_PATH
         if not Path(ruta).exists():
@@ -43,10 +47,10 @@ class InferenceService:
                 "Coloca tu modelo entrenado en esa ruta o ajusta YOLO_MODEL_PATH.",
                 ruta,
             )
-            self._modelo = None
+            InferenceService._modelo = None
             return
         logger.info("Cargando modelo YOLO desde %s", ruta)
-        self._modelo = YOLO(ruta)
+        InferenceService._modelo = YOLO(ruta)
         logger.info("Modelo YOLO cargado exitosamente")
 
     @property
