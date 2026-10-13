@@ -7,7 +7,10 @@ import '../../../core/models/detection_record.dart';
 import '../../../core/providers/inventario_provider.dart';
 import '../../../core/services/product_service.dart';
 import '../../../core/session/session_controller.dart';
+import '../../../core/utils/descarga_reporte.dart'
+    if (dart.library.io) '../../../core/utils/descarga_reporte_io.dart';
 import '../../../shared/widgets/section_card.dart';
+import 'barcode_scanner_page.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
@@ -81,6 +84,11 @@ return ListView(
               icon: const Icon(Icons.refresh),
               tooltip: 'Recargar',
               onPressed: () => inventario.cargarInventario(),
+            ),
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Escanear codigo',
+              onPressed: _escanearCodigo,
             ),
             IconButton(
               icon: const Icon(Icons.description_outlined),
@@ -376,6 +384,23 @@ Future<void> _openCategoriasDialog(BuildContext context) async {
         service: context.read<InventarioProvider>().productService,
       ),
     );
+  }
+
+  Future<void> _escanearCodigo() async {
+    final codigo = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeScannerPage(
+          onDetectado: (codigo) {
+            _searchController.text = codigo;
+            setState(() => _textoBusqueda = codigo);
+          },
+        ),
+      ),
+    );
+    if (codigo != null) {
+      _searchController.text = codigo;
+      setState(() => _textoBusqueda = codigo);
+    }
   }
 }
 
@@ -831,14 +856,40 @@ class _ReportesDialogState extends State<_ReportesDialog> {
     });
   }
 
-  Future<void> _exportarStock() async {
-    final csv = await widget.service.exportarStock();
-    _mostrarMensaje('Reporte de stock exportado (CSV).');
+  Future<void> _exportar(
+    Future<List<int>> Function() obtenerBytes,
+    String nombreBase,
+    String formato,
+  ) async {
+    try {
+      final bytes = await obtenerBytes();
+      final mimeType = formato == 'xlsx'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv';
+      final ruta =
+          await descargarReporte(bytes, '$nombreBase.$formato', mimeType);
+      _mostrarMensaje(ruta == null
+          ? 'Reporte $nombreBase.$formato listo para compartir.'
+          : 'Reporte guardado en: $ruta');
+    } catch (e) {
+      _mostrarMensaje('No se pudo exportar: $e');
+    }
   }
 
-  Future<void> _exportarMovimientos() async {
-    final csv = await widget.service.exportarMovimientos();
-    _mostrarMensaje('Reporte de movimientos exportado (CSV).');
+  Future<void> _exportarStock(String formato) {
+    return _exportar(
+      () => widget.service.exportarStock(formato: formato),
+      'reporte_stock',
+      formato,
+    );
+  }
+
+  Future<void> _exportarMovimientos(String formato) {
+    return _exportar(
+      () => widget.service.exportarMovimientos(formato: formato),
+      'reporte_movimientos',
+      formato,
+    );
   }
 
   void _mostrarMensaje(String msg) {
@@ -862,9 +913,14 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.download),
+                  icon: const Icon(Icons.description_outlined),
                   tooltip: 'Exportar CSV',
-                  onPressed: _exportarStock,
+                  onPressed: () => _exportarStock('csv'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.table_chart_outlined),
+                  tooltip: 'Exportar Excel',
+                  onPressed: () => _exportarStock('xlsx'),
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
@@ -914,9 +970,14 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.download),
+                  icon: const Icon(Icons.description_outlined),
                   tooltip: 'Exportar CSV',
-                  onPressed: _exportarMovimientos,
+                  onPressed: () => _exportarMovimientos('csv'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.table_chart_outlined),
+                  tooltip: 'Exportar Excel',
+                  onPressed: () => _exportarMovimientos('xlsx'),
                 ),
               ],
             ),

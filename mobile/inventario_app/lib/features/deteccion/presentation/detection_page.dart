@@ -19,6 +19,14 @@ class _DetectionPageState extends State<DetectionPage> {
   bool _capturando = false;
   Uint8List? _imageBytes;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<InventarioProvider>().consultarEstadoServidor();
+    });
+  }
+
   // Solo celular tiene camara; en laptop y web se selecciona un archivo.
   bool get _soportaCamara =>
       !kIsWeb &&
@@ -103,6 +111,50 @@ class _DetectionPageState extends State<DetectionPage> {
             ],
           ),
         ),
+        if (inventario.yoloDisponible == false) ...[
+          const SizedBox(height: 16),
+          SectionCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.amber),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Reconocimiento con IA pendiente',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'El servidor todavia no tiene el modelo entrenado '
+                        '(best.pt). Mientras tanto puedes registrar entradas '
+                        'y salidas a mano desde la pestaña Productos.',
+                        style: TextStyle(
+                            color: Colors.white70, fontSize: 13, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (inventario.yoloDisponible == true) ...[
+          const SizedBox(height: 16),
+          SectionCard(
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                const Text('Modelo de IA cargado. Deteccion activa.'),
+              ],
+            ),
+          ),
+        ],
         if (_imageBytes != null) ...[
           const SizedBox(height: 16),
           SectionCard(
@@ -121,6 +173,16 @@ class _DetectionPageState extends State<DetectionPage> {
           SectionCard(
             child: Text(
               inventario.error!,
+              style: const TextStyle(color: Colors.orange),
+            ),
+          ),
+        ],
+        if (resultado != null && resultado.detecciones.isEmpty) ...[
+          const SizedBox(height: 16),
+          SectionCard(
+            child: Text(
+              'No se reconocieron productos en la imagen. '
+              'Prueba con mejor iluminacion y acercando mas.',
               style: const TextStyle(color: Colors.orange),
             ),
           ),
