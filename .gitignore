@@ -43,6 +43,32 @@ backups/
 tecnico y original/
 revision-sistematica/
 
+# ---------------------------------------------------------------------------
+# Fuera del repositorio. El repo solo lleva el codigo de la app movil
+# (mobile/) y del backend (backend/). Todo lo demas es material de trabajo
+# que se conserva unicamente en esta maquina.
+# ---------------------------------------------------------------------------
+
+# Scripts auxiliares (generadores de diagramas UML, etc.). Los .ps1 de
+# operacion (backup, deploy, start-dev) si se versionan: son parte del repo.
+scripts/generar_*.py
+*.puml
+
+# Documentos de trabajo, notas y tablas de calculo.
+# Los README/AGENTS del codigo SI se versionan (ver excepciones abajo).
+*.md
+!README.md
+!AGENTS.md
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.csv
+
+# Entrenamientos de YOLOv8: pesos, curvas, resultados y argumentos.
+# *.pt ya estaba cubierto arriba; aqui va el resto del directorio runs/.
+runs/
+
 # OS
 .DS_Store
 Thumbs.db

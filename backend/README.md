@@ -78,6 +78,7 @@ Copia `.env.example` a `.env` y ajusta:
 - `DELETE /api/usuarios/{id}` desactiva un usuario (solo administrador).
 - `POST /api/usuarios/{id}/activar` reactiva un usuario (solo administrador).
 - `GET /api/categorias/` lista categorias.
+- `GET /api/categorias/{id}` detalle de una categoria.
 - `POST /api/categorias/` crea una categoria (solo administrador).
 - `PUT /api/categorias/{id}` actualiza una categoria (solo administrador).
 - `DELETE /api/categorias/{id}` desactiva una categoria (solo administrador).
@@ -93,9 +94,22 @@ Copia `.env.example` a `.env` y ajusta:
 - `POST /api/inventario/movimiento` registra un movimiento de stock: `tipo` acepta `entrada`, `salida` o `ajuste` (en ajuste, `cantidad` es el nuevo stock).
 - `GET /api/reportes/stock` reporte de stock actual.
 - `GET /api/reportes/movimientos` reporte de movimientos (filtros: `fecha_desde`, `fecha_hasta`).
-- `GET /api/reportes/exportar-stock` exporta el reporte de stock a CSV (solo administrador).
-- `GET /api/reportes/exportar-movimientos` exporta el reporte de movimientos a CSV (solo administrador).
-- `POST /api/inference/` sube una imagen de los productos de un estante y devuelve detecciones; registra automaticamente un movimiento de **entrada** (conteo) en el inventario y una sesion de camara. El campo `tipo_operacion` permite parametrizar `entrada` (default), `salida` o `conteo` para uso futuro.
+- `GET /api/reportes/valorizacion` valoriza el inventario a costo y a precio de venta.
+- `GET /api/reportes/exportar-stock` exporta el reporte de stock (solo administrador). El parametro `formato` acepta `csv` (default) o `xlsx`.
+- `GET /api/reportes/exportar-movimientos` exporta el reporte de movimientos (solo administrador). El parametro `formato` acepta `csv` (default) o `xlsx`.
+- `POST /api/inference/` sube una imagen de los productos de un estante y devuelve detecciones; registra automaticamente un movimiento de **entrada** (conteo) en el inventario y una sesion de camara. El campo `tipo_operacion` permite parametrizar `entrada` (default), `salida` o `conteo` para uso futuro. Devuelve **503** si el modelo no esta disponible.
+
+## Estado del servicio
+
+- `GET /api/health` informa si la API responde y si el modelo de vision esta cargado (`yolo_disponible`). La app lo consulta para distinguir "el servidor esta caido" de "la IA todavia no esta entrenada".
+
+## Estado del reconocimiento con IA
+
+El reconocimiento depende de `app/models/best.pt`. **Ese archivo no se versiona** (pesos entrenados pesan decenas de MB). Mientras no exista:
+
+- `POST /api/inference/` responde **503** y `GET /api/health` devuelve `yolo_disponible: false`.
+- La app muestra una tarjeta de "Reconocimiento con IA pendiente" en lugar de un error generico.
+- Todo el resto del sistema (catalogo, movimientos, reportes, valorizacion) funciona con normalidad: la IA es una capa opcional.
 
 ## App movil
 

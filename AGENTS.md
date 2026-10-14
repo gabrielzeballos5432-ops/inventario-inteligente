@@ -7,8 +7,10 @@ Todo el repo (código, comentarios, docs, commits) está **en español**; commit
 
 - `backend/` — API FastAPI (async SQLAlchemy + Alembic). Entrypoint: `backend/app/main.py` (lifespan ejecuta `create_all` + seed al arrancar).
 - `mobile/inventario_app/` — Flutter con **3 plataformas**: Android, Web (`flutter run -d chrome`) y Windows (`flutter run -d windows`).
-- `backend/app/yolo/` — inferencia YOLOv8. Modelo `backend/app/models/best.pt` está gitignored (`*.pt`): sin él, `POST /api/inference/` devuelve 503 (esperado, S5–S6 pendientes).
+- `backend/app/yolo/` — inferencia YOLOv8. Modelo `backend/app/models/best.pt` está gitignored (`*.pt`): sin él, `POST /api/inference/` devuelve 503 y `GET /api/health` responde `yolo_disponible: false` (esperado, S5–S6 pendientes). `InferenceService` es un singleton con carga perezosa.
+- `backend/app/routers/reportes.py` — reportes y exportación real a **CSV y XLSX** (`openpyxl`), no CSV crudo. `/valorizacion` devuelve el inventario valorado a costo y a venta.
 - Docs académicas en `tecnico y original/` y `revision-sistematica/` — **gitignored**, no editar desde aquí.
+- `scripts/generar_*.py` — generadores de los 16 diagramas UML (PlantUML). Están **gitignored**: son material de trabajo local, no código del sistema. Se regeneran con `python scripts/generar_dcc.py` (etc.), requieren `plantuml.jar` + Java.
 
 ## Entorno de desarrollo (solo Windows)
 
@@ -49,6 +51,9 @@ Orden recomendado tras tocar la app: `flutter analyze` → `flutter test` → (s
 - Importaciones condicionales — no romperlas:
   - `core/db/db_bootstrap.dart` (web, no-op) vs `db_bootstrap_io.dart` (desktop: sqflite FFI).
   - `core/services/local_db_service.dart` exporta `_web.dart` (memoria) o `_io.dart` (sqflite) según `dart.library.io`.
+  - `core/utils/descarga_reporte.dart` exporta `_web.dart` (descarga por `<a download>`) o `_io.dart` (`path_provider` + `share_plus`) según `dart.library.io`.
+- Plugins con código nativo: `mobile_scanner` (escáner de código de barras), `permission_handler` (permiso CAMERA), `share_plus` + `path_provider` (descargar y compartir el reporte exportado). El escáner **solo funciona en Android/iOS**: en web/escritorio el botón debe seguir ofreciendo el selector de archivos.
+- AndroidManifest: el permiso `CAMERA` está declarado y `android.hardware.camera` va con `required="false"` para no romper la instalación en dispositivos sin cámara.
 - `flutter run -d windows` requiere Visual Studio con carga "Desarrollo de escritorio con C++" (**no instalado** en esta máquina); `flutter run -d chrome` funciona sin nada extra.
 - CI (`.github/workflows/build-mobile.yml`) analiza y compila APK en cambios de `mobile/`; tiene **Flutter 3.29 fijado** mientras el repo usa local 3.41.6 / `sdk: ^3.11.4` — verificar que el CI verde coincida antes de confiar en él.
 
@@ -56,6 +61,15 @@ Orden recomendado tras tocar la app: `flutter analyze` → `flutter test` → (s
 
 - Esquema de referencia: `backend/app/db/inventario_db.sql`. La única migración Alembic (`backend/alembic/versions/20260401_00_inventario_db.py`) debe reproducirlo exactamente: si cambia un modelo SQLAlchemy, actualizar **ambos** (SQL + migración).
 - `POST /api/inference/` acepta el campo Form `tipo_operacion` (default `entrada`): el reconocimiento registra **entrada** de stock; salida es trabajo futuro.
+- `GET /api/health` responde `yolo_disponible`. Es la forma de distinguir "API caída" de "IA sin entrenar": el 503 de `/api/inference/` **no es un error de red** y la app lo muestra como "IA pendiente" (`ApiException` en `core/providers/inventario_provider.dart`), nunca como "sin conexión".
 - CORS acepta cualquier puerto local (`localhost`/`127.0.0.1`) vía `allow_origin_regex` en `main.py` (el servidor web de Flutter usa puertos aleatorios).
 - Los `Decimal` de los schemas Pydantic salen en JSON como **string** (`"8.00"`): en Flutter parsear con `parseDouble` de `core/models/json_utils.dart` (nunca `as num`, truena en runtime y cae al catch "sin conexion").
-- `dataset/` (imágenes YOLO) y `backups/` (SQL dumps) viven en la raíz; `dataset/` está gitignored.
+- `dataset/` (imágenes YOLO) y `backups/` (SQL dumps) viven en la raíz; ambos están gitignored.
+
+## Qué se versiona y qué no
+
+El repositorio lleva **solo el código del sistema**: `mobile/` (app), `backend/` (API), `scripts/*.ps1` (operación: backup, deploy, `start-dev.ps1`), CI y docker-compose.
+
+Quedan fuera (`.gitignore`, material de trabajo local): documentos del proyecto de grado (`tecnico y original/`, `revision-sistematica/`), generadores de diagramas UML (`scripts/generar_*.py`), hojas de cálculo y documentos de Office (`*.xlsx`, `*.docx`, `*.csv`), fuentes PlantUML (`*.puml`), pesos del modelo (`*.pt`) y resultados de entrenamiento (`runs/`).
+
+Excepción deliberada: `README.md` y `AGENTS.md` **sí** se versionan (regla `!README.md` / `!AGENTS.md` en `.gitignore`), porque son la documentación del código. Si agregas un documento nuevo de trabajo, no lo versiona — esa es la intención.
