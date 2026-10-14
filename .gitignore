@@ -30,6 +30,11 @@ mobile/inventario_app/ios/Runner.xcworkspace/xcuserdata/
 *.swp
 *.swo
 
+# Capturas y material generado por asistentes, que se cuelan en la raiz
+Copilot_*.png
+*_screenshot_*.png
+Screenshot_*.png
+
 # Docker
 pgdata/
 
