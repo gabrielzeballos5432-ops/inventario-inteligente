@@ -133,21 +133,20 @@ class _ShellPageState extends State<ShellPage> {
         usuarioNombre: auth.usuario?.nombre ?? 'Invitado',
         rol: _rol(auth),
         esNoche: esNoche,
+        mostrarGestion: auth.isAdmin,
         alNavegar: (indice) => setState(() => _currentIndex = indice),
         alAlternarTema: () => context.read<ThemeController>().alternar(),
         alConfigurarServidor: () => mostrarDialogoServidor(context),
         alCerrarSesion: () => auth.logout(),
+        // Los catalogos se citan con el contexto del shell (ruta raiz): si
+        // colgaran del drawer, el dialogo moriria al cerrarse el menu.
+        alAbrirCatalogo: (cual) => abrirCatalogoDesdeMenu(context, cual),
       ),
       body: SafeArea(
         child: IndexedStack(
           index: _currentIndex,
           children: tabs.map((tab) => tab.page).toList(),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        destinations: tabs.map((tab) => tab.destination).toList(),
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
       ),
     );
   }

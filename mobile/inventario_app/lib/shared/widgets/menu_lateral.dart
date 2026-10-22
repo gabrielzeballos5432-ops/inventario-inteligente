@@ -16,10 +16,16 @@ class MenuLateral extends StatelessWidget {
   final String rol;
   final bool esNoche;
 
+  /// Con admin aparecen los catalogos por su nombre (antes vivian escondidos
+  /// en un menu de tres puntos de la pestaña Productos): cada fila abre el
+  /// dialogo de gestion directo.
+  final bool mostrarGestion;
+
   final ValueChanged<int> alNavegar;
   final VoidCallback alAlternarTema;
   final VoidCallback alConfigurarServidor;
   final VoidCallback alCerrarSesion;
+  final ValueChanged<String> alAbrirCatalogo;
 
   const MenuLateral({
     super.key,
@@ -28,10 +34,12 @@ class MenuLateral extends StatelessWidget {
     required this.usuarioNombre,
     required this.rol,
     required this.esNoche,
+    required this.mostrarGestion,
     required this.alNavegar,
     required this.alAlternarTema,
     required this.alConfigurarServidor,
     required this.alCerrarSesion,
+    required this.alAbrirCatalogo,
   });
 
   String get _inicial {
@@ -88,6 +96,37 @@ class MenuLateral extends StatelessWidget {
     );
   }
 
+  /// Fila de gestion de catalogos: misma forma que _item pero con callback
+  /// propio, porque abren un dialogo (que se muestra sobre el shell) en vez
+  /// de cambiar de pestana.
+  Widget _filaCatalogo(
+    BuildContext context,
+    IconData icono,
+    String texto,
+    String clave,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          dense: true,
+          leading: Icon(icono, color: context.textoPrimario),
+          title: Text(texto, style: TextStyle(color: context.textoPrimario)),
+          onTap: () {
+            // El dialogo se pide cuando el drawer ya se va, para que la
+            // animacion del menu no pelee con la del dialogo: showdialog se
+            // llama desde el contexto del shell, no del drawer.
+            Navigator.of(context).pop();
+            alAbrirCatalogo(clave);
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -103,6 +142,12 @@ class MenuLateral extends StatelessWidget {
             _tituloSeccion(context, 'Operacion'),
             for (var i = 0; i < elementos.length; i++)
               _item(context, elementos[i], i),
+            if (mostrarGestion) ...[
+              _tituloSeccion(context, 'Gestion'),
+              _filaCatalogo(context, Icons.category_outlined, 'Categorias', 'categorias'),
+              _filaCatalogo(context, Icons.label_outline, 'Marcas', 'marcas'),
+              _filaCatalogo(context, Icons.local_shipping_outlined, 'Proveedores', 'proveedores'),
+            ],
             _tituloSeccion(context, 'Cuenta'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),

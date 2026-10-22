@@ -20,6 +20,29 @@ import 'barcode_scanner_page.dart';
 import 'marcas_dialog.dart';
 import 'proveedores_dialog.dart';
 
+/// Abre el catalogo pedido desde el sidebar (fuera de la pagina de
+/// productos). Es funcion de primer nivel porque la gestion de
+/// categorias/marcas/proveedores es privada de este archivo, pero el menu
+/// lateral debe alcanzarla. Al cerrar refresca el inventario para reflejar la
+/// edicion del catalogo (colores, marcas y proveedores alimentan productos).
+Future<void> abrirCatalogoDesdeMenu(BuildContext context, String cual) async {
+  final provider = context.read<InventarioProvider>();
+  final service = provider.productService;
+  switch (cual) {
+    case 'categorias':
+      await showDialog(
+        context: context,
+        builder: (_) => _CategoriasDialog(service: service),
+      );
+    case 'marcas':
+      await showDialog(context: context, builder: (_) => const MarcasDialog());
+    case 'proveedores':
+      await showDialog(
+          context: context, builder: (_) => const ProveedoresDialog());
+  }
+  provider.cargarInventario();
+}
+
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
 
@@ -119,50 +142,9 @@ return ListView(
               tooltip: 'Recargar',
               onPressed: () => inventario.cargarInventario(),
             ),
-            if (isAdmin)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                tooltip: 'Catalogos',
-                onSelected: (opcion) {
-                  switch (opcion) {
-                    case 'categorias':
-                      _openCategoriasDialog(context);
-                    case 'marcas':
-                      _openMarcasDialog(context);
-                    case 'proveedores':
-                      _openProveedoresDialog(context);
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem<String>(
-                    value: 'categorias',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.category_outlined, size: 20),
-                      title: Text('Gestionar categorias'),
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'marcas',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.label_outline, size: 20),
-                      title: Text('Gestionar marcas'),
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'proveedores',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.local_shipping_outlined, size: 20),
-                      title: Text('Gestionar proveedores'),
-                    ),
-                  ),
-                ],
-              ),
+            // La gestion de catalogos (categorias/marcas/proveedores) se
+            // mudo al sidebar (seccion Gestion): aqui duplicaba el menu de
+            // tres puntos.
           ],
         ),
         const SizedBox(height: 16),
@@ -555,27 +537,7 @@ return ListView(
     }
   }
 
-Future<void> _openCategoriasDialog(BuildContext context) async {
-    await showDialog(
-      context: context,
-      builder: (context) => _CategoriasDialog(service: context.read<InventarioProvider>().productService),
-    );
-    _refresh();
-  }
-
-  /// Catalogo de marcas. Tras gestionarlo se refresca la lista de productos.
-  Future<void> _openMarcasDialog(BuildContext context) async {
-    await showDialog(context: context, builder: (_) => const MarcasDialog());
-    _refresh();
-  }
-
-  /// Catalogo de proveedores, tambien opcional en el producto.
-  Future<void> _openProveedoresDialog(BuildContext context) async {
-    await showDialog(
-        context: context, builder: (_) => const ProveedoresDialog());
-    _refresh();
-  }
-
+  /// Abre el dialogo de reportes desde el chip de la cabecera.
   Future<void> _openReportesDialog(BuildContext context) async {
     await showDialog(
       context: context,
