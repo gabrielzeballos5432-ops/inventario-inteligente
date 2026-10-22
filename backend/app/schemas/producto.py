@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from decimal import Decimal
 
@@ -39,9 +39,11 @@ class ProductoCreate(BaseModel):
     categoria_id: Optional[int] = None
     marca_id: Optional[int] = None
     proveedor_id: Optional[int] = None
-    precio_compra: Decimal = 0
-    precio_venta: Decimal = 0
-    stock_minimo: int = 5
+    # Los precios tienen que ser mayores a 0: un producto con precio 0 falsea
+    # la valorizacion del inventario y el margen. El stock minimo si admite 0.
+    precio_compra: Decimal = Field(gt=0)
+    precio_venta: Decimal = Field(gt=0)
+    stock_minimo: int = Field(default=5, ge=0)
 
 
 class ProductoUpdate(BaseModel):
@@ -52,9 +54,9 @@ class ProductoUpdate(BaseModel):
     categoria_id: Optional[int] = None
     marca_id: Optional[int] = None
     proveedor_id: Optional[int] = None
-    precio_compra: Optional[Decimal] = None
-    precio_venta: Optional[Decimal] = None
-    stock_minimo: Optional[int] = None
+    precio_compra: Optional[Decimal] = Field(default=None, gt=0)
+    precio_venta: Optional[Decimal] = Field(default=None, gt=0)
+    stock_minimo: Optional[int] = Field(default=None, ge=0)
     activo: Optional[bool] = None
 
 

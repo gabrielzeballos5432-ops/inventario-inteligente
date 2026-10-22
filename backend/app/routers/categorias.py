@@ -39,8 +39,22 @@ async def crear_categoria(
     db: AsyncSession = Depends(get_db),
 ):
     repo = CategoriaRepository(db)
-    if await repo.obtener_por_nombre(body.nombre):
-        raise HTTPException(status_code=400, detail="Ya existe una categoria con ese nombre")
+    # El borrado de categorias es logico (activo=false) y el nombre es UNIQUE
+    # sobre toda la tabla, no solo entre las activas. Una categoria desactivada
+    # sigue reservando su nombre y, como listar_todas() solo devuelve las
+    # activas, el usuario recibe un rechazo sin ver nunca el conflicto. Por eso
+    # se reactiva la fila en vez de crear otra o devolver un error que no
+    # puede resolver.
+    existente = await repo.obtener_por_nombre(body.nombre)
+    if existente is not None:
+        if existente.activo:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe una categoria activa con ese nombre",
+            )
+        existente.activo = True
+        existente.padre_id = body.padre_id
+        return await repo.guardar(existente)
     if body.padre_id is not None and await repo.obtener_por_id(body.padre_id) is None:
         raise HTTPException(status_code=400, detail="Categoria padre no encontrada")
     categoria = Categoria(nombre=body.nombre, padre_id=body.padre_id, activo=True)
@@ -60,8 +74,19 @@ async def actualizar_categoria(
         raise HTTPException(status_code=404, detail="Categoria no encontrada")
     cambios = body.model_dump(exclude_unset=True)
     if "nombre" in cambios and cambios["nombre"] != categoria.nombre:
-        if await repo.obtener_por_nombre(cambios["nombre"]):
-            raise HTTPException(status_code=400, detail="Ya existe una categoria con ese nombre")
+        # Igual que al crear: solo estorba otra categoria activa. Chocar con
+        # una inactiva daria un rechazo sobre un nombre que el usuario no ve
+        # en ninguna lista.
+        #
+        # El id importa: la busqueda ignora mayusculas, asi que cambiar
+        # "uñas" por "Uñas" se encuentra a si misma y sin esta excepcion el
+        # renombrado por capitalizacion quedaria bloqueado.
+        conflicto = await repo.obtener_por_nombre(cambios["nombre"])
+        if conflicto is not None and conflicto.activo and conflicto.id != categoria.id:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe una categoria activa con ese nombre",
+            )
     if cambios.get("padre_id") == categoria.id:
         raise HTTPException(status_code=400, detail="Una categoria no puede ser su propio padre")
     for campo, valor in cambios.items():

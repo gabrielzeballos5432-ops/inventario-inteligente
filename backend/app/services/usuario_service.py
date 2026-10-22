@@ -10,13 +10,48 @@ class UsuarioService:
     def __init__(self, repo: UsuarioRepository):
         self.repo = repo
 
-    def to_out(self, usuario: Usuario) -> dict:
+    @staticmethod
+    def _rol_cargado(usuario: Usuario):
+        """Devuelve `usuario.rol` solo si la relationship YA esta cargada.
+
+        Acceder a una relationship en lazy dispara una consulta, y en SQLAlchemy
+        async eso fuera del greenlet lanza MissingGreenlet. Mirar el estado de
+        la instancia con __dict__ permite aprovechar el joinedload que ya traen
+        las consultas del repositorio (listar, obtener_por_id,
+        obtener_por_email) y evitar una consulta extra por usuario.
+
+        El id tiene que coincidir con el rol_id actual: la sesion se crea con
+        expire_on_commit=False, de modo que tras cambiar el rol de un usuario
+        el joinedload NO sobrescribe la relationship que ya estaba cacheada y
+        se terminaria devolviendo el rol_nombre anterior junto al rol_id nuevo
+        (el PUT respondia 200 con rol_id 1 y rol_nombre "vendedor").
+        """
+        rol = usuario.__dict__.get("rol")
+        if rol is not None and rol.id != usuario.rol_id:
+            return None
+        return rol
+
+    async def to_out(self, usuario: Usuario) -> dict:
+        """Arma el dict del response_model.
+
+        Es async a proposito: leer `usuario.rol.nombre` cuando la relationship
+        viene en lazy lanza MissingGreenlet, porque ese acceso dispara IO
+        fuera del greenlet de SQLAlchemy. Ese requisito se cumplio en casi
+        todos los metodos del repositorio y se olvido en crear(), lo que hacia
+        que el alta de usuario devolviera 500.
+
+        Primero se aprovecha la relationship si ya viene cargada; solo si no,
+        se consulta el rol explicitamente.
+        """
+        rol = self._rol_cargado(usuario)
+        if rol is None:
+            rol = await self.repo.obtener_rol_por_id(usuario.rol_id)
         return {
             "id": usuario.id,
             "nombre": usuario.nombre,
             "email": usuario.email,
             "rol_id": usuario.rol_id,
-            "rol_nombre": usuario.rol.nombre if usuario.rol else "",
+            "rol_nombre": rol.nombre if rol else "",
             "activo": usuario.activo,
             "created_at": usuario.creado_en,
         }

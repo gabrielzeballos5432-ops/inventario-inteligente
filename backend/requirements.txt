@@ -5,6 +5,9 @@ asyncpg==0.29.0
 alembic==1.13.1
 pydantic==2.7.4
 pydantic-settings==2.3.4
+# Necesario para el EmailStr del schema de proveedores. Venia como dependencia
+# transitiva; se declara explicito porque si desaparece la app no arranca.
+email-validator==2.3.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1

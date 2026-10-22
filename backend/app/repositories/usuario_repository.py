@@ -51,8 +51,12 @@ class UsuarioRepository:
     async def crear(self, usuario: Usuario) -> Usuario:
         self.db.add(usuario)
         await self.db.commit()
-        await self.db.refresh(usuario)
-        return usuario
+        # refresh() no basta: recarga las columnas pero deja la relationship
+        # `rol` en lazy. Como UsuarioService.to_out() es sincrono y lee
+        # usuario.rol.nombre, ese acceso dispara IO fuera del greenlet y
+        # revienta con MissingGreenlet -> el alta devolvia 500. Se vuelve a
+        # leer con joinedload, igual que las demas consultas del repositorio.
+        return await self.obtener_por_id(usuario.id)
 
     async def contar_admins_activos(self) -> int:
         result = await self.db.execute(

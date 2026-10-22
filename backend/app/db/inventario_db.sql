@@ -10,9 +10,10 @@ CREATE TABLE roles (
 -- 2. Tabla de marcas
 CREATE TABLE marcas (
     id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL UNIQUE,
+    nombre VARCHAR(100) NOT NULL, -- Sin UNIQUE: la unicidad no distingue mayusculas (ver indice LOWER)
     activo BOOLEAN NOT NULL DEFAULT true
 );
+CREATE UNIQUE INDEX uq_marcas_nombre_lower ON marcas(LOWER(nombre));
 
 -- 3. Tabla de proveedores
 CREATE TABLE proveedores (
@@ -23,14 +24,16 @@ CREATE TABLE proveedores (
     email VARCHAR(100),
     activo BOOLEAN NOT NULL DEFAULT true
 );
+CREATE UNIQUE INDEX uq_proveedores_nombre_lower ON proveedores(LOWER(nombre));
 
 -- 4. Tabla de categorías
 CREATE TABLE categorias (
     id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL UNIQUE,
+    nombre VARCHAR(100) NOT NULL, -- Sin UNIQUE: la unicidad no distingue mayusculas (ver indice LOWER)
     padre_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL,
     activo BOOLEAN NOT NULL DEFAULT true
 );
+CREATE UNIQUE INDEX uq_categorias_nombre_lower ON categorias(LOWER(nombre));
 
 -- 5. Tabla de usuarios (Sin UNIQUE normal, ya que hay índice LOWER)
 CREATE TABLE usuarios (
