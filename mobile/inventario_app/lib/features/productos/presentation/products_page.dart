@@ -1828,31 +1828,45 @@ class _ReportesDialogState extends State<_ReportesDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // insetPadding propio, igual que producto y lote: el default de 40 por
+      // lado dejaba los dos listados apretados en el telefono.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Reportes'),
-      content: SizedBox(
-        width: 460,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Recargar a la vista, arriba de todo: antes era un tercer icono
+            // perdido entre los dos de exportar, y nadie lo asociaba con
+            // "refrescar el reporte".
+            Align(
+              alignment: Alignment.centerRight,
+              child: _AccionChip(
+                icono: Icons.refresh,
+                texto: 'Actualizar',
+                alPresionar: _reload,
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 const Text('Stock actual',
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.description_outlined),
-                  tooltip: 'Exportar CSV',
-                  onPressed: () => _exportarStock('csv'),
+                // Exportar con etiqueta: "CSV" y "Excel" se entienden solos,
+                // los dos iconos iguales con tooltip los confundian.
+                _AccionChip(
+                  icono: Icons.description_outlined,
+                  texto: 'CSV',
+                  alPresionar: () => _exportarStock('csv'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.table_chart_outlined),
-                  tooltip: 'Exportar Excel',
-                  onPressed: () => _exportarStock('xlsx'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _reload,
+                const SizedBox(width: 4),
+                _AccionChip(
+                  icono: Icons.table_chart_outlined,
+                  texto: 'Excel',
+                  alPresionar: () => _exportarStock('xlsx'),
                 ),
               ],
             ),
@@ -1875,7 +1889,7 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                 if (items.isEmpty) return const Text('Sin datos.');
                 return Flexible(
                   child: SizedBox(
-                    height: 160,
+                    height: 200,
                     child: ListView(
                       shrinkWrap: true,
                       children: items
@@ -1906,15 +1920,16 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                 const Text('Movimientos',
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.description_outlined),
-                  tooltip: 'Exportar CSV',
-                  onPressed: () => _exportarMovimientos('csv'),
+                _AccionChip(
+                  icono: Icons.description_outlined,
+                  texto: 'CSV',
+                  alPresionar: () => _exportarMovimientos('csv'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.table_chart_outlined),
-                  tooltip: 'Exportar Excel',
-                  onPressed: () => _exportarMovimientos('xlsx'),
+                const SizedBox(width: 4),
+                _AccionChip(
+                  icono: Icons.table_chart_outlined,
+                  texto: 'Excel',
+                  alPresionar: () => _exportarMovimientos('xlsx'),
                 ),
               ],
             ),
@@ -1934,7 +1949,7 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                 if (items.isEmpty) return const Text('Sin movimientos.');
                 return Flexible(
                   child: SizedBox(
-                    height: 160,
+                    height: 200,
                     child: ListView(
                       shrinkWrap: true,
                       children: items
@@ -1962,15 +1977,27 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                 ),
               ),
             ],
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 50),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: const Text('Cerrar'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cerrar'),
-        ),
-      ],
     );
   }
 }

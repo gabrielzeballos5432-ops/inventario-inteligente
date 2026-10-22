@@ -8,8 +8,11 @@ class DetectionService {
   DetectionService(this._apiClient);
 
   Future<List<Movimiento>> fetchHistory() async {
+    // Los filtros de la pestaña Historial (tipo, periodo, producto) corren
+    // del lado de la app: con 50 registros el filtro encontraba poco; 200
+    // cubre un par de semanas de operacion sin pesar la lista.
     final json =
-        await _apiClient.getJson(ApiConfig.historial, query: {'limite': '50'})
+        await _apiClient.getJson(ApiConfig.historial, query: {'limite': '200'})
             as List<dynamic>;
     return json
         .map((item) => Movimiento.fromJson(item as Map<String, dynamic>))
