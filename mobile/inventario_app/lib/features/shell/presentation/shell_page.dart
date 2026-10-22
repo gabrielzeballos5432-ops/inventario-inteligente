@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../app/theme.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/inventario_provider.dart';
 import '../../../core/providers/theme_controller.dart';
+import '../../../shared/widgets/menu_lateral.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import '../../deteccion/presentation/detection_page.dart';
@@ -22,6 +22,7 @@ class ShellPage extends StatefulWidget {
 
 class _ShellPageState extends State<ShellPage> {
   int _currentIndex = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Solo celular (Android/iOS nativo) tiene camara; laptop y web usan archivo.
   bool get _esDispositivoMovil =>
@@ -84,104 +85,58 @@ class _ShellPageState extends State<ShellPage> {
     return tabs;
   }
 
-  /// Etiqueta del rol, para el menu de usuario.
+  /// Etiqueta del rol, para el sidebar.
   String _rol(AuthProvider auth) =>
       auth.isAdmin ? 'Administrador' : 'Vendedor';
-
-  void _accionDelMenu(BuildContext context, AuthProvider auth, String opcion) {
-    switch (opcion) {
-      case 'servidor':
-        mostrarDialogoServidor(context);
-      case 'tema':
-        context.read<ThemeController>().alternar();
-      case 'cerrar':
-        auth.logout();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    // Se lee fuera del itemBuilder: dentro del PopupMenu, context.watch queda
-    // fuera del arbol y salta "Tried to listen... from outside of the widget tree".
+    // Se lee fuera del builder del drawer: dentro, context.watch queda fuera
+    // del arbol y salta "Tried to listen... from outside of the widget tree".
     final esNoche = context.watch<ThemeController>().esNoche;
     final tabs = _buildTabs();
     if (_currentIndex >= tabs.length) {
       _currentIndex = 0;
     }
 
+    final inicial = (auth.usuario?.nombre.trim().isNotEmpty ?? false)
+        ? auth.usuario!.nombre.trim()[0].toUpperCase()
+        : 'Z';
+
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Text(tabs[_currentIndex].title),
+        // Con el drawer montado la hamburguesa sale sola a la izquierda; los
+        // ajustes de cuenta (tema, servidor, sesion) migraron al sidebar.
         actions: [
           IconButton(
             tooltip: 'Actualizar datos',
             onPressed: () => context.read<InventarioProvider>().refrescarTodo(),
             icon: const Icon(Icons.refresh),
           ),
-          PopupMenuButton<String>(
-            tooltip: 'Menu de usuario',
-            onSelected: (opcion) => _accionDelMenu(context, auth, opcion),
-            itemBuilder: (ctx) {
-              return [
-                PopupMenuItem<String>(
-                  enabled: false,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        auth.usuario?.nombre ?? 'Invitado',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: context.textoPrimario,
-                        ),
-                      ),
-                      Text(
-                        _rol(auth),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.textoSecundario,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: 'tema',
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      esNoche ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                    ),
-                    title: Text(esNoche ? 'Modo claro' : 'Modo noche'),
-                  ),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'servidor',
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.dns_outlined),
-                    title: Text('Configurar servidor'),
-                  ),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'cerrar',
-                  child: ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.logout),
-                    title: Text('Cerrar sesion'),
-                  ),
-                ),
-              ];
-            },
-          ),
           const SizedBox(width: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: _AvatarBoton(
+              inicial: inicial,
+              alPresionar: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
+          ),
+          const SizedBox(width: 10),
         ],
+      ),
+      drawer: MenuLateral(
+        elementos: tabs.map((tab) => tab.destination).toList(),
+        seleccion: _currentIndex,
+        usuarioNombre: auth.usuario?.nombre ?? 'Invitado',
+        rol: _rol(auth),
+        esNoche: esNoche,
+        alNavegar: (indice) => setState(() => _currentIndex = indice),
+        alAlternarTema: () => context.read<ThemeController>().alternar(),
+        alConfigurarServidor: () => mostrarDialogoServidor(context),
+        alCerrarSesion: () => auth.logout(),
       ),
       body: SafeArea(
         child: IndexedStack(
@@ -193,6 +148,41 @@ class _ShellPageState extends State<ShellPage> {
         selectedIndex: _currentIndex,
         destinations: tabs.map((tab) => tab.destination).toList(),
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
+      ),
+    );
+  }
+}
+
+/// Boton avatar de la app bar: reemplaza al menu de tres puntos. Al tocarlo
+/// abre el mismo sidebar, donde vive la cuenta completa.
+class _AvatarBoton extends StatelessWidget {
+  final String inicial;
+  final VoidCallback alPresionar;
+
+  const _AvatarBoton({required this.inicial, required this.alPresionar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.primary,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: alPresionar,
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Center(
+            child: Text(
+              inicial,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
