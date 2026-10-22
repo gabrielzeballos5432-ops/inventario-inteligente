@@ -1,3 +1,4 @@
+import '../../../app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -35,15 +36,7 @@ class _HistoryPageState extends State<HistoryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Historial',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Movimientos de inventario registrados.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
+                  // El titulo de la pestana ya lo muestra la AppBar.
                 ],
               ),
             ),
@@ -66,51 +59,76 @@ class _HistoryPageState extends State<HistoryPage> {
           const SectionCard(child: Text('Aun no hay movimientos registrados.'))
         else
           ...historial.map(
-            (m) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          m.tipo == 'entrada'
-                              ? Icons.login
-                              : Icons.logout,
-                          color: m.tipo == 'entrada'
-                              ? Colors.green
-                              : Colors.red,
-                          size: 20,
+            (m) {
+              final esEntrada = m.tipo == 'entrada';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SectionCard(
+                  // Antes cada movimiento ocupaba cinco lineas (tipo,
+                  // cantidad, stock, origen y fecha). Con una sola fila cabe
+                  // el doble de movimientos en la misma pantalla.
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: (esEntrada ? context.paleta.positivo : context.paleta.negativo)
+                              .withValues(alpha: 0.18),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            m.productoNombre ?? 'Producto #${m.productoId}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                        child: Icon(
+                          esEntrada ? Icons.south_west : Icons.north_east,
+                          size: 17,
+                          color: esEntrada ? context.paleta.positivo : context.paleta.negativo,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              m.productoNombre ?? 'Producto #${m.productoId}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${esEntrada ? 'Entrada' : 'Salida'} de ${m.cantidad} '
+                              '· stock ${m.stockResultante}'
+                              '${m.origen != null ? ' · ${m.origen}' : ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: context.textoSecundario,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (m.creadoEn != null) ...[
+                        SizedBox(width: 8),
+                        Text(
+                          DateFormat('dd/MM HH:mm')
+                              .format(DateTime.parse(m.creadoEn!).toLocal()),
+                          style: TextStyle(
+                            color: context.textoTerciario,
+                            fontSize: 11,
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Tipo: ${m.tipo == 'entrada' ? 'Entrada' : 'Salida'}'),
-                    Text('Cantidad: ${m.cantidad}'),
-                    Text('Stock resultante: ${m.stockResultante}'),
-                    if (m.origen != null) Text('Origen: ${m.origen}'),
-                    if (m.creadoEn != null)
-                      Text(
-                        DateFormat('dd/MM/yyyy HH:mm').format(
-                          DateTime.parse(m.creadoEn!).toLocal(),
-                        ),
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
       ],
     );

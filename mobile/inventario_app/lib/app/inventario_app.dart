@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/providers/auth_provider.dart';
+import '../core/providers/theme_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/shell/presentation/shell_page.dart';
+import '../shared/widgets/servidor_guard.dart';
 import 'theme.dart';
 
 class InventarioApp extends StatelessWidget {
@@ -11,10 +13,16 @@ class InventarioApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modo = context.watch<ThemeController>().modo;
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Inventario Inteligente',
-      theme: buildAppTheme(),
+      theme: buildTemaClaro(),
+      darkTheme: buildTemaNoche(),
+      themeMode: modo,
+      builder: (context, child) =>
+          ServidorGuard(child: child ?? const SizedBox.shrink()),
       home: Consumer<AuthProvider>(
         builder: (context, auth, _) {
           if (auth.status == AuthStatus.initial) {

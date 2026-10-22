@@ -7,6 +7,8 @@ import 'core/db/db_bootstrap.dart'
     if (dart.library.io) 'core/db/db_bootstrap_io.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/inventario_provider.dart';
+import 'core/providers/servidor_controller.dart';
+import 'core/providers/theme_controller.dart';
 import 'core/network/api_client.dart';
 import 'core/services/local_db_service.dart';
 import 'core/services/sync_service.dart';
@@ -20,6 +22,10 @@ void main() async {
 
   // Servidor configurado desde la app (si cambia la IP del PC no hay que recompilar).
   await ApiConfig.init();
+
+  // Modo claro / noche. Se lee antes de runApp para no arrancar en claro y
+  // cambiar a noche un instante despues (el parpadeo se nota mucho).
+  final themeController = await ThemeController.cargar();
 
   // Escritorio: SQLite via FFI. Web: no-op (BD local en memoria).
   initLocalDatabase();
@@ -41,6 +47,14 @@ void main() async {
   );
   connectivityService.iniciar();
 
+  // Vigila que el backend responda (la laptop puede suspenderse y "desaparecer"
+  // aunque el telefono siga con Wi-Fi). Al reconectar, recarga el inventario.
+  final servidorController = ServidorController(
+    apiClient,
+    onReconectado: () => inventarioProvider.cargarInventario(),
+  );
+  servidorController.iniciar();
+
   runApp(
     MultiProvider(
       providers: [
@@ -48,6 +62,8 @@ void main() async {
           create: (_) => AuthProvider(AuthService(apiClient))..tryAutoLogin(),
         ),
         ChangeNotifierProvider.value(value: inventarioProvider),
+        ChangeNotifierProvider.value(value: themeController),
+        ChangeNotifierProvider.value(value: servidorController),
       ],
       child: const InventarioApp(),
     ),

@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/inventario_provider.dart';
+import '../../../core/providers/theme_controller.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
 import '../../dashboard/presentation/dashboard_page.dart';
 import '../../deteccion/presentation/detection_page.dart';
@@ -30,11 +33,11 @@ class _ShellPageState extends State<ShellPage> {
     final auth = context.read<AuthProvider>();
     final tabs = <_ShellTab>[
       const _ShellTab(
-        title: 'Dashboard',
+        title: 'Zoomventory',
         page: DashboardPage(),
         destination: NavigationDestination(
           icon: Icon(Icons.dashboard_outlined),
-          label: 'Dashboard',
+          label: 'Panel',
         ),
       ),
       const _ShellTab(
@@ -54,7 +57,8 @@ class _ShellPageState extends State<ShellPage> {
               : Icons.image_search_outlined),
           label: 'Deteccion',
         ),
-      ),      const _ShellTab(
+      ),
+      const _ShellTab(
         title: 'Historial',
         page: HistoryPage(),
         destination: NavigationDestination(
@@ -80,9 +84,27 @@ class _ShellPageState extends State<ShellPage> {
     return tabs;
   }
 
+  /// Etiqueta del rol, para el menu de usuario.
+  String _rol(AuthProvider auth) =>
+      auth.isAdmin ? 'Administrador' : 'Vendedor';
+
+  void _accionDelMenu(BuildContext context, AuthProvider auth, String opcion) {
+    switch (opcion) {
+      case 'servidor':
+        mostrarDialogoServidor(context);
+      case 'tema':
+        context.read<ThemeController>().alternar();
+      case 'cerrar':
+        auth.logout();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    // Se lee fuera del itemBuilder: dentro del PopupMenu, context.watch queda
+    // fuera del arbol y salta "Tried to listen... from outside of the widget tree".
+    final esNoche = context.watch<ThemeController>().esNoche;
     final tabs = _buildTabs();
     if (_currentIndex >= tabs.length) {
       _currentIndex = 0;
@@ -92,25 +114,73 @@ class _ShellPageState extends State<ShellPage> {
       appBar: AppBar(
         title: Text(tabs[_currentIndex].title),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: Text(
-                auth.usuario?.nombre ?? '',
-                style: const TextStyle(fontSize: 13, color: Colors.white70),
-              ),
-            ),
-          ),
           IconButton(
-            tooltip: 'Configurar servidor',
-            onPressed: () => mostrarDialogoServidor(context),
-            icon: const Icon(Icons.dns_outlined),
+            tooltip: 'Actualizar datos',
+            onPressed: () => context.read<InventarioProvider>().refrescarTodo(),
+            icon: const Icon(Icons.refresh),
           ),
-          IconButton(
-            tooltip: 'Cerrar sesion',
-            onPressed: () => auth.logout(),
-            icon: const Icon(Icons.logout),
+          PopupMenuButton<String>(
+            tooltip: 'Menu de usuario',
+            onSelected: (opcion) => _accionDelMenu(context, auth, opcion),
+            itemBuilder: (ctx) {
+              return [
+                PopupMenuItem<String>(
+                  enabled: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        auth.usuario?.nombre ?? 'Invitado',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: context.textoPrimario,
+                        ),
+                      ),
+                      Text(
+                        _rol(auth),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textoSecundario,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'tema',
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      esNoche ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                    ),
+                    title: Text(esNoche ? 'Modo claro' : 'Modo noche'),
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'servidor',
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.dns_outlined),
+                    title: Text('Configurar servidor'),
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'cerrar',
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.logout),
+                    title: Text('Cerrar sesion'),
+                  ),
+                ),
+              ];
+            },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(

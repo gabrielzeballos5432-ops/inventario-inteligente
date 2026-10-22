@@ -46,15 +46,27 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   }
 
   Future<void> _solicitarPermiso() async {
-    final status = await Permission.camera.request();
-    if (status.isDenied || status.isPermanentlyDenied) {
+    // En pruebas y en plataformas sin implementacion del plugin, request()
+    // lanza MissingPluginException. Sin capturar, esa excepcion sube como
+    // Unhandled Exception y el usuario ve la pantalla en rojo.
+    try {
+      final status = await Permission.camera.request();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Permiso de camara denegado')),
-      );
+      if (status.isDenied || status.isPermanentlyDenied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permiso de camara denegado')),
+        );
+      }
+    } catch (_) {
+      // Sin permiso no hay escaneo; la propia pagina avisa en su cuerpo.
     }
   }
 
+  /// Contrato de [BarcodeScannerPage.onDetectado]: es solo una notificacion.
+  /// Esta pagina se cierra sola y devuelve el codigo como resultado de la
+  /// ruta, asi que el callback no debe cerrar nada: un pop desde el contexto
+  /// de quien llamo al push saca la ruta de mas y deja el Navigator bloqueado
+  /// con _debugLocked en true.
   void _manejarCaptura(BarcodeCapture capture) {
     if (_procesando) return;
     final codigo = capture.barcodes
@@ -64,6 +76,10 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
 
     setState(() => _procesando = true);
     widget.onDetectado(codigo);
+
+    // Red de seguridad: si el callback ya cerro la pagina, isCurrent es false
+    // y el pop se omite en lugar de cerrar una ruta ajena.
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     Navigator.of(context).pop(codigo);
   }
 

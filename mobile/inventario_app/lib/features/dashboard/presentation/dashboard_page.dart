@@ -1,3 +1,4 @@
+import '../../../app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -32,16 +33,6 @@ class _DashboardPageState extends State<DashboardPage> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const Text(
-          'Dashboard',
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Resumen operativo del sistema de inventario inteligente.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        const SizedBox(height: 20),
         if (inventario.cargando && productos.isEmpty)
           const Center(
             child: Padding(
@@ -50,35 +41,56 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           )
         else ...[
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            children: [
-              _MetricTile(label: 'Productos', value: '${productos.length}'),
-              _MetricTile(label: 'Stock bajo', value: '${stockBajo.length}'),
-              _MetricTile(
-                label: 'Valorizado (costo)',
-                value: valorizacion == null
-                    ? '-'
-                    : 'Bs. ${valorizacion.valorizadoCosto.toStringAsFixed(2)}',
-              ),
-              _MetricTile(
-                label: 'Valorizado (venta)',
-                value: valorizacion == null
-                    ? '-'
-                    : 'Bs. ${valorizacion.valorizadoVenta.toStringAsFixed(2)}',
-              ),
-            ],
+          // Sin subtitulo: el nombre de la pestana ya esta en la AppBar y
+          // una frase descriptiva encima de las cifras soloocupaba alto.
+          _MetricRow(
+            icon: Icons.inventory_2_outlined,
+            label: 'Productos',
+            value: '${productos.length}',
+          ),
+          _MetricRow(
+            icon: Icons.warning_amber,
+            label: 'Stock bajo',
+            value: '${stockBajo.length}',
+            color: stockBajo.isEmpty ? null : context.paleta.stockBajo,
+          ),
+          _MetricRow(
+            icon: Icons.sell_outlined,
+            label: 'Valorizado (costo)',
+            value: valorizacion == null
+                ? '-'
+                : 'Bs. ${valorizacion.valorizadoCosto.toStringAsFixed(2)}',
+          ),
+          _MetricRow(
+            icon: Icons.paid_outlined,
+            label: 'Valorizado (venta)',
+            value: valorizacion == null
+                ? '-'
+                : 'Bs. ${valorizacion.valorizadoVenta.toStringAsFixed(2)}',
+          ),
+          _MetricRow(
+            icon: Icons.layers_outlined,
+            label: 'Unidades en stock',
+            value: valorizacion == null
+                ? '-'
+                : '${valorizacion.unidadesTotales}',
+          ),
+          _MetricRow(
+            icon: Icons.trending_up,
+            label: 'Utilidad potencial',
+            value: valorizacion == null
+                ? '-'
+                : 'Bs. ${(valorizacion.valorizadoVenta - valorizacion.valorizadoCosto).toStringAsFixed(2)}',
+            color: valorizacion == null
+                ? null
+                : context.paleta.info,
           ),
           if (valorizacion != null) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               '${valorizacion.productosActivos} productos activos, '
               '${valorizacion.unidadesTotales} unidades en total.',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              style: TextStyle(color: context.textoSecundario, fontSize: 13),
             ),
           ],
           const SizedBox(height: 16),
@@ -86,7 +98,7 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Alertas de stock bajo',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
@@ -96,11 +108,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 else
                   ...stockBajo.map(
                     (p) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: EdgeInsets.only(bottom: 8),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber,
-                              color: Colors.orange, size: 20),
+                          Icon(Icons.warning_amber,
+                              color: context.paleta.stockBajo, size: 20),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -115,11 +127,11 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           if (inventario.error != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             SectionCard(
               child: Text(
                 inventario.error!,
-                style: const TextStyle(color: Colors.orange),
+                style: TextStyle(color: context.paleta.stockBajo),
               ),
             ),
           ],
@@ -129,27 +141,47 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _MetricTile extends StatelessWidget {
+class _MetricRow extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
+  final Color? color;
 
-  const _MetricTile({required this.label, required this.value});
+  _MetricRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-        ],
+    final tono = color ?? context.textoPrimario;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: SectionCard(
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color ?? context.textoSecundario),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(color: context.textoSecundario, fontSize: 14),
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: tono,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+

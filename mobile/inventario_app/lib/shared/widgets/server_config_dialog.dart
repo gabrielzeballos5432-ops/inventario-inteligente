@@ -1,3 +1,4 @@
+import '../../app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -81,53 +82,61 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Configurar servidor'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Direccion del backend (PC) que usa la app. Se guarda en el '
-            'dispositivo y no requiere reinstalar.',
-            style: TextStyle(fontSize: 13, color: Colors.white70),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              labelText: 'URL del backend',
-              hintText: 'http://192.168.100.43:8000',
-              prefixIcon: Icon(Icons.dns_outlined),
+      // Con scroll: el campo tiene autofocus, asi que el teclado sube solo, y
+      // si ademas aparece el mensaje de error de tres lineas el contenido no
+      // cabe y Flutter pinta la franja amarilla de "overflowed". Con el
+      // SingleChildScrollView el dialogo se desplaza en vez de desbordar.
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Direccion del backend (PC) que usa la app. Se guarda en el '
+              'dispositivo y no requiere reinstalar.',
+              style: TextStyle(fontSize: 13, color: context.textoSecundario),
             ),
-          ),
-          if (_mensaje != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (_ocupado)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'URL del backend',
+                hintText: 'http://192.168.100.43:8000',
+                prefixIcon: Icon(Icons.dns_outlined),
+              ),
+            ),
+            if (_mensaje != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (_ocupado)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      _mensaje!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _esError
+                            ? context.paleta.negativo
+                            : context.paleta.positivo,
+                      ),
                     ),
                   ),
-                Expanded(
-                  child: Text(
-                    _mensaje!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _esError ? Colors.redAccent : Colors.greenAccent,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
