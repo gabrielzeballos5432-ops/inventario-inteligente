@@ -4,8 +4,9 @@ from app.repositories.sesion_repository import SesionRepository
 from app.repositories.deteccion_repository import DeteccionRepository
 from app.yolo.inference_service import InferenceService
 from app.schemas.inferencia import InferenciaResponse, DeteccionOut
-from app.schemas.movimiento import MovimientoOut
+from app.schemas.movimiento import MovimientoLoteItem, MovimientoLoteResultado, MovimientoOut
 from app.schemas.producto import ProductoStockOut
+from app.models.movimiento import Movimiento
 
 
 class InventarioService:
@@ -85,6 +86,80 @@ class InventarioService:
             movimientos_creados=movimientos_creados,
             sesion_id=sesion_id,
         )
+
+    async def registrar_lote(
+        self,
+        tipo: str,
+        items: list[MovimientoLoteItem],
+        usuario_id: int,
+        origen: str = "manual",
+        sesion_id: int | None = None,
+    ) -> tuple[list[MovimientoLoteResultado], list[Movimiento]]:
+        """Registra varios movimientos del mismo tipo en una sola operacion.
+
+        Es el mismo nucleo que usara la IA en RF-10: una captura detecta varios
+        productos y guarda todas sus entradas de una vez con origen "ia"; el
+        modo manual (recepcion de mercaderia) llama a este metodo con origen
+        "manual" desde POST /api/inventario/movimientos/lote.
+
+        Devuelve el resultado fila a fila y los movimientos creados. Si alguna
+        linea es rechazada NO se crea ninguna: la recepcion es un documento, no
+        debe quedar guardada a medias. El router traduce los rechazos en un 400
+        con el detalle de cada fila para que se corrijan todos de una vez.
+        """
+        ids_con_orden = list(dict.fromkeys(item.producto_id for item in items))
+        productos = await self.producto_repo.obtener_por_ids(ids_con_orden)
+        por_id = {p.id: p for p in productos}
+        stocks = await self.producto_repo.obtener_stocks(ids_con_orden)
+
+        resultados: list[MovimientoLoteResultado] = []
+        vistos: set[int] = set()
+        for indice, item in enumerate(items, start=1):
+            producto = por_id.get(item.producto_id)
+            nombre = producto.nombre if producto else None
+            detalle: str | None = None
+            if producto is None:
+                detalle = f"Fila {indice}: el producto {item.producto_id} no existe"
+            elif not producto.activo:
+                detalle = f"Fila {indice}: '{nombre}' esta dado de baja"
+            elif item.producto_id in vistos:
+                detalle = f"Fila {indice}: '{nombre}' esta repetido en el lote"
+            elif tipo != "ajuste" and item.cantidad <= 0:
+                detalle = f"Fila {indice}: la cantidad debe ser mayor a 0"
+            elif tipo == "salida" and item.cantidad > stocks.get(item.producto_id, 0):
+                disponible = stocks.get(item.producto_id, 0)
+                detalle = (
+                    f"Fila {indice} ({nombre}): no hay stock suficiente: "
+                    f"disponible {disponible}"
+                )
+            vistos.add(item.producto_id)
+            resultados.append(
+                MovimientoLoteResultado(
+                    fila=indice,
+                    producto_id=item.producto_id,
+                    producto_nombre=nombre,
+                    correcto=detalle is None,
+                    detalle=detalle,
+                )
+            )
+
+        if any(r.detalle is not None for r in resultados):
+            # Nada se crea: devolvemos los rechazos para que el router muestre
+            # de que se corregiria en cada fila.
+            return resultados, []
+
+        movimientos = await self.movimiento_repo.crear_lote(
+            productos_y_cantidades=[(i.producto_id, i.cantidad) for i in items],
+            usuario_id=usuario_id,
+            tipo=tipo,
+            origen=origen,
+            sesion_id=sesion_id,
+        )
+        # El orden de creacion respeta al de las filas, asi que queda en pareja
+        # directo y cada resultado lleva el id de su movimiento.
+        for resultado, movimiento in zip(resultados, movimientos):
+            resultado.movimiento_id = movimiento.id
+        return resultados, movimientos
 
     async def obtener_inventario(self) -> list[ProductoStockOut]:
         datos = await self.producto_repo.listar_con_stock()

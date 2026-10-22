@@ -52,6 +52,25 @@ class ProductoRepository:
         inventario = result.scalar_one_or_none()
         return inventario.cantidad if inventario else 0
 
+    async def obtener_por_ids(self, ids: list[int]) -> list[Producto]:
+        # Un solo SELECT para todo el lote: evita N+1 al validar las filas.
+        if not ids:
+            return []
+        result = await self.db.execute(select(Producto).where(Producto.id.in_(ids)))
+        return list(result.scalars().all())
+
+    async def obtener_stocks(self, ids: list[int]) -> dict[int, int]:
+        # Stocks actuales de varios productos en una consulta, para validar las
+        # salidas del lote sin llamar a obtener_stock por cada fila (N+1).
+        if not ids:
+            return {}
+        result = await self.db.execute(
+            select(Inventario.producto_id, Inventario.cantidad).where(
+                Inventario.producto_id.in_(ids)
+            )
+        )
+        return {producto_id: cantidad for producto_id, cantidad in result.all()}
+
     async def listar_con_stock(self) -> list[dict]:
         productos = await self.listar_todos()
         resultado = []

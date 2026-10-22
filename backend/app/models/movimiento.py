@@ -19,7 +19,13 @@ class Movimiento(Base):
             "tipo IN ('entrada', 'salida', 'ajuste')", name="chk_movimiento_tipo"
         ),
         CheckConstraint("cantidad_anterior >= 0", name="chk_cantidad_anterior_no_negativa"),
-        CheckConstraint("cantidad > 0", name="chk_movimiento_cantidad_positiva"),
+        # El ajuste fija el stock exacto, por eso 0 es una cantidad valida para
+        # ese tipo (producto agotado); entrada y salida exigen > 0. Validar
+        # tambien aqui, no solo en el schema de Pydantic.
+        CheckConstraint(
+            "(cantidad > 0 OR tipo = 'ajuste')",
+            name="chk_movimiento_cantidad_positiva",
+        ),
         CheckConstraint(
             "stock_resultante >= 0", name="chk_stock_resultante_no_negativo"
         ),

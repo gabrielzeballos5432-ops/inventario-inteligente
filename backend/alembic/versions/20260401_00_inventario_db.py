@@ -175,7 +175,7 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("tipo IN ('entrada', 'salida', 'ajuste')", name="chk_movimiento_tipo"),
         sa.CheckConstraint("cantidad_anterior >= 0", name="chk_cantidad_anterior_no_negativa"),
-        sa.CheckConstraint("cantidad > 0", name="chk_movimiento_cantidad_positiva"),
+        sa.CheckConstraint("(cantidad > 0 OR tipo = 'ajuste')", name="chk_movimiento_cantidad_positiva"),
         sa.CheckConstraint("stock_resultante >= 0", name="chk_stock_resultante_no_negativo"),
         sa.CheckConstraint("origen IN ('manual', 'ia')", name="chk_movimiento_origen"),
         sa.CheckConstraint(

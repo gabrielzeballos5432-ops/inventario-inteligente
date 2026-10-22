@@ -87,6 +87,27 @@ class ProductService {
     return Categoria.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Renombra una categoria. El backend rechaza el nombre si otra categoria
+  /// activa ya lo usa.
+  Future<Categoria> actualizarCategoria(int id,
+      {String? nombre, int? padreId}) async {
+    final payload = <String, dynamic>{
+      if (nombre != null) 'nombre': nombre,
+      if (padreId != null) 'padre_id': padreId,
+    };
+    final json = await _apiClient.putJson('/api/categorias/$id', payload);
+    return Categoria.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Desactiva una categoria. El backend la marca como inactiva en lugar de
+  /// borrarla, para no romper los productos que ya la referencian. El nombre
+  /// sigue reservado, asi que volver a crearla con el mismo nombre la
+  /// reactiva en vez de crear una fila nueva.
+  Future<bool> desactivarCategoria(int id) async {
+    final json = await _apiClient.deleteJson('/api/categorias/$id');
+    return json is Map<String, dynamic> ? (json['activo'] as bool? ?? false) : true;
+  }
+
   Future<Movimiento?> registrarMovimiento({
     required int productoId,
     required String tipo,
@@ -104,6 +125,28 @@ class ProductService {
     );
     if (json == null) return null;
     return Movimiento.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Registra varios movimientos del mismo tipo en una sola llamada.
+  ///
+  /// El backend guarda todo o nada: si rechaza una fila responde 400 con el
+  /// detalle de cada fila ("Fila 2 (Esmalte Rojo 30): no hay stock
+  /// suficiente: disponible 3"), que sube en ApiException.detalle para que el
+  /// dialogo lo muestre sin perder el nombre del producto y el numero de fila.
+  Future<ResultadoLote> registrarLote({
+    required String tipo,
+    required List<({int productoId, int cantidad})> items,
+  }) async {
+    final json = await _apiClient.postJson(
+      ApiConfig.movimientoLote,
+      {
+        'tipo': tipo,
+        'items': items
+            .map((i) => {'producto_id': i.productoId, 'cantidad': i.cantidad})
+            .toList(),
+      },
+    );
+    return ResultadoLote.fromJson(json as Map<String, dynamic>);
   }
 
   Future<List<ProductoConStock>> reporteStock() async {

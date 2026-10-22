@@ -57,26 +57,49 @@ class InventarioProvider extends ChangeNotifier {
             .toList(),
       );
       _error = null;
+    } on ApiException catch (e) {
+      // El servidor respondio (con error). Antes esto caia en el catch
+      // generico y reportaba "sin conexion" tambien ante un 401 o un 500,
+      // que depurar es mucho mas dificil. La cache se sigue mostrando para no
+      // dejar la pantalla vacia, pero el mensaje dice la causa real.
+      debugPrint('cargarInventario: HTTP ${e.statusCode} | ${e.body}');
+      _productos = await _leerCache();
+      _error = switch (e.statusCode) {
+        401 || 403 => 'Sesion expirada o sin permisos. Vuelve a iniciar sesion.',
+        404 => 'El servidor no encontro el recurso de inventario.',
+        >= 500 => 'El servidor tiene un problema (HTTP ${e.statusCode}). '
+            'Se muestran los datos de la ultima carga.',
+        _ => 'El servidor rechazo la peticion (HTTP ${e.statusCode}). '
+            'Se muestran los datos de la ultima carga.',
+      };
     } catch (e, st) {
+      // Solo aqui es un problema de red de verdad: no hay IP valida, el wifi
+      // cayo o el servidor esta apagado.
       debugPrint('cargarInventario FALLA: $e | $st');
-      final cache = await _localDb.obtenerCacheInventario();
-      _productos = cache
-          .map((c) => ProductoConStock(
-                id: c['producto_id'] as int,
-                nombre: c['nombre'] as String,
-                stockActual: c['stock_actual'] as int,
-                stockMinimo: c['stock_minimo'] as int,
-                precioCompra: 0,
-                precioVenta: (c['precio_venta'] as num).toDouble(),
-                stockBajo: (c['stock_bajo'] as int) == 1,
-                activo: true,
-              ))
-          .toList();
-      _error = 'Mostrando datos en cache (sin conexion)';
+      _productos = await _leerCache();
+      _error = 'Sin conexion con el servidor. '
+          'Se muestran los datos de la ultima carga.';
     }
 
     _cargando = false;
     notifyListeners();
+  }
+
+  /// Lee el inventario desde la cache local de la ultima carga correcta.
+  Future<List<ProductoConStock>> _leerCache() async {
+    final cache = await _localDb.obtenerCacheInventario();
+    return cache
+        .map((c) => ProductoConStock(
+              id: c['producto_id'] as int,
+              nombre: c['nombre'] as String,
+              stockActual: c['stock_actual'] as int,
+              stockMinimo: c['stock_minimo'] as int,
+              precioCompra: 0,
+              precioVenta: (c['precio_venta'] as num).toDouble(),
+              stockBajo: (c['stock_bajo'] as int) == 1,
+              activo: true,
+            ))
+        .toList();
   }
 
   Future<void> cargarHistorial() async {
@@ -136,6 +159,19 @@ class InventarioProvider extends ChangeNotifier {
       debugPrint('consultarEstadoServidor FALLA: $e');
     }
     notifyListeners();
+  }
+
+  /// Vuelve a pedir al servidor todo lo que la app muestra: inventario,
+  /// historial, valorizacion y estado del modelo. Se usa desde el menu de
+  /// usuario para que un cambio hecho en otro dispositivo (por ejemplo al
+  /// editar un producto) aparezca sin cerrar y abrir la app.
+  Future<void> refrescarTodo() async {
+    await Future.wait([
+      cargarInventario(),
+      cargarHistorial(),
+      cargarValorizacion(),
+      consultarEstadoServidor(),
+    ]);
   }
 
   Future<int> sincronizar() async {
@@ -216,5 +252,23 @@ class InventarioProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Registra varios movimientos del mismo tipo y devuelve cuantos quedaron
+  /// guardados.
+  ///
+  /// A diferencia de registrarMovimiento, aqui NO se atrapa ApiException: el
+  /// 400 del lote trae el rechazo fila a fila ("Fila 2 (Esmalte Rojo 30):
+  /// no hay stock suficiente: disponible 3") y el dialogo lo muestra tal
+  /// cual; atraparlo lo degeneraria en 'No se pudo registrar el movimiento'
+  /// y el usuario tendria que adivinar que fila corregir.
+  Future<int> registrarLote({
+    required String tipo,
+    required List<({int productoId, int cantidad})> items,
+  }) async {
+    final resultado = await _productService.registrarLote(tipo: tipo, items: items);
+    await cargarInventario();
+    await cargarHistorial();
+    return resultado.guardados;
   }
 }

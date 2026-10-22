@@ -148,6 +148,21 @@ class ProductoConStock extends Product {
   }
 }
 
+/// Respuesta del lote (POST /api/inventario/movimientos/lote).
+///
+/// El guardado es todo o nada: si el backend rechaza una fila, no guarda
+/// ninguna y responde 400 con el detalle de cada fila, que el dialogo
+/// muestra via ApiException.detalle.
+class ResultadoLote {
+  final int guardados;
+
+  ResultadoLote({required this.guardados});
+
+  factory ResultadoLote.fromJson(Map<String, dynamic> json) {
+    return ResultadoLote(guardados: json['guardados'] as int? ?? 0);
+  }
+}
+
 class ValorizacionInventario {
   final int productosActivos;
   final int unidadesTotales;

@@ -60,6 +60,11 @@ class ApiConfig {
   static const String inferencia = '/api/inference/';
   static const String productos = '/api/productos/';
   static const String movimiento = '/api/inventario/movimiento';
+
+  /// Varios movimientos del mismo tipo en una sola llamada (recepcion de
+  /// mercaderia). El backend guarda todo o nada: si una fila falla no guarda
+  /// ninguna y responde 400 con el rechazo de cada fila.
+  static const String movimientoLote = '/api/inventario/movimientos/lote';
   static const String reporteStock = '/api/reportes/stock';
   static const String reporteMovimientos = '/api/reportes/movimientos';
   static const String exportarStock = '/api/reportes/exportar-stock';

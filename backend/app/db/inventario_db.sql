@@ -100,7 +100,7 @@ CREATE TABLE movimientos (
     stock_resultante INTEGER NOT NULL,
     origen VARCHAR(10) NOT NULL CHECK (origen IN ('manual', 'ia')),
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_movimiento_cantidad_positiva CHECK (cantidad > 0),
+    CONSTRAINT chk_movimiento_cantidad_positiva CHECK (cantidad > 0 OR tipo = 'ajuste'),
     CONSTRAINT chk_stock_resultante_no_negativo CHECK (stock_resultante >= 0),
     -- RESTRICCIÓN MATEMÁTICA (La joya de la corona)
     CONSTRAINT chk_consistencia_movimiento CHECK (
