@@ -23,12 +23,18 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  String _bs(double? valor) =>
+      valor == null ? '-' : 'Bs. ${valor.toStringAsFixed(2)}';
+
   @override
   Widget build(BuildContext context) {
     final inventario = context.watch<InventarioProvider>();
     final productos = inventario.productos;
     final stockBajo = productos.where((p) => p.stockBajo).toList();
     final valorizacion = inventario.valorizacion;
+    final utilidad = valorizacion == null
+        ? null
+        : valorizacion.valorizadoVenta - valorizacion.valorizadoCosto;
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -41,49 +47,57 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           )
         else ...[
-          // Sin subtitulo: el nombre de la pestana ya esta en la AppBar y
-          // una frase descriptiva encima de las cifras soloocupaba alto.
-          _MetricRow(
-            icon: Icons.inventory_2_outlined,
-            label: 'Productos',
-            value: '${productos.length}',
-          ),
-          _MetricRow(
-            icon: Icons.warning_amber,
-            label: 'Stock bajo',
-            value: '${stockBajo.length}',
-            color: stockBajo.isEmpty ? null : context.paleta.stockBajo,
-          ),
-          _MetricRow(
-            icon: Icons.sell_outlined,
-            label: 'Valorizado (costo)',
-            value: valorizacion == null
-                ? '-'
-                : 'Bs. ${valorizacion.valorizadoCosto.toStringAsFixed(2)}',
-          ),
-          _MetricRow(
-            icon: Icons.paid_outlined,
-            label: 'Valorizado (venta)',
-            value: valorizacion == null
-                ? '-'
-                : 'Bs. ${valorizacion.valorizadoVenta.toStringAsFixed(2)}',
-          ),
-          _MetricRow(
-            icon: Icons.layers_outlined,
-            label: 'Unidades en stock',
-            value: valorizacion == null
-                ? '-'
-                : '${valorizacion.unidadesTotales}',
-          ),
-          _MetricRow(
-            icon: Icons.trending_up,
-            label: 'Utilidad potencial',
-            value: valorizacion == null
-                ? '-'
-                : 'Bs. ${(valorizacion.valorizadoVenta - valorizacion.valorizadoCosto).toStringAsFixed(2)}',
-            color: valorizacion == null
-                ? null
-                : context.paleta.info,
+          // Las cifras clave en una grilla de tarjetas: antes eran filas
+          // planas y la pantalla se leia como una tabla de consola.
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.6,
+            children: [
+              _MetricaTarjeta(
+                icono: Icons.inventory_2_outlined,
+                etiqueta: 'Productos',
+                valor: '${productos.length}',
+                tono: context.paleta.info,
+              ),
+              _MetricaTarjeta(
+                icono: Icons.warning_amber,
+                etiqueta: 'Stock bajo',
+                valor: stockBajo.isEmpty ? '0' : '${stockBajo.length}',
+                tono: stockBajo.isEmpty
+                    ? context.paleta.positivo
+                    : context.paleta.stockBajo,
+              ),
+              _MetricaTarjeta(
+                icono: Icons.sell_outlined,
+                etiqueta: 'Valorizado (costo)',
+                valor: _bs(valorizacion?.valorizadoCosto),
+                tono: context.textoPrimario,
+              ),
+              _MetricaTarjeta(
+                icono: Icons.paid_outlined,
+                etiqueta: 'Valorizado (venta)',
+                valor: _bs(valorizacion?.valorizadoVenta),
+                tono: context.paleta.positivo,
+              ),
+              _MetricaTarjeta(
+                icono: Icons.layers_outlined,
+                etiqueta: 'Unidades en stock',
+                valor: valorizacion == null
+                    ? '-'
+                    : '${valorizacion.unidadesTotales}',
+                tono: context.paleta.aviso,
+              ),
+              _MetricaTarjeta(
+                icono: Icons.trending_up,
+                etiqueta: 'Utilidad potencial',
+                valor: _bs(utilidad),
+                tono: context.paleta.info,
+              ),
+            ],
           ),
           if (valorizacion != null) ...[
             SizedBox(height: 8),
@@ -141,47 +155,62 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _MetricRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color? color;
+class _MetricaTarjeta extends StatelessWidget {
+  final IconData icono;
+  final String etiqueta;
+  final String valor;
+  final Color tono;
 
-  _MetricRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.color,
+  const _MetricaTarjeta({
+    required this.icono,
+    required this.etiqueta,
+    required this.valor,
+    required this.tono,
   });
 
   @override
   Widget build(BuildContext context) {
-    final tono = color ?? context.textoPrimario;
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8),
-      child: SectionCard(
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color ?? context.textoSecundario),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(color: context.textoSecundario, fontSize: 14),
-              ),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.superficie,
+        border: Border.all(color: context.colorBorde),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tono.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(11),
             ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: tono,
-              ),
+            child: Icon(icono, size: 19, color: tono),
+          ),
+          const Spacer(),
+          Text(
+            etiqueta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style:
+                TextStyle(fontSize: 12.5, color: context.textoSecundario),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            valor,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: tono,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
-

@@ -79,12 +79,38 @@ return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Acciones con etiqueta en vez de iconos desnudos: cada chip es
+            // mas alto, se entiende sin tooltip y caben dos filas en el
+            // telefono sin cortarse.
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  // El titulo de la pestana ya lo muestra la AppBar.
+                  if (isAdmin)
+                    _AccionChip(
+                      icono: Icons.add_box_outlined,
+                      texto: 'Producto',
+                      destacado: true,
+                      alPresionar: () => _openProductDialog(context),
+                    ),
+                  _AccionChip(
+                    icono: Icons.playlist_add,
+                    texto: 'Lote',
+                    alPresionar: () => _openLoteDialog(context),
+                  ),
+                  _AccionChip(
+                    icono: Icons.qr_code_scanner,
+                    texto: 'Escanear',
+                    alPresionar: _escanearCodigo,
+                  ),
+                  _AccionChip(
+                    icono: Icons.description_outlined,
+                    texto: 'Reportes',
+                    alPresionar: () => _openReportesDialog(context),
+                  ),
                 ],
               ),
             ),
@@ -93,25 +119,7 @@ return ListView(
               tooltip: 'Recargar',
               onPressed: () => inventario.cargarInventario(),
             ),
-            IconButton(
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: 'Escanear codigo',
-              onPressed: _escanearCodigo,
-            ),
-            IconButton(
-              icon: const Icon(Icons.playlist_add),
-              tooltip: 'Movimiento por lote',
-              onPressed: () => _openLoteDialog(context),
-            ),
-            IconButton(
-              icon: const Icon(Icons.description_outlined),
-              tooltip: 'Reportes',
-              onPressed: () => _openReportesDialog(context),
-            ),
-            if (isAdmin) ...[
-              // Los tres catalogos van en un menu y no en tres iconos: la
-              // barra se saturaba y lo raro (marcas, proveedores) engordaba
-              // lo que mas se usa cada dia.
+            if (isAdmin)
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 tooltip: 'Catalogos',
@@ -155,12 +163,6 @@ return ListView(
                   ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.add_box_outlined),
-                tooltip: 'Registrar producto',
-                onPressed: () => _openProductDialog(context),
-              ),
-            ],
           ],
         ),
         const SizedBox(height: 16),
@@ -872,10 +874,15 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // En telefono el dialogo toma casi todo el ancho disponible (los campos
+    // compactos de escritorio lo achatan); en escritorio se limita a 480
+    // para que no se estire de mas. Con < 600 de ventana los selectores de
+    // marca y proveedor van apilados: en media fila sus textos se cortan.
+    final angosto = MediaQuery.of(context).size.width < 600;
     return AlertDialog(
       title: Text(_isEditing ? 'Editar producto' : 'Registrar producto'),
-      content: SizedBox(
-        width: 440,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -995,43 +1002,117 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   },
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _selectorMarca()),
-                    SizedBox(width: 12),
-                    Expanded(child: _selectorProveedor()),
-                  ],
-                ),
+                if (angosto) ...[
+                  _selectorMarca(),
+                  const SizedBox(height: 12),
+                  _selectorProveedor(),
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(child: _selectorMarca()),
+                      const SizedBox(width: 12),
+                      Expanded(child: _selectorProveedor()),
+                    ],
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 8),
                   Text(_error!, style: TextStyle(color: context.paleta.negativo)),
                 ],
+                const SizedBox(height: 24),
+                // Botones a lo ancho con 50 de alto: los actions del dialogo
+                // quedan diminutos en el telefono y fuera del alcance del
+                // pulgar. Viven dentro del contenido para heredar el ancho
+                // real del dialogo en cada dispositivo.
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 50),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : _save,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 50),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        icon: Icon(
+                          _saving ? Icons.hourglass_top : Icons.save_outlined,
+                        ),
+                        label: Text(_saving
+                            ? 'Guardando...'
+                            : (_isEditing ? 'Actualizar' : 'Registrar')),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton.icon(
-          onPressed: _saving ? null : _save,
-          icon: Icon(_saving ? Icons.hourglass_top : Icons.save_outlined),
-          label: Text(_saving
-              ? 'Guardando...'
-              : (_isEditing ? 'Actualizar' : 'Registrar')),
-        ),
-      ],
+    );
+  }
+}
+
+/// Chip de accion con etiqueta para la barra superior de productos: ocupa el
+/// lugar de los IconButton con tooltip (que en el telefono quedaban pequenos
+/// y sin decir nada), con 42 dp de alto y texto claro. [destacado] pinta el
+/// chip de la accion principal con el morado de marca; los demas van hundidos
+/// en la superficie elevada, tono que sale de la paleta del modo activo.
+class _AccionChip extends StatelessWidget {
+  final IconData icono;
+  final String texto;
+  final VoidCallback alPresionar;
+  final bool destacado;
+
+  const _AccionChip({
+    required this.icono,
+    required this.texto,
+    required this.alPresionar,
+    this.destacado = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: alPresionar,
+      icon: Icon(icono, size: 18),
+      label: Text(texto),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 42),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(21)),
+        backgroundColor:
+            destacado ? Theme.of(context).colorScheme.primary : context.superficieElevada,
+        foregroundColor:
+            destacado ? Colors.white : context.textoPrimario,
+        textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
 
 /// Banda de aviso con icono. Antes el mensaje de error era un bloque de color
 /// plano, sin icono ni borde, que se leia como un hueco raro en la pantalla.
-class _AvisoBanner extends StatelessWidget {
-  final String texto;
+class _AvisoBanner extends StatelessWidget {  final String texto;
   final IconData icono;
   final Color color;
 
@@ -1469,8 +1550,8 @@ class _MovimientoDialogState extends State<_MovimientoDialog> {
         context.watch<InventarioProvider>().productos.where((p) => p.activo).toList();
     return AlertDialog(
       title: const Text('Registrar movimiento'),
-      content: SizedBox(
-        width: 460,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -1525,22 +1606,52 @@ class _MovimientoDialogState extends State<_MovimientoDialog> {
                     style: TextStyle(color: context.paleta.negativo),
                   ),
                 ],
+                const SizedBox(height: 24),
+                // Botones a lo ancho y grandes, igual que el formulario de
+                // producto: los actions del dialogo quedan muy chicos en el
+                // telefono.
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 50),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : _guardar,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 50),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        icon: Icon(
+                          _saving ? Icons.hourglass_top : Icons.save_outlined,
+                        ),
+                        label: Text(_saving ? 'Guardando...' : 'Guardar lote'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton.icon(
-          onPressed: _saving ? null : _guardar,
-          icon: Icon(_saving ? Icons.hourglass_top : Icons.save_outlined),
-          label: Text(_saving ? 'Guardando...' : 'Guardar lote'),
-        ),
-      ],
     );
   }
 

@@ -259,7 +259,12 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
       color: p.superficie,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: radioTarjeta),
+      // Borde sutil: sin el, en modo claro las tarjetas blancas se funden con
+      // el fondo casi blanco y en noche el plomo se pierde contra el negro.
+      shape: RoundedRectangleBorder(
+        borderRadius: radioTarjeta,
+        side: BorderSide(color: p.borde, width: 1),
+      ),
       margin: EdgeInsets.zero,
     ),
     dialogTheme: DialogThemeData(
@@ -299,6 +304,9 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: p.superficieElevada,
+      // Campos de ~62 dp de alto: en el telefono un campo compacto obliga a
+      // apuntar fino y el teclado se come la mitad de la pantalla.
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       hintStyle: TextStyle(color: p.textoTerciario),
       labelStyle: TextStyle(color: p.textoSecundario),
       prefixIconColor: p.textoSecundario,
@@ -318,6 +326,56 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
               ? AppColors.moradoClaro
               : AppColors.morado,
           width: 1.5,
+        ),
+      ),
+    ),
+    // Botones altos y consistentes en toda la app: los targets de toque
+    // pequenos son el problema #1 de usabilidad en el telefono. El minimo de
+    // 48-50 dp y la letra 16 salen de WCAG y de las guias de Material; los
+    // colores no se tocan aqui porque los botones ya heredan el esquema y el
+    // test de contraste (theme_test.dart) sigue pasando.
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(88, 50),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(88, 50),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(88, 50),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        side: BorderSide(color: p.borde),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        minimumSize: const Size(44, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size(0, 46)),
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        shape: const WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(14)),
+          ),
         ),
       ),
     ),
