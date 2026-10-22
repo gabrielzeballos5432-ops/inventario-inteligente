@@ -880,6 +880,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     // marca y proveedor van apilados: en media fila sus textos se cortan.
     final angosto = MediaQuery.of(context).size.width < 600;
     return AlertDialog(
+      // Mismo insetPadding que el dialogo de movimiento: el default de 40 a
+      // cada lado dejaba el modal angosto y partia los textos largos.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEditing ? 'Editar producto' : 'Registrar producto'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -1043,21 +1046,23 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton.icon(
+                      child: FilledButton(
                         onPressed: _saving ? null : _save,
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 50),
+                          // Padding 12: con el 24 del tema no cabe la mitad
+                          // del dialogo y "Actualizar" se partia en dos.
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        icon: Icon(
-                          _saving ? Icons.hourglass_top : Icons.save_outlined,
+                        child: Text(
+                          _saving
+                              ? 'Guardando...'
+                              : (_isEditing ? 'Actualizar' : 'Registrar'),
                         ),
-                        label: Text(_saving
-                            ? 'Guardando...'
-                            : (_isEditing ? 'Actualizar' : 'Registrar')),
                       ),
                     ),
                   ],
@@ -1549,6 +1554,11 @@ class _MovimientoDialogState extends State<_MovimientoDialog> {
     final disponibles =
         context.watch<InventarioProvider>().productos.where((p) => p.activo).toList();
     return AlertDialog(
+      // insetPadding propio: el default (40 a cada lado) se comia 80 dp del
+      // ancho del telefono, achataba los segmentos de tipo hasta partir las
+      // palabras en 3 lineas y hacia verse desprolijo. 16 deja el modal casi
+      // a pantalla util sin tocar los bordes.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: const Text('Registrar movimiento'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -1562,22 +1572,13 @@ class _MovimientoDialogState extends State<_MovimientoDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SegmentedButton<String>(
-                  segments: [
-                    ButtonSegment(
-                      value: 'entrada',
-                      label: Text('Entrada'),
-                      icon: Icon(Icons.login),
-                    ),
-                    ButtonSegment(
-                      value: 'salida',
-                      label: Text('Salida'),
-                      icon: Icon(Icons.logout),
-                    ),
-                    ButtonSegment(
-                      value: 'ajuste',
-                      label: Text('Ajuste'),
-                      icon: Icon(Icons.tune),
-                    ),
+                  // Sin iconos: Entrada/Salida/Ajuste caben en una linea por
+                  // segmento; con icono, en telefono se partian en 2-3.
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: 'entrada', label: Text('Entrada')),
+                    ButtonSegment(value: 'salida', label: Text('Salida')),
+                    ButtonSegment(value: 'ajuste', label: Text('Ajuste')),
                   ],
                   selected: {_tipo},
                   onSelectionChanged: (s) => setState(() => _tipo = s.first),
@@ -1629,19 +1630,20 @@ class _MovimientoDialogState extends State<_MovimientoDialog> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton.icon(
+                      child: FilledButton(
                         onPressed: _saving ? null : _guardar,
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 50),
+                          // Padding 12: con el 24 por lado del tema, el icono
+                          // y la letra 16 no caben en la mitad del dialogo y
+                          // "Guardar lote" se partia en dos lineas.
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        icon: Icon(
-                          _saving ? Icons.hourglass_top : Icons.save_outlined,
-                        ),
-                        label: Text(_saving ? 'Guardando...' : 'Guardar lote'),
+                        child: Text(_saving ? 'Guardando...' : 'Guardar lote'),
                       ),
                     ),
                   ],
