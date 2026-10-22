@@ -26,6 +26,7 @@ class MenuLateral extends StatelessWidget {
   final VoidCallback alConfigurarServidor;
   final VoidCallback alCerrarSesion;
   final ValueChanged<String> alAbrirCatalogo;
+  final VoidCallback alAbrirUsuarios;
 
   const MenuLateral({
     super.key,
@@ -40,6 +41,7 @@ class MenuLateral extends StatelessWidget {
     required this.alConfigurarServidor,
     required this.alCerrarSesion,
     required this.alAbrirCatalogo,
+    required this.alAbrirUsuarios,
   });
 
   String get _inicial {
@@ -147,6 +149,23 @@ class MenuLateral extends StatelessWidget {
               _filaCatalogo(context, Icons.category_outlined, 'Categorias', 'categorias'),
               _filaCatalogo(context, Icons.label_outline, 'Marcas', 'marcas'),
               _filaCatalogo(context, Icons.local_shipping_outlined, 'Proveedores', 'proveedores'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Material(
+                  color: Colors.transparent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.groups_outlined, color: context.textoPrimario),
+                    title: Text('Usuarios', style: TextStyle(color: context.textoPrimario)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      alAbrirUsuarios();
+                    },
+                  ),
+                ),
+              ),
             ],
             _tituloSeccion(context, 'Cuenta'),
             Padding(

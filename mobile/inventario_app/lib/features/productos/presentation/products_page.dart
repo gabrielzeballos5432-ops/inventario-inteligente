@@ -28,18 +28,29 @@ import 'proveedores_dialog.dart';
 Future<void> abrirCatalogoDesdeMenu(BuildContext context, String cual) async {
   final provider = context.read<InventarioProvider>();
   final service = provider.productService;
+  Widget pagina;
+  String titulo;
   switch (cual) {
     case 'categorias':
-      await showDialog(
-        context: context,
-        builder: (_) => _CategoriasDialog(service: service),
-      );
+      pagina = _CategoriasDialog(service: service);
+      titulo = 'Gestionar categorias';
     case 'marcas':
-      await showDialog(context: context, builder: (_) => const MarcasDialog());
+      pagina = const MarcasDialog();
+      titulo = 'Gestionar marcas';
     case 'proveedores':
-      await showDialog(
-          context: context, builder: (_) => const ProveedoresDialog());
+      pagina = const ProveedoresDialog();
+      titulo = 'Gestionar proveedores';
+    default:
+      return;
   }
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(title: Text(titulo)),
+        body: SafeArea(child: pagina),
+      ),
+    ),
+  );
   provider.cargarInventario();
 }
 

@@ -69,19 +69,8 @@ class _ShellPageState extends State<ShellPage> {
       ),
     ];
 
-    if (auth.isAdmin) {
-      tabs.add(
-        const _ShellTab(
-          title: 'Usuarios',
-          page: UsersPage(),
-          destination: NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            label: 'Usuarios',
-          ),
-        ),
-      );
-    }
-
+    // Usuarios se movio a la seccion Gestion del sidebar (junto a los
+    // catalogos): un solo hogar para la administracion, sin tab propio.
     return tabs;
   }
 
@@ -141,6 +130,9 @@ class _ShellPageState extends State<ShellPage> {
         // Los catalogos se citan con el contexto del shell (ruta raiz): si
         // colgaran del drawer, el dialogo moriria al cerrarse el menu.
         alAbrirCatalogo: (cual) => abrirCatalogoDesdeMenu(context, cual),
+        alAbrirUsuarios: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const UsersPage()),
+        ),
       ),
       body: SafeArea(
         child: IndexedStack(
