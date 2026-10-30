@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
+import 'boton_seguro.dart';
 
 /// Abre el dialogo para ver o cambiar la URL del backend sin recompilar.
 /// Devuelve true si el usuario guardo un nuevo servidor.
@@ -147,7 +148,7 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
           onPressed: () => Navigator.of(context).pop(false),
           child: const Text('Cancelar'),
         ),
-        FilledButton(
+        BotonSeguro(
           onPressed: _guardar,
           child: const Text('Guardar'),
         ),

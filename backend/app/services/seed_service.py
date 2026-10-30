@@ -8,12 +8,13 @@ from app.models.rol import Rol
 from app.models.categoria import Categoria
 from app.models.marca import Marca
 from app.models.usuario import Usuario
+from app.models.compra import Moneda
 
 logger = logging.getLogger(__name__)
 
 
 class SeedService:
-    """Crea datos iniciales: roles, categorias, marcas y usuario administrador."""
+    """Crea datos iniciales: catalogos, monedas y usuario administrador."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -22,6 +23,7 @@ class SeedService:
         await self._asegurar_roles()
         await self._asegurar_categorias()
         await self._asegurar_marcas()
+        await self._asegurar_monedas()
         await self._asegurar_admin()
         await self.db.commit()
         logger.info("Datos iniciales verificados")
@@ -48,6 +50,24 @@ class SeedService:
             existe = await self.db.execute(select(Marca).where(Marca.nombre == nombre))
             if existe.scalar_one_or_none() is None:
                 self.db.add(Marca(nombre=nombre, activo=True))
+
+    async def _asegurar_monedas(self) -> None:
+        for codigo, nombre, simbolo, pais in [
+            ("BOB", "Boliviano", "Bs", "Bolivia"),
+            ("USD", "Dólar estadounidense", "$", "Estados Unidos"),
+        ]:
+            existe = await self.db.get(Moneda, codigo)
+            if existe is None:
+                self.db.add(
+                    Moneda(
+                        codigo=codigo,
+                        nombre=nombre,
+                        simbolo=simbolo,
+                        pais=pais,
+                        decimales=2,
+                        activa=True,
+                    )
+                )
 
     async def _asegurar_admin(self) -> None:
         existe = await self.db.execute(

@@ -51,6 +51,7 @@ async def crear_producto(
         proveedor_id=body.proveedor_id,
         precio_compra=body.precio_compra,
         precio_venta=body.precio_venta,
+        precio_mayor=body.precio_mayor,
         stock_minimo=body.stock_minimo,
         activo=True,
     )

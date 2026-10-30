@@ -19,6 +19,11 @@ from app.routers import (
     marcas,
     proveedores,
     reportes,
+    ventas,
+    compras,
+    sueldos,
+    caja,
+    contabilidad,
 )
 from app.services.seed_service import SeedService
 from app.yolo.inference_service import InferenceService
@@ -67,6 +72,13 @@ app.include_router(categorias.router)
 app.include_router(marcas.router)
 app.include_router(proveedores.router)
 app.include_router(reportes.router)
+app.include_router(ventas.router)
+app.include_router(compras.compras_router)
+app.include_router(compras.monedas_router)
+app.include_router(sueldos.router)
+app.include_router(caja.caja_router)
+app.include_router(caja.clientes_router)
+app.include_router(contabilidad.router)
 
 
 @app.exception_handler(IntegrityError)
@@ -79,12 +91,16 @@ async def manejar_error_integridad(request: Request, exc: IntegrityError):
     el valor esta repetido. El rollback de la sesion lo hace get_db().
     """
     detalle = str(getattr(exc, "orig", exc))
-    if "uq_categorias_nombre_lower" in detalle or "categorias_nombre_key" in detalle:
+    if (
+        "uq_categoria_nombre_lower" in detalle
+        or "uq_categorias_nombre_lower" in detalle
+        or "categorias_nombre_key" in detalle
+    ):
         mensaje = (
             "Ya existe una categoria con ese nombre (no se distinguen las "
             "mayusculas de las minusculas)."
         )
-    elif "uq_usuarios_email_lower" in detalle:
+    elif "uq_usuario_email_lower" in detalle or "uq_usuarios_email_lower" in detalle:
         mensaje = "Ya existe un usuario registrado con ese correo."
     elif "codigo_barras" in detalle:
         mensaje = "Ese codigo de barras ya pertenece a otro producto."

@@ -24,7 +24,7 @@ class MarcaRepository:
 
     async def obtener_por_nombre(self, nombre: str) -> Optional[Marca]:
         # Sin distincion de mayusculas, igual que categorias: la unicidad la
-        # garantiza uq_marcas_nombre_lower sobre lower(nombre).
+        # garantiza uq_marca_nombre_lower sobre lower(nombre).
         resultado = await self.db.execute(
             select(Marca)
             .where(func.lower(Marca.nombre) == nombre.strip().lower())

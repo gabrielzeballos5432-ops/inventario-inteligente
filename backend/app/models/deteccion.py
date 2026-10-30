@@ -14,7 +14,7 @@ from app.db.base import Base
 
 
 class Deteccion(Base):
-    __tablename__ = "detecciones"
+    __tablename__ = "deteccion"
     __table_args__ = (
         CheckConstraint("confianza BETWEEN 0 AND 1", name="chk_confianza_rango"),
     )
@@ -22,10 +22,10 @@ class Deteccion(Base):
     id = Column(Integer, primary_key=True, index=True)
     sesion_id = Column(
         Integer,
-        ForeignKey("sesiones_camara.id", ondelete="CASCADE"),
+        ForeignKey("sesion_camara.id", ondelete="CASCADE"),
         nullable=False,
     )
-    producto_id = Column(Integer, ForeignKey("productos.id"))
+    producto_id = Column(Integer, ForeignKey("producto.id"))
     confianza = Column(Numeric(5, 4), nullable=False)
     imagen_url = Column(Text)
     detectado_en = Column(

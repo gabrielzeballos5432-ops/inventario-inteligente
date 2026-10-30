@@ -17,42 +17,8 @@ import '../../../core/utils/descarga_reporte.dart'
 import '../../../core/utils/validaciones.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'barcode_scanner_page.dart';
-import 'marcas_dialog.dart';
-import 'proveedores_dialog.dart';
-
-/// Abre el catalogo pedido desde el sidebar (fuera de la pagina de
-/// productos). Es funcion de primer nivel porque la gestion de
-/// categorias/marcas/proveedores es privada de este archivo, pero el menu
-/// lateral debe alcanzarla. Al cerrar refresca el inventario para reflejar la
-/// edicion del catalogo (colores, marcas y proveedores alimentan productos).
-Future<void> abrirCatalogoDesdeMenu(BuildContext context, String cual) async {
-  final provider = context.read<InventarioProvider>();
-  final service = provider.productService;
-  Widget pagina;
-  String titulo;
-  switch (cual) {
-    case 'categorias':
-      pagina = _CategoriasDialog(service: service);
-      titulo = 'Gestionar categorias';
-    case 'marcas':
-      pagina = const MarcasDialog();
-      titulo = 'Gestionar marcas';
-    case 'proveedores':
-      pagina = const ProveedoresDialog();
-      titulo = 'Gestionar proveedores';
-    default:
-      return;
-  }
-  await Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => Scaffold(
-        appBar: AppBar(title: Text(titulo)),
-        body: SafeArea(child: pagina),
-      ),
-    ),
-  );
-  provider.cargarInventario();
-}
+import 'movimiento_dialog.dart';
+import '../../../shared/widgets/boton_seguro.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
@@ -95,6 +61,7 @@ class _ProductsPageState extends State<ProductsPage> {
       // escribir su nombre ni la etiqueta.
       final matchTexto = query.isEmpty ||
           p.nombre.toLowerCase().contains(query) ||
+          (p.sku != null && p.sku!.toLowerCase().contains(query)) ||
           (p.codigoBarras != null &&
               p.codigoBarras!.toLowerCase().contains(query));
       final matchCategoria = _filtroCategoria == null ||
@@ -110,7 +77,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final isAdmin = SessionController.instance.isAdmin;
 
 return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -132,7 +99,7 @@ return ListView(
                     ),
                   _AccionChip(
                     icono: Icons.playlist_add,
-                    texto: 'Lote',
+                    texto: 'Movimiento',
                     alPresionar: () => _openLoteDialog(context),
                   ),
                   _AccionChip(
@@ -247,10 +214,19 @@ return ListView(
             ),
           )
         else
-          ..._productosFiltrados(productos).map(
-            (p) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SectionCard(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columnas = constraints.maxWidth >= 900 ? 2 : 1;
+              final ancho = (constraints.maxWidth - (columnas - 1) * 12) /
+                  columnas;
+              return Wrap(
+                spacing: 12,
+                children: _productosFiltrados(productos).map(
+                  (p) => SizedBox(
+                    width: ancho,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -329,8 +305,12 @@ return ListView(
                       ),
                   ],
                 ),
-              ),
-            ),
+                      ),
+                    ),
+                  ),
+                ).toList(),
+              );
+            },
           ),
         if (inventario.error != null) ...[
           SizedBox(height: 16),
@@ -369,6 +349,7 @@ return ListView(
     final nuevo = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Configurar stock minimo'),
         content: Form(
           key: formKey,
@@ -390,7 +371,7 @@ return ListView(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               Navigator.of(context).pop(int.tryParse(controller.text) ?? 0);
@@ -412,10 +393,7 @@ return ListView(
   /// solo guardado. Sale sin fila precargada porque aqui el usuario ya llega
   /// queriendo cargar una lista, no un producto concreto.
   Future<void> _openLoteDialog(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => const _MovimientoDialog(),
-    );
+    final ok = await mostrarMovimientoLote(context);
     if (ok != true) return;
     _refresh();
     await context.read<InventarioProvider>().cargarInventario();
@@ -423,10 +401,7 @@ return ListView(
 
   Future<void> _openMovimientoDialog(
       BuildContext context, ProductoConStock product) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => _MovimientoDialog(product: product),
-    );
+    final ok = await mostrarMovimientoLote(context, producto: product);
     if (ok != true) return;
     _refresh();
     await context.read<InventarioProvider>().cargarInventario();
@@ -463,6 +438,7 @@ return ListView(
     final repone = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         icon: Icon(Icons.warning_amber, color: context.paleta.stockBajo, size: 32),
         title: Text(eraBajo ? 'Sigue bajo el minimo' : 'Stock bajo el minimo'),
         content: Column(
@@ -495,10 +471,10 @@ return ListView(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Entendido'),
           ),
-          FilledButton.icon(
+          BotonSeguro(
             onPressed: () => Navigator.of(ctx).pop(true),
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('Registrar entrada'),
+            child: const Text('Registrar entrada'),
           ),
         ],
       ),
@@ -508,13 +484,11 @@ return ListView(
     // Se abre la entrada con la cantidad que hace falta ya calculada: el
     // aviso sirve para actuar, no solo para informar. `despues` es el producto
     // ya actualizado del inventario, asi que se reutiliza tal cual.
-    final ok2 = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => _MovimientoDialog(
-        product: actual,
-        tipoInicial: 'entrada',
-        cantidadInicial: suggested,
-      ),
+    final ok2 = await mostrarMovimientoLote(
+      context,
+      producto: actual,
+      tipoInicial: 'entrada',
+      cantidadInicial: suggested,
     );
     if (ok2 == true && mounted) {
       _refresh();
@@ -526,6 +500,7 @@ return ListView(
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Dar de baja producto'),
         content: Text('Se dara de baja "${product.nombre}".'),
         actions: [
@@ -533,7 +508,7 @@ return ListView(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Dar de baja'),
           ),
@@ -652,10 +627,16 @@ class _ProductFormDialog extends StatefulWidget {
 
 class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  late final CatalogService _catalogService;
+  late final Future<List<Categoria>> _futureCategorias;
+  late final Future<List<Marca>> _futureMarcas;
+  late final Future<List<Proveedor>> _futureProveedores;
   late final TextEditingController _nombreController;
   late final TextEditingController _descripcionController;
   late final TextEditingController _precioCompraController;
   late final TextEditingController _precioVentaController;
+  late final TextEditingController _precioMayorController;
+  late final TextEditingController _codigoController;
   late final TextEditingController _stockMinimoController;
   late final TextEditingController _codigoBarrasController;
   int? _categoriaId;
@@ -670,6 +651,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   @override
   void initState() {
     super.initState();
+    _catalogService = CatalogService(ApiClient());
+    _futureCategorias = widget.service.fetchCategorias();
+    _futureMarcas = _catalogService.fetchMarcas();
+    _futureProveedores = _catalogService.fetchProveedores();
     final p = widget.product;
     _nombreController = TextEditingController(text: p?.nombre ?? '');
     _descripcionController = TextEditingController(text: p?.descripcion ?? '');
@@ -677,6 +662,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         text: p != null ? p.precioCompra.toStringAsFixed(2) : '');
     _precioVentaController = TextEditingController(
         text: p != null ? p.precioVenta.toStringAsFixed(2) : '');
+    _precioMayorController = TextEditingController(
+        text: p?.precioMayor?.toStringAsFixed(2) ?? '');
+    _codigoController = TextEditingController(text: p?.sku ?? '');
     _stockMinimoController =
         TextEditingController(text: p != null ? '${p.stockMinimo}' : '5');
     _codigoBarrasController =
@@ -692,6 +680,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _descripcionController.dispose();
     _precioCompraController.dispose();
     _precioVentaController.dispose();
+    _precioMayorController.dispose();
+    _codigoController.dispose();
     _stockMinimoController.dispose();
     _codigoBarrasController.dispose();
     super.dispose();
@@ -701,7 +691,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   /// estado por defecto de un producto nuevo.
   Widget _selectorMarca() {
     return FutureBuilder<List<Marca>>(
-      future: CatalogService(ApiClient()).fetchMarcas(),
+      future: _futureMarcas,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const InputDecorator(
@@ -740,7 +730,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   /// Selector de proveedor. Opcional, con el mismo criterio que la marca.
   Widget _selectorProveedor() {
     return FutureBuilder<List<Proveedor>>(
-      future: CatalogService(ApiClient()).fetchProveedores(),
+      future: _futureProveedores,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const InputDecorator(
@@ -812,6 +802,13 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       'precio_venta':
           double.tryParse(_precioVentaController.text.replaceAll(',', '.')) ??
               0,
+      'precio_mayor': double.tryParse(
+          _precioMayorController.text.trim().replaceAll(',', '.')),
+      // Codigo propio de la tienda (columna sku, UNIQUE): igual que el codigo
+      // de barras, vacio se manda como null para no chocar entre productos.
+      'sku': _codigoController.text.trim().isEmpty
+          ? null
+          : _codigoController.text.trim(),
       'stock_minimo': int.tryParse(_stockMinimoController.text) ?? 5,
       'categoria_id': _categoriaId,
       // Marca y proveedor son opcionales: null es "sin asignar". Se mandan
@@ -867,6 +864,16 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextFormField(
+                  controller: _codigoController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Codigo (opcional)',
+                    helperText: 'Codigo propio de la tienda, se usa en ventas.',
+                    helperMaxLines: 2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
                   controller: _nombreController,
                   decoration: const InputDecoration(
                     labelText: 'Nombre',
@@ -920,6 +927,19 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  controller: _precioMayorController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Precio por mayor (Bs.) (opcional)',
+                    errorMaxLines: 2,
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? null
+                      : Validaciones.precio(v, etiqueta: 'precio por mayor'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
                   controller: _stockMinimoController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -932,7 +952,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 FutureBuilder<List<Categoria>>(
-                  future: widget.service.fetchCategorias(),
+                  future: _futureCategorias,
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return const InputDecorator(
@@ -1008,7 +1028,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                             ? null
                             : () => Navigator.of(context).pop(false),
                         style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 50),
+                          minimumSize: const Size(0, 44),
                           textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -1019,10 +1039,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton(
+                      child: BotonSeguro(
                         onPressed: _saving ? null : _save,
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 50),
+                          minimumSize: const Size(0, 44),
                           // Padding 12: con el 24 del tema no cabe la mitad
                           // del dialogo y "Actualizar" se partia en dos.
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1158,15 +1178,15 @@ class _ErrorFila extends StatelessWidget {
   }
 }
 
-class _CategoriasDialog extends StatefulWidget {
+class CategoriasPage extends StatefulWidget {
   final ProductService service;
-  const _CategoriasDialog({required this.service});
+  const CategoriasPage({super.key, required this.service});
 
   @override
-  State<_CategoriasDialog> createState() => _CategoriasDialogState();
+  State<CategoriasPage> createState() => _CategoriasPageState();
 }
 
-class _CategoriasDialogState extends State<_CategoriasDialog> {
+class _CategoriasPageState extends State<CategoriasPage> {
   late Future<List<Categoria>> _future;
   final _nombreController = TextEditingController();
 
@@ -1222,6 +1242,7 @@ class _CategoriasDialogState extends State<_CategoriasDialog> {
     final nombre = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('Renombrar categoria'),
         content: Form(
           key: formKey,
@@ -1245,7 +1266,7 @@ class _CategoriasDialogState extends State<_CategoriasDialog> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               Navigator.of(ctx).pop(controller.text.trim());
@@ -1277,6 +1298,7 @@ class _CategoriasDialogState extends State<_CategoriasDialog> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('Desactivar categoria'),
         content: Text(
           'La categoria "${c.nombre}" dejara de aparecer al registrar o editar '
@@ -1287,7 +1309,7 @@ class _CategoriasDialogState extends State<_CategoriasDialog> {
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Desactivar'),
           ),
@@ -1309,418 +1331,78 @@ class _CategoriasDialogState extends State<_CategoriasDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Gestionar categorias'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return FutureBuilder<List<Categoria>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final categorias = snapshot.data ?? const <Categoria>[];
+        return ListView(
+          padding: const EdgeInsets.all(20),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _nombreController,
-                    decoration:
-                        const InputDecoration(labelText: 'Nueva categoria'),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _crear,
-                  icon: const Icon(Icons.add),
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Desactivar no borra el nombre: si vuelves a escribir el de una '
-              'categoria desactivada, esta se reactiva.',
-              style: TextStyle(color: context.textoTerciario, fontSize: 11),
-            ),
-            const SizedBox(height: 12),
-            FutureBuilder<List<Categoria>>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator();
-                }
-                // Sin este caso, una lista vacia producida por un fallo de red
-                // se presentaria como No hay categorias: un dato falso que
-                // hace creer al usuario que el salon no tiene categorias y lo
-                // lleva a crear duplicadas.
-                if (snapshot.hasError) {
-                  return Row(
-                    children: [
-                      Icon(Icons.cloud_off,
-                          size: 16, color: context.paleta.stockBajo),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'No se pudieron cargar las categorias.',
-                          style:
-                              TextStyle(color: context.paleta.stockBajo, fontSize: 12),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _reload,
-                        child: const Text('Reintentar'),
-                      ),
+            Row(children: [
+              Expanded(child: Text('Administra las categorias del inventario.', style: TextStyle(color: context.textoSecundario))),
+              BotonSeguro(onPressed: _abrirCrear, icon: const Icon(Icons.add), child: const Text('Registrar')),
+            ]),
+            const SizedBox(height: 20),
+            if (snapshot.connectionState == ConnectionState.waiting)
+              const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+            else if (snapshot.hasError)
+              SectionCard(child: Row(children: [
+                Icon(Icons.cloud_off, color: context.paleta.stockBajo),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('No se pudieron cargar las categorias.')),
+                TextButton(onPressed: _reload, child: const Text('Reintentar')),
+              ]))
+            else if (categorias.isEmpty)
+              const SectionCard(child: Text('No hay categorias registradas.'))
+            else ...[
+              SectionCard(child: Text('Total de categorias: ${categorias.length}', style: const TextStyle(fontWeight: FontWeight.w600))),
+              const SizedBox(height: 12),
+              ...categorias.map((c) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SectionCard(child: Row(children: [
+                  const Icon(Icons.category_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(c.nombre)),
+                  PopupMenuButton<String>(
+                    tooltip: 'Acciones',
+                    onSelected: (op) { if (op == 'editar') _editar(c); if (op == 'desactivar') _desactivar(context, c); },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'editar', child: Text('Editar')),
+                      PopupMenuItem(value: 'desactivar', child: Text('Desactivar')),
                     ],
-                  );
-                }
-                final cats = snapshot.data ?? const <Categoria>[];
-                if (cats.isEmpty) {
-                  return const Text('No hay categorias.');
-                }
-                return Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: cats
-                        .map((c) => ListTile(
-                              dense: true,
-                              title: Text(c.nombre),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    tooltip: 'Renombrar categoria',
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () => _editar(c),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Desactivar categoria',
-                                    icon: const Icon(Icons.delete_outline),
-                                    onPressed: () => _desactivar(context, c),
-                                  ),
-                                ],
-                              ),
-                            ))
-                        .toList(),
                   ),
-                );
-              },
-            ),
+                ])),
+              )),
+            ],
+            const SizedBox(height: 8),
+            Text('Desactivar no borra el nombre: al registrar nuevamente una categoria desactivada, se reactiva.', style: TextStyle(color: context.textoTerciario, fontSize: 12)),
           ],
-        ),
-      ),
-actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cerrar'),
-        ),
-      ],
-    );
-  }
-}
-
-class _MovimientoDialog extends StatefulWidget {
-  /// Producto con el que se abre el dialogo. No viene cuando se abre desde el
-  /// boton "Movimiento por lote" de la barra superior: ahi las filas se eligen
-  /// a mano, producto por producto.
-  final ProductoConStock? product;
-
-  /// Se usan al abrir el dialogo desde la alerta de stock bajo: la repeticion
-  /// sale ya en "Entrada" y con la cantidad que falta calculada, para que
-  /// reponer sea un toque y no un formulario desde cero.
-  final String? tipoInicial;
-  final int? cantidadInicial;
-
-  const _MovimientoDialog({
-    this.product,
-    this.tipoInicial,
-    this.cantidadInicial,
-  });
-
-  @override
-  State<_MovimientoDialog> createState() => _MovimientoDialogState();
-}
-
-/// Una fila del lote: producto elegido + cantidad escrita. Con controllers por
-/// fila se puede agregar y quitar lineas sin perder lo tecleado de las demas.
-class _FilaLote {
-  ProductoConStock? producto;
-  final TextEditingController cantidad = TextEditingController();
-}
-
-class _MovimientoDialogState extends State<_MovimientoDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final List<_FilaLote> _filas;
-  late String _tipo;
-  bool _saving = false;
-  String? _error;
-  bool get _esAjuste => _tipo == 'ajuste';
-
-  @override
-  void initState() {
-    super.initState();
-    _tipo = widget.tipoInicial ?? 'entrada';
-    _filas = [];
-    final inicial = widget.product;
-    if (inicial != null) {
-      final fila = _FilaLote();
-      fila.producto = inicial;
-      fila.cantidad.text = widget.cantidadInicial?.toString() ?? '';
-      _filas.add(fila);
-    } else {
-      _filas.add(_FilaLote());
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final fila in _filas) {
-      fila.cantidad.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    // Los validadores ya garantizan producto elegido y cantidad escrita, asi
-    // que aqui se puede parsear sin sustos. El tipo va una sola vez: el lote es
-    // por tipo, no una mezcla de entradas y salidas (asi lo exige el backend,
-    // que valida stock fila a fila y guarda todo o nada).
-    final items = <({int productoId, int cantidad})>[];
-    for (final fila in _filas) {
-      items.add((
-        productoId: fila.producto!.id,
-        cantidad: int.parse(fila.cantidad.text.trim()),
-      ));
-    }
-    try {
-      final guardados = await context
-          .read<InventarioProvider>()
-          .registrarLote(tipo: _tipo, items: items);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(guardados == 1
-              ? '1 movimiento guardado'
-              : '$guardados movimientos guardados'),
-        ),
-      );
-      Navigator.of(context).pop(true);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
-        // El 400 trae el rechazo fila a fila ("Fila 2 (Esmalte Rojo 30): no
-        // hay stock suficiente..."), listo para mostrarlo tal cual.
-        _error = e.detalle;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _error =
-            'Sin conexion con el servidor. No se guardo ningun movimiento.';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final disponibles =
-        context.watch<InventarioProvider>().productos.where((p) => p.activo).toList();
-    return AlertDialog(
-      // insetPadding propio: el default (40 a cada lado) se comia 80 dp del
-      // ancho del telefono, achataba los segmentos de tipo hasta partir las
-      // palabras en 3 lineas y hacia verse desprolijo. 16 deja el modal casi
-      // a pantalla util sin tocar los bordes.
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Registrar movimiento'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            // El teclado resta altura y cada fila agrega dos campos: sin el
-            // scroll el dialogo se desborda y aparece la franja amarilla.
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SegmentedButton<String>(
-                  // Sin iconos: Entrada/Salida/Ajuste caben en una linea por
-                  // segmento; con icono, en telefono se partian en 2-3.
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: 'entrada', label: Text('Entrada')),
-                    ButtonSegment(value: 'salida', label: Text('Salida')),
-                    ButtonSegment(value: 'ajuste', label: Text('Ajuste')),
-                  ],
-                  selected: {_tipo},
-                  onSelectionChanged: (s) => setState(() => _tipo = s.first),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Una fila por producto, todas del mismo tipo',
-                  style:
-                      TextStyle(color: context.textoSecundario, fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                for (var i = 0; i < _filas.length; i++)
-                  _filaCard(i, disponibles),
-                OutlinedButton.icon(
-                  onPressed: _saving
-                      ? null
-                      : () => setState(() => _filas.add(_FilaLote())),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Agregar producto'),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  // El detalle del lote trae una linea por fila rechazada.
-                  Text(
-                    _error!,
-                    style: TextStyle(color: context.paleta.negativo),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                // Botones a lo ancho y grandes, igual que el formulario de
-                // producto: los actions del dialogo quedan muy chicos en el
-                // telefono.
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.of(context).pop(false),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 50),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        child: const Text('Cancelar'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _saving ? null : _guardar,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 50),
-                          // Padding 12: con el 24 por lado del tema, el icono
-                          // y la letra 16 no caben en la mitad del dialogo y
-                          // "Guardar lote" se partia en dos lineas.
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        child: Text(_saving ? 'Guardando...' : 'Guardar lote'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-              ],
-            ),
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _filaCard(int indice, List<ProductoConStock> disponibles) {
-    final fila = _filas[indice];
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Producto ${indice + 1}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: context.textoSecundario,
-                ),
-              ),
-              const Spacer(),
-              if (_filas.length > 1)
-                IconButton(
-                  tooltip: 'Quitar fila',
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () {
-                    final filaQuitada = _filas.removeAt(indice);
-                    // El controller sigue colgado en la fila que sale de la
-                    // pantalla en este mismo frame: se despide al final, no
-                    // antes, o EditableText choca contra un controller muerto.
-                    WidgetsBinding.instance.addPostFrameCallback(
-                      (_) => filaQuitada.cantidad.dispose(),
-                    );
-                    setState(() {});
-                  },
-                ),
-            ],
-          ),
-          DropdownButtonFormField<ProductoConStock>(
-            value: fila.producto,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Producto',
-              errorMaxLines: 2,
-            ),
-            items: [
-              for (final p in disponibles)
-                DropdownMenuItem(
-                  value: p,
-                  child: Text(
-                    p.nombre,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: _saving
-                ? null
-                : (p) => setState(() => fila.producto = p),
-            validator: (p) {
-              if (p == null) return 'Elige el producto';
-              final repetida = _filas.indexWhere(
-                (f) => f.producto != null && f.producto!.id == p.id,
-              );
-              if (repetida >= 0 && repetida != indice) {
-                return 'Ya esta en la fila ${repetida + 1}';
-              }
-              return null;
-            },
-          ),
-          TextFormField(
-            controller: fila.cantidad,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(
-              labelText: _esAjuste ? 'Nuevo stock (ajuste)' : 'Cantidad',
-              helperText: _esAjuste
-                  ? 'Establece el stock exacto del producto'
-                  : null,
-              errorMaxLines: 2,
-            ),
-            validator: (v) => Validaciones.cantidad(
-              v,
-              tipo: _tipo,
-              stockDisponible: fila.producto?.stockActual,
-            ),
-          ),
+  Future<void> _abrirCrear() async {
+    final formKey = GlobalKey<FormState>();
+    _nombreController.clear();
+    final crear = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: const Text('Registrar categoria'),
+        content: Form(key: formKey, child: TextFormField(
+          controller: _nombreController,
+          autofocus: true,
+          validator: Validaciones.nombreSinNumeros,
+          decoration: const InputDecoration(labelText: 'Nombre', errorMaxLines: 2),
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          BotonSeguro(onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(ctx, true); }, child: const Text('Registrar')),
         ],
       ),
     );
+    if (crear == true) await _crear();
   }
 }
 
@@ -1957,7 +1639,7 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 50),
+                      minimumSize: const Size(0, 44),
                       textStyle: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

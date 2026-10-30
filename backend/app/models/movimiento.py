@@ -5,6 +5,7 @@ from sqlalchemy import (
     ForeignKey,
     DateTime,
     CheckConstraint,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import relationship
@@ -13,7 +14,7 @@ from app.db.base import Base
 
 
 class Movimiento(Base):
-    __tablename__ = "movimientos"
+    __tablename__ = "movimiento"
     __table_args__ = (
         CheckConstraint(
             "tipo IN ('entrada', 'salida', 'ajuste')", name="chk_movimiento_tipo"
@@ -38,13 +39,32 @@ class Movimiento(Base):
             "OR (tipo = 'ajuste')",
             name="chk_consistencia_movimiento",
         ),
+        UniqueConstraint("venta_detalle_id", name="uq_movimiento_venta_detalle"),
+        UniqueConstraint("compra_detalle_id", name="uq_movimiento_compra_detalle"),
+        CheckConstraint(
+            "movimiento_revertido_id IS NULL OR tipo IN ('entrada', 'salida')",
+            name="chk_movimiento_reversion_tipo",
+        ),
+        CheckConstraint(
+            "venta_detalle_id IS NULL OR compra_detalle_id IS NULL",
+            name="chk_movimiento_un_solo_documento",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    producto_id = Column(Integer, ForeignKey("producto.id"), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuario.id"))
     sesion_id = Column(
-        Integer, ForeignKey("sesiones_camara.id", ondelete="SET NULL")
+        Integer, ForeignKey("sesion_camara.id", ondelete="SET NULL")
+    )
+    venta_detalle_id = Column(
+        Integer, ForeignKey("venta_detalle.id", ondelete="RESTRICT")
+    )
+    compra_detalle_id = Column(
+        Integer, ForeignKey("compra_detalle.id", ondelete="RESTRICT")
+    )
+    movimiento_revertido_id = Column(
+        Integer, ForeignKey("movimiento.id", ondelete="RESTRICT")
     )
     tipo = Column(String(20), nullable=False)
     cantidad_anterior = Column(Integer, nullable=False)
@@ -56,3 +76,9 @@ class Movimiento(Base):
     producto = relationship("Producto", back_populates="movimientos")
     usuario = relationship("Usuario", back_populates="movimientos")
     sesion = relationship("SesionCamara", back_populates="movimientos")
+    venta_detalle = relationship("VentaDetalle", back_populates="movimientos")
+    compra_detalle = relationship("CompraDetalle", back_populates="movimiento")
+    movimiento_revertido = relationship(
+        "Movimiento", remote_side=[id], back_populates="reversiones"
+    )
+    reversiones = relationship("Movimiento", back_populates="movimiento_revertido")

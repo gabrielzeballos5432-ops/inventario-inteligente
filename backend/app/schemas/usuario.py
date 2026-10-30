@@ -1,6 +1,14 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from typing import Optional
+from decimal import Decimal
+from typing import Annotated, Optional
 from datetime import datetime
+
+PagoPorHora = Annotated[
+    Decimal, Field(gt=0, max_digits=10, decimal_places=2)
+]
+PorcentajeComision = Annotated[
+    Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)
+]
 
 
 class RolOut(BaseModel):
@@ -16,6 +24,8 @@ class UsuarioBase(BaseModel):
     email: EmailStr
     rol_id: int
     activo: bool = True
+    pago_por_hora: Optional[PagoPorHora] = None
+    porcentaje_comision: Optional[PorcentajeComision] = None
 
 
 class UsuarioCreate(UsuarioBase):
@@ -27,6 +37,8 @@ class UsuarioUpdate(BaseModel):
     email: Optional[EmailStr] = None
     rol_id: Optional[int] = None
     activo: Optional[bool] = None
+    pago_por_hora: Optional[PagoPorHora] = None
+    porcentaje_comision: Optional[PorcentajeComision] = None
     password: Optional[str] = Field(default=None, min_length=6, max_length=128)
 
 
@@ -38,3 +50,5 @@ class UsuarioOut(BaseModel):
     rol_nombre: str
     activo: bool
     created_at: Optional[datetime] = None
+    pago_por_hora: Optional[Decimal] = None
+    porcentaje_comision: Optional[Decimal] = None

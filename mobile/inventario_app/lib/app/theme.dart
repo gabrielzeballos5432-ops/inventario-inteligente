@@ -232,11 +232,15 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
   // El morado de marca necesita texto blanco encima en los dos modos.
   final esquema = scheme.copyWith(onPrimary: Colors.white);
 
-  final radioBorde = BorderRadius.circular(18);
-  final radioTarjeta = BorderRadius.circular(22);
+  final radioBorde = BorderRadius.circular(12);
+  final radioTarjeta = BorderRadius.circular(16);
 
   return ThemeData(
     useMaterial3: true,
+    // Interfaz compacta: la app se usa sobre todo en el telefono y con el
+    // teclado abierto queda media pantalla. Los toques siguen >= 40-44 dp.
+    visualDensity: VisualDensity.compact,
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     brightness: brightness,
     colorScheme: esquema,
     extensions: <ThemeExtension<dynamic>>[p],
@@ -270,7 +274,15 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
     dialogTheme: DialogThemeData(
       backgroundColor: p.superficie,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      // El inset por defecto (40 dp) deja el formulario en una columna
+      // angosta en el telefono; con 12 dp aprovecha casi todo el ancho.
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+      titleTextStyle: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: p.textoPrimario,
+      ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: p.superficie,
@@ -288,6 +300,9 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
     listTileTheme: ListTileThemeData(
       iconColor: p.textoSecundario,
       textColor: p.textoPrimario,
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      minLeadingWidth: 24,
     ),
     chipTheme: ChipThemeData(
       backgroundColor: p.superficieElevada,
@@ -304,9 +319,10 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: p.superficieElevada,
-      // Campos de ~62 dp de alto: en el telefono un campo compacto obliga a
-      // apuntar fino y el teclado se come la mitad de la pantalla.
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      // Campos densos (~48 dp): con el teclado abierto caben mas filas sin
+      // desplazarse y la etiqueta flotante sigue legible.
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       hintStyle: TextStyle(color: p.textoTerciario),
       labelStyle: TextStyle(color: p.textoSecundario),
       prefixIconColor: p.textoSecundario,
@@ -329,52 +345,51 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
         ),
       ),
     ),
-    // Botones altos y consistentes en toda la app: los targets de toque
-    // pequenos son el problema #1 de usabilidad en el telefono. El minimo de
-    // 48-50 dp y la letra 16 salen de WCAG y de las guias de Material; los
-    // colores no se tocan aqui porque los botones ya heredan el esquema y el
-    // test de contraste (theme_test.dart) sigue pasando.
+    // Botones compactos y consistentes en toda la app: 44 dp de alto (minimo
+    // comodo para el pulgar segun WCAG 2.5.8) y letra 15, para que formularios
+    // y tablas quepan en el telefono sin desbordarse. Los colores no se tocan
+    // aqui porque los botones heredan el esquema y theme_test.dart lo valida.
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(88, 50),
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        minimumSize: const Size(88, 50),
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(88, 50),
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         side: BorderSide(color: p.borde),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        minimumSize: const Size(44, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        minimumSize: const Size(40, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(
-        minimumSize: const WidgetStatePropertyAll(Size(0, 46)),
+        minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
         textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         shape: const WidgetStatePropertyAll(
           RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(14)),
+            borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
         ),
       ),

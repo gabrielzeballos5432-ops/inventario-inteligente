@@ -7,9 +7,11 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mas ajustado en el telefono: cada dp lateral es ancho util de la tabla.
+    final angosta = MediaQuery.sizeOf(context).width < 600;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(angosta ? 12 : 16),
         child: child,
       ),
     );

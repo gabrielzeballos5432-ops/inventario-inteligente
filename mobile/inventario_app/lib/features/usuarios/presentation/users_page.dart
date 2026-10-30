@@ -9,6 +9,7 @@ import '../../../core/services/user_service.dart';
 import '../../../core/session/session_controller.dart';
 import '../../../core/utils/validaciones.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/boton_seguro.dart';
 
 /// Estado del listado de roles dentro del panel de usuarios. Distingue
 /// cargando, fallo y listo para no habilitar el alta de usuarios con una
@@ -27,7 +28,8 @@ RolesEstado _estadoDe(AsyncSnapshot<List<RoleOption>> snapshot) {
   if (snapshot.hasError) {
     return const RolesEstado(
       puedeEditar: false,
-      mensaje: 'No se pudieron cargar los roles. El alta y la edicion de '
+      mensaje:
+          'No se pudieron cargar los roles. El alta y la edicion de '
           'usuarios quedan deshabilitadas hasta recuperar la lista.',
     );
   }
@@ -35,7 +37,8 @@ RolesEstado _estadoDe(AsyncSnapshot<List<RoleOption>> snapshot) {
   if (roles.isEmpty) {
     return const RolesEstado(
       puedeEditar: false,
-      mensaje: 'El servidor no devolvio ningun rol, asi que no se puede '
+      mensaje:
+          'El servidor no devolvio ningun rol, asi que no se puede '
           'asignar uno a un usuario.',
     );
   }
@@ -125,11 +128,8 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (context) => _UserFormDialog(
-        user: user,
-        roles: roles,
-        service: _service,
-      ),
+      builder: (context) =>
+          _UserFormDialog(user: user, roles: roles, service: _service),
     );
 
     if (saved == true) {
@@ -141,7 +141,11 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
     final sessionUserId = SessionController.instance.user?.id;
     if (sessionUserId == user.id) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No es posible desactivar tu propia cuenta desde esta sesion.')),
+        const SnackBar(
+          content: Text(
+            'No es posible desactivar tu propia cuenta desde esta sesion.',
+          ),
+        ),
       );
       return;
     }
@@ -149,6 +153,7 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Desactivar usuario'),
         content: Text('Se desactivara la cuenta de ${user.nombreCompleto}.'),
         actions: [
@@ -156,7 +161,7 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Desactivar'),
           ),
@@ -216,7 +221,9 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
         children: const [
           // El titulo de la pestana ya lo muestra la AppBar.
           SectionCard(
-            child: Text('Solo un administrador puede ver y gestionar el panel de usuarios.'),
+            child: Text(
+              'Solo un administrador puede ver y gestionar el panel de usuarios.',
+            ),
           ),
         ],
       );
@@ -259,8 +266,8 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                       ),
                     ),
                     FilledButton.icon(
-                      onPressed: usersSnapshot.hasData &&
-                              estadoRoles.puedeEditar
+                      onPressed:
+                          usersSnapshot.hasData && estadoRoles.puedeEditar
                           ? () => _openUserDialog(roles: roles)
                           : null,
                       icon: const Icon(Icons.person_add_alt_1),
@@ -277,9 +284,20 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Total', style: TextStyle(color: context.textoSecundario)),
+                              Text(
+                                'Total',
+                                style: TextStyle(
+                                  color: context.textoSecundario,
+                                ),
+                              ),
                               const SizedBox(height: 8),
-                              Text('${users.length}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                              Text(
+                                '${users.length}',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -290,9 +308,20 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Activos', style: TextStyle(color: context.textoSecundario)),
+                              Text(
+                                'Activos',
+                                style: TextStyle(
+                                  color: context.textoSecundario,
+                                ),
+                              ),
                               const SizedBox(height: 8),
-                              Text('$activeUsers', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                              Text(
+                                '$activeUsers',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -303,9 +332,20 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Inactivos', style: TextStyle(color: context.textoSecundario)),
+                              Text(
+                                'Inactivos',
+                                style: TextStyle(
+                                  color: context.textoSecundario,
+                                ),
+                              ),
                               const SizedBox(height: 8),
-                              Text('$inactiveUsers', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                              Text(
+                                '$inactiveUsers',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -318,14 +358,19 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                     child: SectionCard(
                       child: Row(
                         children: [
-                          Icon(Icons.cloud_off,
-                              size: 18, color: context.paleta.stockBajo),
+                          Icon(
+                            Icons.cloud_off,
+                            size: 18,
+                            color: context.paleta.stockBajo,
+                          ),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               estadoRoles.mensaje!,
                               style: TextStyle(
-                                  color: context.paleta.stockBajo, fontSize: 12),
+                                color: context.paleta.stockBajo,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                           TextButton(
@@ -338,9 +383,18 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                   ),
                 const SizedBox(height: 20),
                 if (usersSnapshot.connectionState == ConnectionState.waiting)
-                  const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
                 else if (usersSnapshot.hasError)
-                  SectionCard(child: Text('No se pudo cargar el panel de usuarios: ${usersSnapshot.error}'))
+                  SectionCard(
+                    child: Text(
+                      'No se pudo cargar el panel de usuarios: ${usersSnapshot.error}',
+                    ),
+                  )
                 else if (!usersSnapshot.hasData || users.isEmpty)
                   const SectionCard(child: Text('No hay usuarios registrados.'))
                 else
@@ -351,7 +405,9 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
                         user: user,
                         isCurrentUser: user.id == session.user?.id,
                         onEdit: () => _openUserDialog(user: user, roles: roles),
-                        onToggleStatus: user.activo ? () => _deactivateUser(user) : () => _activateUser(user),
+                        onToggleStatus: user.activo
+                            ? () => _deactivateUser(user)
+                            : () => _activateUser(user),
                       ),
                     ),
                   ),
@@ -387,13 +443,18 @@ class _UserCard extends StatelessWidget {
           CircleAvatar(
             radius: 19,
             backgroundColor:
-                (user.activo ? context.paleta.info : context.paleta.textoTerciario).withValues(alpha: 0.22),
+                (user.activo
+                        ? context.paleta.info
+                        : context.paleta.textoTerciario)
+                    .withValues(alpha: 0.22),
             child: Text(
               _iniciales(user.nombreCompleto),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: user.activo ? context.paleta.info : context.textoTerciario,
+                color: user.activo
+                    ? context.paleta.info
+                    : context.textoTerciario,
               ),
             ),
           ),
@@ -420,7 +481,10 @@ class _UserCard extends StatelessWidget {
                       SizedBox(width: 6),
                       Text(
                         '(tu sesion)',
-                        style: TextStyle(fontSize: 11, color: context.textoTerciario),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.textoTerciario,
+                        ),
                       ),
                     ],
                   ],
@@ -432,7 +496,9 @@ class _UserCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    color: user.activo ? context.textoSecundario : context.paleta.textoTerciario,
+                    color: user.activo
+                        ? context.textoSecundario
+                        : context.paleta.textoTerciario,
                   ),
                 ),
               ],
@@ -442,8 +508,11 @@ class _UserCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: (user.activo ? context.paleta.info : context.paleta.textoTerciario)
-                  .withValues(alpha: 0.20),
+              color:
+                  (user.activo
+                          ? context.paleta.info
+                          : context.paleta.textoTerciario)
+                      .withValues(alpha: 0.20),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -538,7 +607,8 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     _emailController = TextEditingController(text: user?.email ?? '');
     _nombreController = TextEditingController(text: user?.nombre ?? '');
     _passwordController = TextEditingController();
-    _selectedRoleId = user?.rolId ?? (widget.roles.isNotEmpty ? widget.roles.first.id : null);
+    _selectedRoleId =
+        user?.rolId ?? (widget.roles.isNotEmpty ? widget.roles.first.id : null);
     _active = user?.activo ?? true;
   }
 
@@ -635,10 +705,17 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   controller: _passwordController,
                   obscureText: !_showPassword,
                   decoration: InputDecoration(
-                    labelText: _isEditing ? 'Nueva contrasena (opcional)' : 'Contrasena',
+                    labelText: _isEditing
+                        ? 'Nueva contrasena (opcional)'
+                        : 'Contrasena',
                     suffixIcon: IconButton(
-                      onPressed: () => setState(() => _showPassword = !_showPassword),
-                      icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
                     ),
                   ),
                   validator: (value) {
@@ -652,7 +729,12 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 DropdownButtonFormField<int>(
                   value: _selectedRoleId,
                   items: widget.roles
-                      .map((role) => DropdownMenuItem<int>(value: role.id, child: Text(role.nombre)))
+                      .map(
+                        (role) => DropdownMenuItem<int>(
+                          value: role.id,
+                          child: Text(role.nombre),
+                        ),
+                      )
                       .toList(),
                   onChanged: (value) => setState(() => _selectedRoleId = value),
                   decoration: const InputDecoration(labelText: 'Rol'),
@@ -661,13 +743,18 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Usuario activo'),
-                  subtitle: Text('Puedes dejar la cuenta creada y activa desde el inicio.'),
+                  subtitle: Text(
+                    'Puedes dejar la cuenta creada y activa desde el inicio.',
+                  ),
                   value: _active,
                   onChanged: (value) => setState(() => _active = value),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 8),
-                  Text(_error!, style: TextStyle(color: context.paleta.negativo)),
+                  Text(
+                    _error!,
+                    style: TextStyle(color: context.paleta.negativo),
+                  ),
                 ],
               ],
             ),
@@ -679,10 +766,14 @@ class _UserFormDialogState extends State<_UserFormDialog> {
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
           child: const Text('Cancelar'),
         ),
-        FilledButton.icon(
+        BotonSeguro(
           onPressed: _saving ? null : _save,
           icon: Icon(_saving ? Icons.hourglass_top : Icons.save_outlined),
-          label: Text(_saving ? 'Guardando...' : (_isEditing ? 'Actualizar' : 'Registrar')),
+          child: Text(
+            _saving
+                ? 'Guardando...'
+                : (_isEditing ? 'Actualizar' : 'Registrar'),
+          ),
         ),
       ],
     );

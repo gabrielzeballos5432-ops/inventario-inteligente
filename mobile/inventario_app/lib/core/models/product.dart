@@ -28,6 +28,7 @@ class Product {
   final int? proveedorId;
   final double precioCompra;
   final double precioVenta;
+  final double? precioMayor;
   final int stockMinimo;
   final bool activo;
 
@@ -43,6 +44,7 @@ class Product {
     this.proveedorId,
     required this.precioCompra,
     required this.precioVenta,
+    this.precioMayor,
     required this.stockMinimo,
     required this.activo,
   });
@@ -62,6 +64,9 @@ class Product {
       proveedorId: json['proveedor_id'] as int?,
       precioCompra: parseDouble(json['precio_compra']),
       precioVenta: parseDouble(json['precio_venta']),
+      precioMayor: json['precio_mayor'] == null
+          ? null
+          : parseDouble(json['precio_mayor']),
       stockMinimo: json['stock_minimo'] as int? ?? 5,
       activo: json['activo'] as bool? ?? true,
     );
@@ -78,6 +83,7 @@ class Product {
       'proveedor_id': proveedorId,
       'precio_compra': precioCompra,
       'precio_venta': precioVenta,
+      'precio_mayor': precioMayor,
       'stock_minimo': stockMinimo,
     };
   }
@@ -119,6 +125,7 @@ class ProductoConStock extends Product {
     super.proveedorId,
     required super.precioCompra,
     required super.precioVenta,
+    super.precioMayor,
     required super.stockMinimo,
     required super.activo,
     required this.stockActual,
@@ -140,6 +147,9 @@ class ProductoConStock extends Product {
       proveedorId: json['proveedor_id'] as int?,
       precioCompra: parseDouble(json['precio_compra']),
       precioVenta: parseDouble(json['precio_venta']),
+      precioMayor: json['precio_mayor'] == null
+          ? null
+          : parseDouble(json['precio_mayor']),
       stockMinimo: json['stock_minimo'] as int? ?? 5,
       activo: json['activo'] as bool? ?? true,
       stockActual: json['stock_actual'] as int? ?? 0,

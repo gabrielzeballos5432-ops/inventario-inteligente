@@ -271,4 +271,10 @@ class InventarioProvider extends ChangeNotifier {
     await cargarHistorial();
     return resultado.guardados;
   }
+
+  Future<void> registrarVenta(Map<String, dynamic> payload) async {
+    await _productService.registrarVenta(payload);
+    await cargarInventario();
+    await cargarHistorial();
+  }
 }

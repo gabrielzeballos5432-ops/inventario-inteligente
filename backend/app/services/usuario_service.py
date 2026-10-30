@@ -54,6 +54,8 @@ class UsuarioService:
             "rol_nombre": rol.nombre if rol else "",
             "activo": usuario.activo,
             "created_at": usuario.creado_en,
+            "pago_por_hora": usuario.pago_por_hora,
+            "porcentaje_comision": usuario.porcentaje_comision,
         }
 
     async def _validar_referencias(self, rol_id: int | None) -> None:
@@ -70,6 +72,14 @@ class UsuarioService:
 
     async def crear(self, data: UsuarioCreate) -> Usuario:
         await self._validar_referencias(data.rol_id)
+        rol = await self.repo.obtener_rol_por_id(data.rol_id)
+        if rol and rol.nombre != "vendedor" and (
+            data.pago_por_hora is not None or data.porcentaje_comision is not None
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="La configuración de sueldo solo aplica a usuarios vendedores.",
+            )
 
         if await self.repo.obtener_por_email(data.email):
             raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
@@ -79,6 +89,8 @@ class UsuarioService:
             email=data.email,
             password_hash=hash_password(data.password),
             rol_id=data.rol_id,
+            pago_por_hora=data.pago_por_hora,
+            porcentaje_comision=data.porcentaje_comision,
             activo=data.activo,
         )
         return await self.repo.crear(usuario)
@@ -103,6 +115,18 @@ class UsuarioService:
                 )
 
         nuevo_rol_id = cambios.get("rol_id", usuario.rol_id)
+        nuevo_rol = await self.repo.obtener_rol_por_id(nuevo_rol_id)
+        pago_por_hora = cambios.get("pago_por_hora", usuario.pago_por_hora)
+        porcentaje_comision = cambios.get(
+            "porcentaje_comision", usuario.porcentaje_comision
+        )
+        if nuevo_rol and nuevo_rol.nombre != "vendedor" and (
+            pago_por_hora is not None or porcentaje_comision is not None
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="La configuración de sueldo solo aplica a usuarios vendedores.",
+            )
         nuevo_activo = cambios.get("activo", usuario.activo)
         if (
             usuario.rol

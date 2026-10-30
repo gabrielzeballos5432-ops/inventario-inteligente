@@ -5,7 +5,7 @@ from app.db.base import Base
 
 
 class Marca(Base):
-    __tablename__ = "marcas"
+    __tablename__ = "marca"
 
     # Mismo criterio que categorias: la unicidad va en un indice sobre
     # LOWER(nombre) porque el UNIQUE de la columna distingue mayusculas y
@@ -13,7 +13,7 @@ class Marca(Base):
     # La expresion va como texto porque __table_args__ se evalua antes de que
     # exista el atributo `nombre`.
     __table_args__ = (
-        Index("uq_marcas_nombre_lower", text("lower(nombre)"), unique=True),
+        Index("uq_marca_nombre_lower", text("lower(nombre)"), unique=True),
     )
 
     id = Column(Integer, primary_key=True, index=True)

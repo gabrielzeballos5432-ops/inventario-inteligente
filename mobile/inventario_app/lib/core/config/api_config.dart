@@ -59,6 +59,7 @@ class ApiConfig {
   static const String stockBajo = '/api/inventario/stock-bajo';
   static const String inferencia = '/api/inference/';
   static const String productos = '/api/productos/';
+  static const String ventas = '/api/ventas/';
   static const String movimiento = '/api/inventario/movimiento';
 
   /// Varios movimientos del mismo tipo en una sola llamada (recepcion de

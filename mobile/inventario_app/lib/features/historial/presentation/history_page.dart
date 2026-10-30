@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../../core/models/detection_record.dart';
 import '../../../core/providers/inventario_provider.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/boton_seguro.dart';
+import '../../productos/presentation/movimiento_dialog.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -71,6 +73,7 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
     _busqueda.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<InventarioProvider>().cargarHistorial();
     });
   }
@@ -81,20 +84,13 @@ class _HistoryPageState extends State<HistoryPage> {
     super.dispose();
   }
 
-  Widget _chip(String valor, Map<String, String> etiquetas, bool esPeriodo) {
-    final seleccionado = esPeriodo ? _periodo == valor : _tipo == valor;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(etiquetas[valor] ?? valor),
-        selected: seleccionado,
-        onSelected: (_) => setState(
-          () => esPeriodo ? _periodo = valor : _tipo = valor,
-        ),
-        visualDensity: VisualDensity.compact,
-        labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      ),
-    );
+  Future<void> _registrar() async {
+    final inventario = context.read<InventarioProvider>();
+    final guardado = await mostrarMovimientoLote(context);
+    if (guardado == true) {
+      await inventario.cargarHistorial();
+      await inventario.cargarInventario();
+    }
   }
 
   @override
@@ -104,8 +100,17 @@ class _HistoryPageState extends State<HistoryPage> {
     final filtrados = historial.where(_pasaTodo).toList();
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: BotonSeguro(
+            onPressed: _registrar,
+            icon: const Icon(Icons.playlist_add),
+            child: const Text('Nuevo movimiento'),
+          ),
+        ),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -126,22 +131,42 @@ class _HistoryPageState extends State<HistoryPage> {
           ],
         ),
         const SizedBox(height: 12),
-        // Dos filas de chips de eleccion: la de arriba cambia el tipo, la de
-        // abajo el periodo. En telefono ambos Wraps parten en dos lineas
-        // cuando no caben los cuatro, sin scroll horizontal.
-        Wrap(
-          spacing: 0,
-          runSpacing: 8,
-          children: _tipos.map((t) => _chip(t, _tiposEtiqueta, false)).toList(),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _tipo,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: [
+                  for (final tipo in _tipos)
+                    DropdownMenuItem(value: tipo, child: Text(_tiposEtiqueta[tipo]!)),
+                ],
+                onChanged: (tipo) {
+                  if (tipo != null) setState(() => _tipo = tipo);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _periodo,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Período'),
+                items: [
+                  for (final periodo in _periodos)
+                    DropdownMenuItem(value: periodo, child: Text(_periodosEtiqueta[periodo]!)),
+                ],
+                onChanged: (periodo) {
+                  if (periodo != null) setState(() => _periodo = periodo);
+                },
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 0,
-          runSpacing: 8,
-          children: _periodos
-              .map((p) => _chip(p, _periodosEtiqueta, true))
-              .toList(),
-        ),
+        const SizedBox(height: 8),
+        Text('${filtrados.length} movimiento(s)', style: TextStyle(color: context.textoSecundario, fontSize: 12)),
         const SizedBox(height: 16),
         if (inventario.cargando && historial.isEmpty)
           const Center(

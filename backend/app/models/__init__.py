@@ -8,6 +8,11 @@ from app.models.sesion_camara import SesionCamara
 from app.models.movimiento import Movimiento
 from app.models.deteccion import Deteccion
 from app.models.rol import Rol
+from app.models.venta import Venta, VentaDetalle, PagoVenta
+from app.models.compra import Moneda, Compra, CompraDetalle
+from app.models.sueldo import RegistroHora, LiquidacionSueldo
+from app.models.caja import Cliente, SesionCaja
+from app.models.contabilidad import BonoSueldo, Gasto, PagoGasto
 
 __all__ = [
     "Usuario",
@@ -20,4 +25,17 @@ __all__ = [
     "Movimiento",
     "Deteccion",
     "Rol",
+    "Venta",
+    "VentaDetalle",
+    "PagoVenta",
+    "Moneda",
+    "Compra",
+    "CompraDetalle",
+    "RegistroHora",
+    "LiquidacionSueldo",
+    "Cliente",
+    "SesionCaja",
+    "BonoSueldo",
+    "Gasto",
+    "PagoGasto",
 ]

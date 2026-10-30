@@ -24,6 +24,7 @@ class ProductoOut(BaseModel):
     proveedor_id: Optional[int] = None
     precio_compra: Decimal
     precio_venta: Decimal
+    precio_mayor: Optional[Decimal] = None
     stock_minimo: int
     activo: bool
 
@@ -43,6 +44,7 @@ class ProductoCreate(BaseModel):
     # la valorizacion del inventario y el margen. El stock minimo si admite 0.
     precio_compra: Decimal = Field(gt=0)
     precio_venta: Decimal = Field(gt=0)
+    precio_mayor: Optional[Decimal] = Field(default=None, gt=0)
     stock_minimo: int = Field(default=5, ge=0)
 
 
@@ -56,6 +58,7 @@ class ProductoUpdate(BaseModel):
     proveedor_id: Optional[int] = None
     precio_compra: Optional[Decimal] = Field(default=None, gt=0)
     precio_venta: Optional[Decimal] = Field(default=None, gt=0)
+    precio_mayor: Optional[Decimal] = Field(default=None, gt=0)
     stock_minimo: Optional[int] = Field(default=None, ge=0)
     activo: Optional[bool] = None
 

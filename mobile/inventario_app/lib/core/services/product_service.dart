@@ -54,6 +54,10 @@ class ProductService {
     return Product.fromJson(json as Map<String, dynamic>);
   }
 
+  Future<void> registrarVenta(Map<String, dynamic> payload) async {
+    await _apiClient.postJson(ApiConfig.ventas, payload);
+  }
+
   Future<Product> updateProduct(
       int productId, Map<String, dynamic> payload) async {
     final json =

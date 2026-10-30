@@ -13,7 +13,7 @@ from app.db.base import Base
 
 
 class SesionCamara(Base):
-    __tablename__ = "sesiones_camara"
+    __tablename__ = "sesion_camara"
     __table_args__ = (
         CheckConstraint(
             "tipo_operacion IN ('entrada', 'salida', 'conteo')",
@@ -28,7 +28,7 @@ class SesionCamara(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    usuario_id = Column(Integer, ForeignKey("usuario.id"))
     tipo_operacion = Column(String(50), nullable=False)
     fecha_inicio = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

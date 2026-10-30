@@ -96,6 +96,8 @@ async def registrar_movimiento(
         producto_nombre=producto.nombre if producto else None,
         usuario_id=movimiento.usuario_id,
         sesion_id=movimiento.sesion_id,
+        venta_detalle_id=movimiento.venta_detalle_id,
+        compra_detalle_id=movimiento.compra_detalle_id,
         tipo=movimiento.tipo,
         cantidad_anterior=movimiento.cantidad_anterior,
         cantidad=movimiento.cantidad,

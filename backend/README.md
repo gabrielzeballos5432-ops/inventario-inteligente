@@ -9,27 +9,52 @@ backend/
   app/
     core/          Configuracion, seguridad y dependencias
     db/            Sesion, base declarativa y script SQL de referencia (inventario_db.sql)
-    models/        Modelos SQLAlchemy (roles, usuarios, categorias, marcas, proveedores, productos, inventario, sesiones_camara, movimientos, detecciones)
+    models/        Modelos SQLAlchemy con nombres de tablas singulares
     repositories/  Acceso a datos
     routers/       Endpoints por recurso
     schemas/       Schemas Pydantic de entrada/salida
-    services/      Logica de negocio (auth, inventario, usuarios, seed)
+    services/      Logica de negocio (auth, inventario, compras, ventas, sueldos, usuarios y seed)
     yolo/          Servicio de inferencia YOLO
     main.py        Aplicacion FastAPI
   alembic/         Migraciones de base de datos
   requirements.txt
 ```
 
+## Pruebas unitarias
+
+Desde `backend`, con el entorno virtual activado y las dependencias de
+`requirements.txt` disponibles:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest -v
+```
+
+La suite de `tests/` utiliza pytest y `unittest.mock` para comprobar schemas,
+reglas de ventas y compras, diferencias de caja y serializacion de roles.
+Las corutinas se ejecutan con `asyncio.run`, sin requerir pytest-asyncio.
+Las sesiones y repositorios se simulan: no se inicia FastAPI, no se conecta
+PostgreSQL y no se carga el modelo YOLO. No reemplaza pruebas de integracion,
+concurrencia, rollback ni evaluacion de la IA.
+
+Para conservar un reporte procesable: `python -m pytest -v --junitxml=resultado_pytest.xml`.
+
 ## Base de datos
 
-El esquema de referencia es `app/db/inventario_db.sql` (Salon de Belleza Zoom). La migracion Alembic `20260401_00` reproduce exactamente ese esquema:
+El esquema de referencia es `app/db/inventario_db.sql` (Salon de Belleza Zoom). Las migraciones Alembic parten del esquema inicial y aplican ventas, compras, sueldos, caja y contabilidad:
 
-- `roles`, `usuarios` (email unico en minusculas, `rol_id` FK)
-- `categorias` (jerarquia via `padre_id`), `marcas`, `proveedores`
-- `productos` (`sku`, `codigo_barras`, `precio_compra`, `precio_venta`, `stock_minimo`)
+- `rol`, `usuario` (email unico en minusculas, `rol_id` FK)
+- `categoria` (jerarquia via `padre_id`), `marca`, `proveedor`
+- `producto` (`sku`, `codigo_barras`, `precio_compra`, `precio_venta`, `stock_minimo`)
 - `inventario` (stock actual por producto)
-- `sesiones_camara`, `detecciones`
-- `movimientos` con restriccion matematica de consistencia (`stock_resultante`)
+- `sesion_camara`, `deteccion`
+- `movimiento` con restriccion matematica de consistencia (`stock_resultante`)
+- `moneda`, `compra` y `compra_detalle`, con cotizaciones historicas
+- `registro_hora` y `liquidacion_sueldo` para asistencia y pago por hora/comision
+- `cliente`, `sesion_caja` y `bono_sueldo`
+- `gasto` y `pago_gasto` para gastos en moneda original, conversion a BOB y pagos parciales
+- Las ventas tienen su tipo minorista/mayorista, cliente opcional, clave de idempotencia, anulacion auditada y costo historico por detalle.
+- Todas las tablas y referencias usan nombres singulares. Las ganancias se calculan en reportes y no se almacenan como resultados contables duplicados.
 
 ## Ejecutar en local (entorno principal)
 
@@ -98,6 +123,18 @@ Copia `.env.example` a `.env` y ajusta:
 - `GET /api/reportes/exportar-stock` exporta el reporte de stock (solo administrador). El parametro `formato` acepta `csv` (default) o `xlsx`.
 - `GET /api/reportes/exportar-movimientos` exporta el reporte de movimientos (solo administrador). El parametro `formato` acepta `csv` (default) o `xlsx`.
 - `POST /api/inference/` sube una imagen de los productos de un estante y devuelve detecciones; registra automaticamente un movimiento de **entrada** (conteo) en el inventario y una sesion de camara. El campo `tipo_operacion` permite parametrizar `entrada` (default), `salida` o `conteo` para uso futuro. Devuelve **503** si el modelo no esta disponible.
+- `GET /api/monedas/` lista monedas activas; `POST /api/monedas/` crea una moneda y `PATCH /api/monedas/{codigo}/estado` la activa o desactiva (solo administrador). BOB y USD se cargan al iniciar.
+- `POST /api/compras/` registra la factura, sus productos, el descuento y el porcentaje de manipulacion/envio (solo administrador). En la misma transaccion convierte el costo a BOB, actualiza el inventario y el costo de compra del producto, y registra movimientos de entrada. `GET /api/compras/` y `GET /api/compras/{id}` consultan compras.
+- Las tasas de cambio se guardan por compra: `tipo_cambio_ext` representa unidades de la moneda de factura por USD y `tipo_cambio_bob` representa BOB por USD. La conversion es `(total_moneda / tipo_cambio_ext) * tipo_cambio_bob`; para USD, la primera tasa es 1, y para BOB ambas tasas deben coincidir. Los importes de factura se redondean segun `moneda.decimales`.
+- `POST /api/sueldos/asistencias/entrada` y `/salida` permiten al vendedor registrar su jornada con fecha y hora de Cochabamba. El administrador puede registrar asistencias manuales, consultarlas y confirmarlas mediante las rutas `/api/sueldos/asistencias`.
+- `POST /api/sueldos/liquidaciones` calcula el pago por horas confirmadas y la comision sobre ventas completadas registradas por ese vendedor en el período; guarda las tasas aplicadas. `GET /api/sueldos/liquidaciones` consulta liquidaciones y `POST /api/sueldos/liquidaciones/{id}/pagar` marca el pago (solo administrador). No se aceptan períodos superpuestos.
+- `GET /api/caja/sesiones/actual` permite consultar la sesion del usuario; `POST /api/caja/sesiones/abrir` y `/cerrar` registran aperturas y cierres con conciliacion del efectivo esperado. Las ventas y pagos de gastos en efectivo se vinculan a la sesion abierta.
+- `/api/clientes/` administra el catalogo de clientes para asociarlos opcionalmente a ventas.
+- `/api/contabilidad/bonos` registra bonos y permite asignarlos a una liquidacion pendiente; el total se suma al importe de la liquidacion.
+- `/api/contabilidad/gastos` registra servicios, alquiler, insumos de limpieza, mantenimiento y otros conceptos. Los pagos se registran por separado en `/api/contabilidad/gastos/{id}/pagos`, con soporte para pagos parciales y conversion a BOB. Un gasto sin pagos puede anularse con motivo y usuario responsable.
+- `GET /api/contabilidad/reporte-financiero` calcula ventas netas, costo de ventas historico, ganancia bruta, gastos y utilidad estimada. La ganancia bruta se declara no disponible si hay lineas de venta sin costo historico; la utilidad neta es estimada antes de impuestos y cargos no registrados.
+
+Las ventas aceptan los tipos `minorista` y `mayorista`, registran precios negociados por detalle y capturan el costo historico aplicado. Se puede enviar la cabecera `Idempotency-Key` para que los reintentos no creen ventas duplicadas. La anulacion administrativa conserva el registro y repone stock con movimientos compensatorios. La app movil todavia no incluye pantallas para caja, clientes, bonos ni gastos.
 
 ## Estado del servicio
 

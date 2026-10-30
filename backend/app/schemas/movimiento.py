@@ -10,6 +10,8 @@ class MovimientoOut(BaseModel):
     usuario_id: Optional[int] = None
     usuario_nombre: Optional[str] = None
     sesion_id: Optional[int] = None
+    venta_detalle_id: Optional[int] = None
+    compra_detalle_id: Optional[int] = None
     tipo: str
     cantidad_anterior: int
     cantidad: int

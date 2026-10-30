@@ -16,10 +16,13 @@ from app.db.base import Base
 
 
 class Producto(Base):
-    __tablename__ = "productos"
+    __tablename__ = "producto"
     __table_args__ = (
         CheckConstraint("precio_compra >= 0", name="chk_precio_compra_no_negativo"),
         CheckConstraint("precio_venta >= 0", name="chk_precio_venta_no_negativo"),
+        CheckConstraint(
+            "precio_mayor IS NULL OR precio_mayor > 0", name="chk_precio_mayor_positivo"
+        ),
         CheckConstraint("stock_minimo >= 0", name="chk_stock_minimo_no_negativo"),
     )
 
@@ -28,11 +31,12 @@ class Producto(Base):
     codigo_barras = Column(String(50), unique=True)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text)
-    categoria_id = Column(Integer, ForeignKey("categorias.id"))
-    marca_id = Column(Integer, ForeignKey("marcas.id"))
-    proveedor_id = Column(Integer, ForeignKey("proveedores.id"))
+    categoria_id = Column(Integer, ForeignKey("categoria.id"))
+    marca_id = Column(Integer, ForeignKey("marca.id"))
+    proveedor_id = Column(Integer, ForeignKey("proveedor.id"))
     precio_compra = Column(Numeric(10, 2), nullable=False, default=0)
     precio_venta = Column(Numeric(10, 2), nullable=False, default=0)
+    precio_mayor = Column(Numeric(10, 2))
     stock_minimo = Column(Integer, nullable=False, default=5)
     imagen_url = Column(Text)
     activo = Column(Boolean, nullable=False, default=True)
@@ -44,3 +48,5 @@ class Producto(Base):
     inventario = relationship("Inventario", back_populates="producto", uselist=False)
     movimientos = relationship("Movimiento", back_populates="producto")
     detecciones = relationship("Deteccion", back_populates="producto")
+    ventas_detalle = relationship("VentaDetalle", back_populates="producto")
+    compras_detalle = relationship("CompraDetalle", back_populates="producto")

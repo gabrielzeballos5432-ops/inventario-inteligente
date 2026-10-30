@@ -5,20 +5,22 @@ import '../../../core/models/marca.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/catalog_service.dart';
 import '../../../core/utils/validaciones.dart';
+import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/boton_seguro.dart';
 
 /// Gestion del catalogo de marcas.
 ///
 /// Mismo criterio que el dialogo de categorias: el borrado es logico y el
 /// nombre sigue reservado, asi que escribir el nombre de una marca
 /// desactivada la reactiva en lugar de crear otra.
-class MarcasDialog extends StatefulWidget {
-  const MarcasDialog();
+class MarcasPage extends StatefulWidget {
+  const MarcasPage();
 
   @override
-  State<MarcasDialog> createState() => MarcasDialogState();
+  State<MarcasPage> createState() => MarcasPageState();
 }
 
-class MarcasDialogState extends State<MarcasDialog> {
+class MarcasPageState extends State<MarcasPage> {
   final _service = CatalogService(ApiClient());
   final _nombreController = TextEditingController();
   late Future<List<Marca>> _future;
@@ -67,6 +69,7 @@ class MarcasDialogState extends State<MarcasDialog> {
     final nombre = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('Renombrar marca'),
         content: Form(
           key: formKey,
@@ -90,7 +93,7 @@ class MarcasDialogState extends State<MarcasDialog> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               Navigator.of(ctx).pop(controller.text.trim());
@@ -117,6 +120,7 @@ class MarcasDialogState extends State<MarcasDialog> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('Desactivar marca'),
         content: Text(
           'La marca "${m.nombre}" dejara de aparecer al registrar o editar '
@@ -127,7 +131,7 @@ class MarcasDialogState extends State<MarcasDialog> {
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          BotonSeguro(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Desactivar'),
           ),
@@ -148,99 +152,120 @@ class MarcasDialogState extends State<MarcasDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Gestionar marcas'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return FutureBuilder<List<Marca>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final marcas = snapshot.data ?? const <Marca>[];
+        return ListView(
+          padding: const EdgeInsets.all(20),
           children: [
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _nombreController,
-                    decoration:
-                        const InputDecoration(labelText: 'Nueva marca'),
+                  child: Text(
+                    'Administra las marcas disponibles para clasificar productos.',
+                    style: TextStyle(color: context.textoSecundario),
                   ),
                 ),
-                IconButton(onPressed: _crear, icon: const Icon(Icons.add)),
+                BotonSeguro(
+                  onPressed: _abrirCrear,
+                  icon: const Icon(Icons.add),
+                  child: const Text('Registrar'),
+                ),
               ],
             ),
-            SizedBox(height: 12),
-            Text(
-              'Desactivar no borra el nombre: si vuelves a escribir el de una '
-              'marca desactivada, esta se reactiva.',
-              style: TextStyle(color: context.textoTerciario, fontSize: 11),
-            ),
-            const SizedBox(height: 12),
-            FutureBuilder<List<Marca>>(
-              future: _future,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return CircularProgressIndicator();
-                }
-                if (snapshot.hasError) {
-                  return Row(
-                    children: [
-                      Icon(Icons.cloud_off,
-                          size: 16, color: context.paleta.stockBajo),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'No se pudieron cargar las marcas.',
-                          style:
-                              TextStyle(color: context.paleta.stockBajo, fontSize: 12),
+            const SizedBox(height: 20),
+            if (snapshot.connectionState == ConnectionState.waiting)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (snapshot.hasError)
+              SectionCard(
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off, color: context.paleta.stockBajo),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('No se pudieron cargar las marcas.')),
+                    TextButton(onPressed: _reload, child: const Text('Reintentar')),
+                  ],
+                ),
+              )
+            else if (marcas.isEmpty)
+              const SectionCard(child: Text('No hay marcas registradas.'))
+            else ...[
+              SectionCard(
+                child: Text('Total de marcas: ${marcas.length}',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 12),
+              ...marcas.map(
+                (m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: SectionCard(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sell_outlined),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(m.nombre)),
+                        PopupMenuButton<String>(
+                          tooltip: 'Acciones',
+                          onSelected: (opcion) {
+                            if (opcion == 'editar') _editar(m);
+                            if (opcion == 'desactivar') _desactivar(m);
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'editar', child: Text('Editar')),
+                            PopupMenuItem(value: 'desactivar', child: Text('Desactivar')),
+                          ],
                         ),
-                      ),
-                      TextButton(
-                        onPressed: _reload,
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
-                  );
-                }
-                final marcas = snapshot.data ?? const <Marca>[];
-                if (marcas.isEmpty) {
-                  return const Text('No hay marcas.');
-                }
-                return Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: marcas
-                        .map((m) => ListTile(
-                              dense: true,
-                              title: Text(m.nombre),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    tooltip: 'Renombrar marca',
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () => _editar(m),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Desactivar marca',
-                                    icon: const Icon(Icons.delete_outline),
-                                    onPressed: () => _desactivar(m),
-                                  ),
-                                ],
-                              ),
-                            ))
-                        .toList(),
+                      ],
+                    ),
                   ),
-                );
-              },
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              'Desactivar no borra el nombre: si vuelves a registrar una marca desactivada, se reactiva.',
+              style: TextStyle(color: context.textoTerciario, fontSize: 12),
             ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cerrar'),
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  Future<void> _abrirCrear() async {
+    final formKey = GlobalKey<FormState>();
+    _nombreController.clear();
+    final crear = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: const Text('Registrar marca'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: _nombreController,
+            autofocus: true,
+            validator: Validaciones.nombreSinNumeros,
+            decoration: const InputDecoration(labelText: 'Nombre', errorMaxLines: 2),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          BotonSeguro(
+            onPressed: () {
+              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+            },
+            child: const Text('Registrar'),
+          ),
+        ],
+      ),
+    );
+    if (crear == true) await _crear();
   }
 }

@@ -13,7 +13,7 @@ class Inventario(Base):
     id = Column(Integer, primary_key=True, index=True)
     producto_id = Column(
         Integer,
-        ForeignKey("productos.id", ondelete="CASCADE"),
+        ForeignKey("producto.id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
     )

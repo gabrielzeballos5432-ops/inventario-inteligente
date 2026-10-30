@@ -24,7 +24,7 @@ class CategoriaRepository:
 
     async def obtener_por_nombre(self, nombre: str) -> Optional[Categoria]:
         # La busqueda ignora mayusculas para coincidir con
-        # uq_categorias_nombre_lower. Con una comparacion exacta, escribir
+        # uq_categoria_nombre_lower. Con una comparacion exacta, escribir
         # "uñas" no encontraria la categoria desactivada "Uñas" y el alta
         # crearia una fila nueva en vez de reactivarla.
         #

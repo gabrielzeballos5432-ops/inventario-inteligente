@@ -1,37 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../app/destino_app.dart';
 
-/// Sidebar (menu lateral) global: concentra la identidad del usuario, la
-/// navegacion y las opciones de cuenta que antes vivian desparramadas en el
-/// menu de tres puntos de la app bar.
-///
-/// La separacion por secciones (Operacion, Cuenta) no es decorativa: en un
-/// telefono de 6 pulgadas el drawer muestra solo la mitad de la lista, asi
-/// que lo de uso diario va arriba y las acciones de cuenta, abajo.
+/// Navegacion agrupada por tareas; desplegable en movil y fija en escritorio.
 class MenuLateral extends StatelessWidget {
-  final List<NavigationDestination> elementos;
-  final int seleccion;
+  final List<DestinoApp> elementos;
+  final DestinoApp seleccion;
+  final bool permanente;
   final String usuarioNombre;
   final String rol;
   final bool esNoche;
 
-  /// Con admin aparecen los catalogos por su nombre (antes vivian escondidos
-  /// en un menu de tres puntos de la pestaña Productos): cada fila abre el
-  /// dialogo de gestion directo.
   final bool mostrarGestion;
 
-  final ValueChanged<int> alNavegar;
+  final ValueChanged<DestinoApp> alNavegar;
   final VoidCallback alAlternarTema;
   final VoidCallback alConfigurarServidor;
   final VoidCallback alCerrarSesion;
-  final ValueChanged<String> alAbrirCatalogo;
-  final VoidCallback alAbrirUsuarios;
 
   const MenuLateral({
     super.key,
     required this.elementos,
     required this.seleccion,
+    this.permanente = false,
     required this.usuarioNombre,
     required this.rol,
     required this.esNoche,
@@ -40,8 +32,6 @@ class MenuLateral extends StatelessWidget {
     required this.alAlternarTema,
     required this.alConfigurarServidor,
     required this.alCerrarSesion,
-    required this.alAbrirCatalogo,
-    required this.alAbrirUsuarios,
   });
 
   String get _inicial {
@@ -50,7 +40,7 @@ class MenuLateral extends StatelessWidget {
   }
 
   Widget _tituloSeccion(BuildContext context, String texto) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
         child: Text(
           texto.toUpperCase(),
           style: TextStyle(
@@ -64,10 +54,9 @@ class MenuLateral extends StatelessWidget {
 
   Widget _item(
     BuildContext context,
-    NavigationDestination destino,
-    int indice,
+    DestinoApp destino,
   ) {
-    final enAqui = seleccion == indice;
+    final enAqui = seleccion == destino;
     final tono = enAqui ? context.paleta.info : context.textoPrimario;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -77,9 +66,9 @@ class MenuLateral extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: ListTile(
           dense: true,
-          leading: Icon((destino.icon as Icon).icon, color: tono),
+          leading: Icon(destino.icono, color: tono),
           title: Text(
-            destino.label,
+            destino.etiqueta(mostrarGestion),
             style: TextStyle(
               fontWeight: enAqui ? FontWeight.w700 : FontWeight.w500,
               color: tono,
@@ -90,48 +79,23 @@ class MenuLateral extends StatelessWidget {
           // pestana sin inventar colores (el test de contraste sigue valiendo).
           tileColor: enAqui ? context.paleta.info.withValues(alpha: 0.12) : null,
           onTap: () {
-            Navigator.of(context).pop(); // cierra el drawer
-            alNavegar(indice);
+            _cerrar(context);
+            alNavegar(destino);
           },
         ),
       ),
     );
   }
 
-  /// Fila de gestion de catalogos: misma forma que _item pero con callback
-  /// propio, porque abren un dialogo (que se muestra sobre el shell) en vez
-  /// de cambiar de pestana.
-  Widget _filaCatalogo(
-    BuildContext context,
-    IconData icono,
-    String texto,
-    String clave,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Material(
-        color: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          dense: true,
-          leading: Icon(icono, color: context.textoPrimario),
-          title: Text(texto, style: TextStyle(color: context.textoPrimario)),
-          onTap: () {
-            // El dialogo se pide cuando el drawer ya se va, para que la
-            // animacion del menu no pelee con la del dialogo: showdialog se
-            // llama desde el contexto del shell, no del drawer.
-            Navigator.of(context).pop();
-            alAbrirCatalogo(clave);
-          },
-        ),
-      ),
-    );
+  void _cerrar(BuildContext context) {
+    if (!permanente) Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      width: permanente ? 252 : null,
+      shape: permanente ? const RoundedRectangleBorder() : null,
       backgroundColor: context.superficie,
       child: SafeArea(
         child: ListView(
@@ -141,31 +105,11 @@ class MenuLateral extends StatelessWidget {
             // blanco porque va encima de morado fijo, El degradado no cambia
             // con el modo porque es el color de la marca.
             _Encabezado(inicial: _inicial, nombre: usuarioNombre, rol: rol),
-            _tituloSeccion(context, 'Operacion'),
-            for (var i = 0; i < elementos.length; i++)
-              _item(context, elementos[i], i),
-            if (mostrarGestion) ...[
-              _tituloSeccion(context, 'Gestion'),
-              _filaCatalogo(context, Icons.category_outlined, 'Categorias', 'categorias'),
-              _filaCatalogo(context, Icons.label_outline, 'Marcas', 'marcas'),
-              _filaCatalogo(context, Icons.local_shipping_outlined, 'Proveedores', 'proveedores'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Material(
-                  color: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.groups_outlined, color: context.textoPrimario),
-                    title: Text('Usuarios', style: TextStyle(color: context.textoPrimario)),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      alAbrirUsuarios();
-                    },
-                  ),
-                ),
-              ),
+            for (var i = 0; i < elementos.length; i++) ...[
+              if (elementos[i].grupo.isNotEmpty &&
+                  (i == 0 || elementos[i].grupo != elementos[i - 1].grupo))
+                _tituloSeccion(context, elementos[i].grupo),
+              _item(context, elementos[i]),
             ],
             _tituloSeccion(context, 'Cuenta'),
             Padding(
@@ -193,7 +137,7 @@ class MenuLateral extends StatelessWidget {
                 title: Text('Configurar servidor',
                     style: TextStyle(color: context.textoPrimario)),
                 onTap: () {
-                  Navigator.of(context).pop();
+                  _cerrar(context);
                   alConfigurarServidor();
                 },
               ),
@@ -213,7 +157,7 @@ class MenuLateral extends StatelessWidget {
                   ),
                 ),
                 onTap: () {
-                  Navigator.of(context).pop();
+                  _cerrar(context);
                   alCerrarSesion();
                 },
               ),
@@ -248,7 +192,7 @@ class _Encabezado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+      padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.morado, Color(0xFF3F2783)],
@@ -256,12 +200,11 @@ class _Encabezado extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -271,29 +214,35 @@ class _Encabezado extends StatelessWidget {
             child: Text(
               inicial,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            nombre,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            rol,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: Colors.white.withValues(alpha: 0.85),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  rol,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

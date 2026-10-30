@@ -16,6 +16,7 @@ import 'core/services/auth_service.dart';
 import 'core/services/product_service.dart';
 import 'core/services/detection_service.dart';
 import 'core/services/connectivity_service.dart';
+import 'core/services/operaciones_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +65,9 @@ void main() async {
         ChangeNotifierProvider.value(value: inventarioProvider),
         ChangeNotifierProvider.value(value: themeController),
         ChangeNotifierProvider.value(value: servidorController),
+        Provider<OperacionesService>(
+          create: (_) => OperacionesService(apiClient),
+        ),
       ],
       child: const InventarioApp(),
     ),
