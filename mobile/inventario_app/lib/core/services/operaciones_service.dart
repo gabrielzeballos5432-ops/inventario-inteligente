@@ -1,9 +1,47 @@
 import '../network/api_client.dart';
+import '../models/categoria_gasto.dart';
 
 class OperacionesService {
   final ApiClient _api;
 
   OperacionesService(this._api);
+
+  Future<List<CategoriaGasto>> listarCategoriasGasto({
+    bool incluirInactivas = false,
+  }) async {
+    final respuesta = await _api.getJson(
+      '/api/contabilidad/categorias-gasto',
+      query: {'incluir_inactivas': '$incluirInactivas'},
+    );
+    return _listaMapas(respuesta).map(CategoriaGasto.fromJson).toList();
+  }
+
+  Future<void> guardarCategoriaGasto({
+    int? id,
+    required String nombre,
+    required String periodicidad,
+    required String tipoImporte,
+    double? montoHabitual,
+    bool activo = true,
+  }) async {
+    final datos = <String, dynamic>{
+      'nombre': nombre.trim(),
+      'periodicidad': periodicidad,
+      'tipo_importe': tipoImporte,
+      'monto_habitual': montoHabitual?.toStringAsFixed(2),
+      if (id != null) 'activo': activo,
+    };
+    const ruta = '/api/contabilidad/categorias-gasto';
+    if (id == null) {
+      await _api.postJson(ruta, datos);
+    } else {
+      await _api.putJson('$ruta/$id', datos);
+    }
+  }
+
+  Future<void> eliminarCategoriaGasto(int id) async {
+    await _api.deleteJson('/api/contabilidad/categorias-gasto/$id');
+  }
 
   Future<Map<String, dynamic>?> obtenerCajaActual() async {
     final respuesta = await _api.getJson('/api/caja/sesiones/actual');
@@ -141,6 +179,7 @@ class OperacionesService {
     String? fechaInicio,
     String? fechaFin,
     String? categoria,
+    int limite = 100,
   }) async {
     final respuesta = await _api.getJson(
       '/api/contabilidad/gastos',
@@ -148,13 +187,15 @@ class OperacionesService {
         if (fechaInicio != null) 'fecha_inicio': fechaInicio,
         if (fechaFin != null) 'fecha_fin': fechaFin,
         if (categoria != null) 'categoria': categoria,
+        'limite': '$limite',
       },
     );
     return _listaMapas(respuesta);
   }
 
   Future<Map<String, dynamic>> crearGasto({
-    required String categoria,
+    String? categoria,
+    int? categoriaGastoId,
     required String concepto,
     required String monedaCodigo,
     required double monto,
@@ -166,7 +207,8 @@ class OperacionesService {
     String? periodoHasta,
   }) async {
     final respuesta = await _api.postJson('/api/contabilidad/gastos', {
-      'categoria': categoria,
+      if (categoria != null) 'categoria': categoria,
+      if (categoriaGastoId != null) 'categoria_gasto_id': categoriaGastoId,
       'concepto': concepto.trim(),
       'moneda_codigo': monedaCodigo,
       'monto': monto.toStringAsFixed(4),
@@ -179,6 +221,15 @@ class OperacionesService {
       if (periodoHasta != null) 'periodo_hasta': periodoHasta,
     });
     return respuesta as Map<String, dynamic>;
+  }
+
+  Future<void> pagarGastoCombinado({
+    required int gastoId,
+    required List<Map<String, dynamic>> pagos,
+  }) async {
+    await _api.postJson('/api/contabilidad/gastos/$gastoId/pagos/mixto', {
+      'pagos': pagos,
+    });
   }
 
   Future<Map<String, dynamic>> pagarGasto({
@@ -330,6 +381,20 @@ class OperacionesService {
       query: const {'limite': '50'},
     );
     return _listaMapas(respuesta);
+  }
+
+  Future<Map<String, dynamic>> leerComprobante({
+    required List<int> bytes,
+    required String nombre,
+  }) async {
+    final respuesta = await _api.postMultipart(
+      '/api/compras/leer-comprobante',
+      fieldName: 'imagen',
+      fileName: nombre,
+      bytes: bytes,
+      timeout: const Duration(minutes: 5),
+    );
+    return respuesta as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> crearCompra(

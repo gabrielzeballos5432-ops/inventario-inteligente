@@ -1,0 +1,3 @@
+# Entorno separado: PaddleOCR 3 usa dependencias incompatibles con la API actual.
+paddleocr==3.7.0
+paddlepaddle==3.3.1

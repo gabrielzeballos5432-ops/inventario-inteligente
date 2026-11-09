@@ -100,77 +100,16 @@ class _CajaPageState extends State<CajaPage> {
     required String etiqueta,
     required bool permitirCero,
     bool pedirNota = false,
-  }) async {
-    final monto = TextEditingController();
-    final nota = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final resultado = await showDialog<({double monto, String? nota})>(
+  }) {
+    return showDialog<({double monto, String? nota})>(
       context: context,
-      builder: (context) => AlertDialog(
-        scrollable: true,
-        title: Text(titulo),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: monto,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(labelText: etiqueta),
-                validator: (texto) {
-                  final valor = double.tryParse(texto ?? '');
-                  if (valor == null ||
-                      valor < 0 ||
-                      (!permitirCero && valor == 0)) {
-                    return permitirCero
-                        ? 'Ingresa un monto válido'
-                        : 'El monto debe ser mayor a cero';
-                  }
-                  if (!RegExp(
-                    r'^\d{1,10}([.]\d{1,2})?$',
-                  ).hasMatch(texto!.trim())) {
-                    return 'Usa hasta 2 decimales';
-                  }
-                  return null;
-                },
-              ),
-              if (pedirNota)
-                TextFormField(
-                  controller: nota,
-                  maxLength: 250,
-                  decoration: const InputDecoration(
-                    labelText: 'Observación del cierre (opcional)',
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          BotonSeguro(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, (
-                  monto: double.parse(monto.text.trim()),
-                  nota: pedirNota ? nota.text.trim() : null,
-                ));
-              }
-            },
-            child: Text(titulo),
-          ),
-        ],
+      builder: (_) => _DialogoMonto(
+        titulo: titulo,
+        etiqueta: etiqueta,
+        permitirCero: permitirCero,
+        pedirNota: pedirNota,
       ),
     );
-    monto.dispose();
-    nota.dispose();
-    return resultado;
   }
 
   Future<void> _ejecutar(Future<void> Function() accion) async {
@@ -318,6 +257,101 @@ class _CajaPageState extends State<CajaPage> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _DialogoMonto extends StatefulWidget {
+  const _DialogoMonto({
+    required this.titulo,
+    required this.etiqueta,
+    required this.permitirCero,
+    required this.pedirNota,
+  });
+
+  final String titulo;
+  final String etiqueta;
+  final bool permitirCero;
+  final bool pedirNota;
+
+  @override
+  State<_DialogoMonto> createState() => _DialogoMontoState();
+}
+
+class _DialogoMontoState extends State<_DialogoMonto> {
+  final _monto = TextEditingController();
+  final _nota = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _monto.dispose();
+    _nota.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: Text(widget.titulo),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _monto,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(labelText: widget.etiqueta),
+              validator: (texto) {
+                final valor = double.tryParse(texto ?? '');
+                if (valor == null ||
+                    valor < 0 ||
+                    (!widget.permitirCero && valor == 0)) {
+                  return widget.permitirCero
+                      ? 'Ingresa un monto válido'
+                      : 'El monto debe ser mayor a cero';
+                }
+                if (!RegExp(
+                  r'^\d{1,10}([.]\d{1,2})?$',
+                ).hasMatch(texto!.trim())) {
+                  return 'Usa hasta 2 decimales';
+                }
+                return null;
+              },
+            ),
+            if (widget.pedirNota)
+              TextFormField(
+                controller: _nota,
+                maxLength: 250,
+                decoration: const InputDecoration(
+                  labelText: 'Observación del cierre (opcional)',
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        BotonSeguro(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.pop(context, (
+                monto: double.parse(_monto.text.trim()),
+                nota: widget.pedirNota ? _nota.text.trim() : null,
+              ));
+            }
+          },
+          child: Text(widget.titulo),
+        ),
+      ],
     );
   }
 }

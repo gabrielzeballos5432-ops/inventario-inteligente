@@ -9,6 +9,7 @@ from app.models.categoria import Categoria
 from app.models.marca import Marca
 from app.models.usuario import Usuario
 from app.models.compra import Moneda
+from app.models.contabilidad import CategoriaGasto
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class SeedService:
         await self._asegurar_categorias()
         await self._asegurar_marcas()
         await self._asegurar_monedas()
+        await self._asegurar_categorias_gasto()
         await self._asegurar_admin()
         await self.db.commit()
         logger.info("Datos iniciales verificados")
@@ -68,6 +70,24 @@ class SeedService:
                         activa=True,
                     )
                 )
+
+    async def _asegurar_categorias_gasto(self) -> None:
+        existe = await self.db.execute(select(CategoriaGasto.id).limit(1))
+        if existe.first() is not None:
+            return
+        for nombre, periodicidad, tipo in [
+            ("Luz", "mensual", "variable"),
+            ("Agua", "mensual", "fijo"),
+            ("Wifi", "mensual", "fijo"),
+            ("Alquiler", "mensual", "fijo"),
+            ("Scotch", "sin_periodicidad", "variable"),
+            ("Papel para tickets", "sin_periodicidad", "variable"),
+            ("Etiquetas", "sin_periodicidad", "variable"),
+        ]:
+            self.db.add(CategoriaGasto(
+                nombre=nombre, periodicidad=periodicidad, tipo_importe=tipo,
+                activo=True,
+            ))
 
     async def _asegurar_admin(self) -> None:
         existe = await self.db.execute(

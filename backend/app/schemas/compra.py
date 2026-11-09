@@ -31,7 +31,7 @@ class CompraDetalleCreate(BaseModel):
 
 
 class CompraCreate(BaseModel):
-    proveedor_id: int = Field(gt=0, le=2_147_483_647)
+    proveedor_id: Optional[int] = Field(default=None, gt=0, le=2_147_483_647)
     moneda_codigo: str = Field(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
     tipo_cambio_ext: Decimal = Field(gt=0, max_digits=18, decimal_places=6)
     tipo_cambio_bob: Decimal = Field(gt=0, max_digits=18, decimal_places=6)
@@ -59,7 +59,7 @@ class CompraDetalleOut(BaseModel):
 
 class CompraOut(BaseModel):
     id: int
-    proveedor_id: int
+    proveedor_id: Optional[int]
     usuario_id: int
     moneda_codigo: str
     tipo_cambio_ext: Decimal

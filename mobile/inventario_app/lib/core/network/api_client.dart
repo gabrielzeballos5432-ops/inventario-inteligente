@@ -20,15 +20,16 @@ class ApiClient {
   static const Duration timeoutSubida = Duration(minutes: 2);
 
   ApiClient({http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client();
 
   void setToken(String? token) {
     _token = token;
   }
 
   Uri _buildUri(String path, [Map<String, String>? query]) {
-    return Uri.parse('${ApiConfig.baseUrl}$path')
-        .replace(queryParameters: query);
+    return Uri.parse(
+      '${ApiConfig.baseUrl}$path',
+    ).replace(queryParameters: query);
   }
 
   Map<String, String> _buildHeaders({bool includeJson = true}) {
@@ -67,8 +68,7 @@ class ApiClient {
     return utf8.decode(response.bodyBytes);
   }
 
-  Future<List<int>> getBytes(String path,
-      {Map<String, String>? query}) async {
+  Future<List<int>> getBytes(String path, {Map<String, String>? query}) async {
     final response = await _httpClient.get(
       _buildUri(path, query),
       headers: _buildHeaders(includeJson: false),
@@ -79,8 +79,7 @@ class ApiClient {
 
   Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
     final response = await _httpClient
-        .post(_buildUri(path),
-            headers: _buildHeaders(), body: jsonEncode(body))
+        .post(_buildUri(path), headers: _buildHeaders(), body: jsonEncode(body))
         .timeout(timeoutPeticion);
     _ensureSuccess(response);
     if (response.body.isEmpty) return null;
@@ -89,8 +88,7 @@ class ApiClient {
 
   Future<dynamic> putJson(String path, Map<String, dynamic> body) async {
     final response = await _httpClient
-        .put(_buildUri(path),
-            headers: _buildHeaders(), body: jsonEncode(body))
+        .put(_buildUri(path), headers: _buildHeaders(), body: jsonEncode(body))
         .timeout(timeoutPeticion);
     _ensureSuccess(response);
     if (response.body.isEmpty) return null;
@@ -108,8 +106,11 @@ class ApiClient {
 
   Future<dynamic> patchJson(String path, Map<String, dynamic> body) async {
     final response = await _httpClient
-        .patch(_buildUri(path),
-            headers: _buildHeaders(), body: jsonEncode(body))
+        .patch(
+          _buildUri(path),
+          headers: _buildHeaders(),
+          body: jsonEncode(body),
+        )
         .timeout(timeoutPeticion);
     _ensureSuccess(response);
     if (response.body.isEmpty) return null;
@@ -122,17 +123,18 @@ class ApiClient {
     required String fileName,
     required List<int> bytes,
     Map<String, String>? fields,
+    Duration timeout = timeoutSubida,
   }) async {
     final request = http.MultipartRequest('POST', _buildUri(path));
     request.headers.addAll(_buildHeaders(includeJson: false));
     request.fields.addAll(fields ?? {});
-    request.files.add(http.MultipartFile.fromBytes(
-      fieldName,
-      bytes,
-      filename: fileName,
-    ));
-    final streamed = await request.send().timeout(timeoutSubida);
-    final response = await http.Response.fromStream(streamed);
+    request.files.add(
+      http.MultipartFile.fromBytes(fieldName, bytes, filename: fileName),
+    );
+    final response = await (() async {
+      final streamed = await _httpClient.send(request);
+      return http.Response.fromStream(streamed);
+    })().timeout(timeout);
     _ensureSuccess(response);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));

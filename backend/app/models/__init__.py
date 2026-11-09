@@ -12,7 +12,7 @@ from app.models.venta import Venta, VentaDetalle, PagoVenta
 from app.models.compra import Moneda, Compra, CompraDetalle
 from app.models.sueldo import RegistroHora, LiquidacionSueldo
 from app.models.caja import Cliente, SesionCaja
-from app.models.contabilidad import BonoSueldo, Gasto, PagoGasto
+from app.models.contabilidad import BonoSueldo, CategoriaGasto, Gasto, PagoGasto
 
 __all__ = [
     "Usuario",
@@ -37,5 +37,6 @@ __all__ = [
     "SesionCaja",
     "BonoSueldo",
     "Gasto",
+    "CategoriaGasto",
     "PagoGasto",
 ]

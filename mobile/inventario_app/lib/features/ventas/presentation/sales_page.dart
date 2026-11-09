@@ -16,9 +16,8 @@ import '../../../shared/widgets/boton_seguro.dart';
 
 /// Registro rapido de ventas pensado para teclado.
 ///
-/// Flujo: Codigo -> Enter -> Cantidad -> Enter -> Monto -> Enter agrega el
-/// producto y vuelve a Codigo. Con Codigo vacio, Enter registra la venta
-/// (tambien Ctrl+Enter desde cualquier campo). Esc limpia la captura actual.
+/// Tab avanza entre campos; Enter registra la venta incluyendo la captura
+/// pendiente. Agregar acumula productos y Esc limpia la captura actual.
 class SalesPage extends StatefulWidget {
   const SalesPage({super.key, this.activa = true});
 
@@ -175,19 +174,6 @@ class _SalesPageState extends State<SalesPage> {
     );
   }
 
-  void _alEnterCodigo() {
-    if (_codigoController.text.trim().isEmpty) {
-      _registrar();
-      return;
-    }
-    if (_productoActual() == null) {
-      setState(() => _errorCaptura = 'No existe un producto con ese código.');
-      _enfocar(_codigoFocus, _codigoController);
-      return;
-    }
-    _enfocar(_cantidadFocus, _cantidadController);
-  }
-
   /// Valida la captura y la pasa a la lista de productos de la venta.
   bool _agregarItem() {
     final producto = _productoActual();
@@ -301,7 +287,7 @@ class _SalesPageState extends State<SalesPage> {
     // Guardia sincronica: un segundo Enter o doble clic mientras se guarda no
     // dispara otra peticion (el boton deshabilitado no frena el teclado).
     if (_guardando) return;
-    if (_items.isEmpty && _codigoController.text.trim().isNotEmpty) {
+    if (_codigoController.text.trim().isNotEmpty) {
       if (!_agregarItem()) return;
     }
     if (_items.isEmpty) {
@@ -514,24 +500,41 @@ class _SalesPageState extends State<SalesPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(12),
             children: [
-              _encabezado(),
-              if (inventario.error != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  inventario.error!,
-                  style: TextStyle(color: context.paleta.aviso),
+              Focus(
+                canRequestFocus: false,
+                onKeyEvent: (_, evento) {
+                  if (!widget.activa) return KeyEventResult.ignored;
+                  if (evento.logicalKey == LogicalKeyboardKey.enter ||
+                      evento.logicalKey == LogicalKeyboardKey.numpadEnter) {
+                    if (evento is KeyDownEvent) unawaited(_registrar());
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _encabezado(),
+                    if (inventario.error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        inventario.error!,
+                        style: TextStyle(color: context.paleta.aviso),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    _seccionProducto(producto, ancho),
+                    const SizedBox(height: 12),
+                    _seccionCantidad(producto, ancho),
+                    const SizedBox(height: 12),
+                    _seccionItems(),
+                    const SizedBox(height: 12),
+                    _seccionPago(ancho),
+                    const SizedBox(height: 12),
+                    _barraRegistro(ancho),
+                  ],
                 ),
-              ],
-              const SizedBox(height: 12),
-              _seccionProducto(producto, ancho),
-              const SizedBox(height: 12),
-              _seccionCantidad(producto, ancho),
-              const SizedBox(height: 12),
-              _seccionItems(),
-              const SizedBox(height: 12),
-              _seccionPago(ancho),
-              const SizedBox(height: 12),
-              _barraRegistro(ancho),
+              ),
               const SizedBox(height: 22),
               ..._historial(esAdmin),
             ],
@@ -622,17 +625,15 @@ class _SalesPageState extends State<SalesPage> {
     final codigo = TextField(
       controller: _codigoController,
       focusNode: _codigoFocus,
-      textInputAction: TextInputAction.next,
+      textInputAction: TextInputAction.done,
       textCapitalization: TextCapitalization.characters,
       decoration: const InputDecoration(
         labelText: 'Código',
         prefixIcon: Icon(Icons.qr_code_2),
       ),
       onChanged: _alCambiarCodigo,
-      // onEditingComplete vacio: el foco lo maneja onSubmitted y no el
-      // "siguiente campo" automatico de Flutter.
       onEditingComplete: () {},
-      onSubmitted: (_) => _alEnterCodigo(),
+      onSubmitted: (_) => _registrar(),
     );
     final descripcion = _lectura(
       'Descripción',
@@ -725,7 +726,7 @@ class _SalesPageState extends State<SalesPage> {
       controller: _cantidadController,
       focusNode: _cantidadFocus,
       keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.next,
+      textInputAction: TextInputAction.done,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: const InputDecoration(labelText: 'Cantidad'),
       onChanged: (_) => setState(() {
@@ -733,7 +734,7 @@ class _SalesPageState extends State<SalesPage> {
         _recalcularMonto();
       }),
       onEditingComplete: () {},
-      onSubmitted: (_) => _enfocar(_montoFocus, _montoController),
+      onSubmitted: (_) => _registrar(),
     );
     final campoMonto = TextField(
       controller: _montoController,
@@ -765,7 +766,7 @@ class _SalesPageState extends State<SalesPage> {
         _errorCaptura = null;
       }),
       onEditingComplete: () {},
-      onSubmitted: (_) => _agregarItem(),
+      onSubmitted: (_) => _registrar(),
     );
     final botonAgregar = FilledButton.tonalIcon(
       onPressed: _agregarItem,
@@ -1042,7 +1043,8 @@ class _SalesPageState extends State<SalesPage> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
-                'Aún no hay productos. Escribe un código y presiona Enter.',
+                'Escribe un código. Usa Agregar para acumular productos '
+                'o Enter para registrar.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.textoSecundario),
               ),
@@ -1240,7 +1242,11 @@ class _SalesPageState extends State<SalesPage> {
       label: const Text('Limpiar'),
     );
     final registrar = BotonSeguro(
-      onPressed: _guardando || _items.isEmpty ? null : _registrar,
+      onPressed:
+          _guardando ||
+              (_items.isEmpty && _codigoController.text.trim().isEmpty)
+          ? null
+          : _registrar,
       icon: _guardando
           ? const SizedBox(
               width: 18,
@@ -1251,7 +1257,7 @@ class _SalesPageState extends State<SalesPage> {
       child: Text(_guardando ? 'Registrando…' : 'Registrar venta'),
     );
     final ayuda = Text(
-      'Enter en Código vacío o Ctrl+Enter registra · Esc limpia la captura',
+      'Tab avanza entre campos · Enter registra · Esc limpia la captura',
       style: TextStyle(color: context.textoSecundario, fontSize: 13),
     );
 

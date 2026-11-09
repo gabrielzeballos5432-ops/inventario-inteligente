@@ -8,13 +8,15 @@ from sqlalchemy.orm import selectinload
 
 from app.models.caja import SesionCaja
 from app.models.compra import Moneda
-from app.models.contabilidad import BonoSueldo, Gasto, PagoGasto
+from app.models.contabilidad import BonoSueldo, CategoriaGasto, Gasto, PagoGasto
 from app.models.proveedor import Proveedor
 from app.models.sueldo import LiquidacionSueldo
 from app.models.usuario import Usuario
 from app.models.venta import Venta, VentaDetalle
 from app.schemas.contabilidad import (
     BonoSueldoCreate,
+    CategoriaGastoCreate,
+    CategoriaGastoUpdate,
     GastoCreate,
     PagoGastoCreate,
 )
@@ -115,7 +117,72 @@ class ContabilidadService:
         await self.db.refresh(bono)
         return bono
 
+    async def listar_categorias_gasto(self, incluir_inactivas: bool = False) -> list[CategoriaGasto]:
+        query = select(CategoriaGasto).order_by(func.lower(CategoriaGasto.nombre), CategoriaGasto.id)
+        if not incluir_inactivas:
+            query = query.where(CategoriaGasto.activo.is_(True))
+        result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def guardar_categoria_gasto(
+        self, data: CategoriaGastoCreate | CategoriaGastoUpdate,
+        categoria_id: int | None = None,
+    ) -> CategoriaGasto:
+        categoria = None
+        if categoria_id is not None:
+            categoria = await self.db.get(CategoriaGasto, categoria_id)
+            if categoria is None:
+                raise ContabilidadValidationError("Categoría de gasto no encontrada.")
+        query = select(CategoriaGasto).where(
+            func.lower(func.regexp_replace(
+                func.trim(CategoriaGasto.nombre), r"\s+", " ", "g"
+            )) == data.nombre.lower()
+        ).with_for_update()
+        if categoria_id is not None:
+            query = query.where(CategoriaGasto.id != categoria_id)
+        existente = await self.db.execute(query)
+        coincidencias = list(existente.scalars().all())
+        if coincidencias:
+            if categoria_id is not None or any(c.activo for c in coincidencias):
+                raise ContabilidadValidationError(
+                    "Ya existe una categoría activa con ese nombre."
+                )
+            if len(coincidencias) > 1:
+                raise ContabilidadValidationError(
+                    "Hay varias categorías inactivas con ese nombre. "
+                    "Contacta al administrador para revisar las coincidencias."
+                )
+            categoria = coincidencias[0]
+            categoria.activo = True
+        if categoria is None:
+            categoria = CategoriaGasto(**data.model_dump(), activo=True)
+            self.db.add(categoria)
+        else:
+            for campo, valor in data.model_dump().items():
+                setattr(categoria, campo, valor)
+        await self.db.commit()
+        await self.db.refresh(categoria)
+        return categoria
+
+    async def eliminar_categoria_gasto(self, categoria_id: int) -> None:
+        categoria = await self.db.get(CategoriaGasto, categoria_id)
+        if categoria is None:
+            raise ContabilidadValidationError("Categoría de gasto no encontrada.")
+        categoria.activo = False
+        await self.db.commit()
+
     async def registrar_gasto(self, data: GastoCreate, usuario_id: int) -> dict:
+        valores = data.model_dump()
+        if data.categoria_gasto_id is not None:
+            resultado = await self.db.execute(
+                select(CategoriaGasto)
+                .where(CategoriaGasto.id == data.categoria_gasto_id)
+                .with_for_update()
+            )
+            categoria = resultado.scalar_one_or_none()
+            if categoria is None or not categoria.activo:
+                raise ContabilidadValidationError("La categoría no existe o está inactiva.")
+            valores["categoria"] = categoria.nombre
         moneda = await self.db.get(Moneda, data.moneda_codigo)
         if moneda is None or not moneda.activa:
             raise ContabilidadValidationError("La moneda no existe o está inactiva.")
@@ -145,7 +212,7 @@ class ContabilidadService:
                 "El importe convertido a BOB debe ser mayor que cero."
             )
         gasto = Gasto(
-            **data.model_dump(),
+            **valores,
             usuario_id=usuario_id,
             monto_bob=monto_bob,
             estado="pendiente",
@@ -157,6 +224,12 @@ class ContabilidadService:
     async def registrar_pago_gasto(
         self, gasto_id: int, data: PagoGastoCreate, usuario_id: int
     ) -> PagoGasto:
+        pagos = await self.registrar_pagos_gasto(gasto_id, [data], usuario_id)
+        return pagos[0]
+
+    async def registrar_pagos_gasto(
+        self, gasto_id: int, datos: list[PagoGastoCreate], usuario_id: int
+    ) -> list[PagoGasto]:
         result = await self.db.execute(
             select(Gasto).where(Gasto.id == gasto_id).with_for_update()
         )
@@ -170,9 +243,9 @@ class ContabilidadService:
             raise ContabilidadValidationError(
                 "La moneda del gasto ya no está disponible."
             )
-        if (
-            data.monto.quantize(Decimal("1").scaleb(-moneda.decimales))
-            != data.monto
+        if any(
+            data.monto.quantize(Decimal("1").scaleb(-moneda.decimales)) != data.monto
+            for data in datos
         ):
             raise ContabilidadValidationError(
                 f"El pago admite como máximo {moneda.decimales} decimales."
@@ -183,48 +256,52 @@ class ContabilidadService:
             )
         )
         pagado = Decimal(pagado_result.scalar_one())
-        if pagado + data.monto > gasto.monto:
+        total = sum((data.monto for data in datos), Decimal("0"))
+        if pagado + total > gasto.monto:
             raise ContabilidadValidationError(
                 "El pago supera el saldo pendiente del gasto."
             )
-        sesion_caja_id = data.sesion_caja_id
-        if data.metodo_pago == "efectivo" and sesion_caja_id is None:
-            abierta = await self.db.execute(
-                select(SesionCaja.id).where(
-                    SesionCaja.usuario_apertura_id == usuario_id,
-                    SesionCaja.estado == "abierta",
+        pagos = []
+        for data in datos:
+            sesion_caja_id = data.sesion_caja_id
+            if data.metodo_pago == "efectivo" and sesion_caja_id is None:
+                abierta = await self.db.execute(
+                    select(SesionCaja.id).where(
+                        SesionCaja.usuario_apertura_id == usuario_id,
+                        SesionCaja.estado == "abierta",
+                    )
                 )
-            )
-            sesion_caja_id = abierta.scalar_one_or_none()
-            if sesion_caja_id is None:
+                sesion_caja_id = abierta.scalar_one_or_none()
+                if sesion_caja_id is None:
+                    raise ContabilidadValidationError(
+                        "Abre una sesión de caja para registrar un pago en efectivo."
+                    )
+            if sesion_caja_id is not None:
+                await CajaService(self.db).validar_caja_venta(
+                    usuario_id, sesion_caja_id
+                )
+            monto_bob = (
+                data.monto / gasto.tipo_cambio_ext * gasto.tipo_cambio_bob
+            ).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+            if monto_bob <= 0:
                 raise ContabilidadValidationError(
-                    "Abre una sesión de caja para registrar un pago en efectivo."
+                    "El importe convertido del pago debe ser mayor que cero."
                 )
-        if sesion_caja_id is not None:
-            await CajaService(self.db).validar_caja_venta(
-                usuario_id, sesion_caja_id
-            )
-        monto_bob = (
-            data.monto / gasto.tipo_cambio_ext * gasto.tipo_cambio_bob
-        ).quantize(CENTAVO, rounding=ROUND_HALF_UP)
-        if monto_bob <= 0:
-            raise ContabilidadValidationError(
-                "El importe convertido del pago debe ser mayor que cero."
-            )
-        pago = PagoGasto(
-            gasto_id=gasto.id,
-            sesion_caja_id=sesion_caja_id,
-            monto=data.monto,
-            monto_bob=monto_bob,
-            metodo_pago=data.metodo_pago,
-            referencia=data.referencia,
-        )
-        self.db.add(pago)
-        if pagado + data.monto == gasto.monto:
+            pagos.append(PagoGasto(
+                gasto_id=gasto.id,
+                sesion_caja_id=sesion_caja_id,
+                monto=data.monto,
+                monto_bob=monto_bob,
+                metodo_pago=data.metodo_pago,
+                referencia=data.referencia,
+            ))
+        self.db.add_all(pagos)
+        if pagado + total == gasto.monto:
             gasto.estado = "pagado"
         await self.db.commit()
-        await self.db.refresh(pago)
-        return pago
+        for pago in pagos:
+            await self.db.refresh(pago)
+        return pagos
 
     async def anular_gasto(
         self, gasto_id: int, usuario_id: int, motivo: str
@@ -272,6 +349,7 @@ class ContabilidadService:
         return {
             "id": gasto.id,
             "categoria": gasto.categoria,
+            "categoria_gasto_id": gasto.categoria_gasto_id,
             "concepto": gasto.concepto,
             "proveedor_id": gasto.proveedor_id,
             "usuario_id": gasto.usuario_id,

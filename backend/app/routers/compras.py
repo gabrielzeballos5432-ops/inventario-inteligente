@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from starlette.concurrency import run_in_threadpool
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
@@ -11,6 +13,10 @@ from app.schemas.compra import (
     MonedaOut,
 )
 from app.services.compra_service import CompraService, CompraValidationError
+from app.models.producto import Producto
+from app.models.proveedor import Proveedor
+from app.schemas.lectura_compra import LecturaCompraOut
+from app.services.lectura_compra_service import LecturaCompraError, leer_comprobante
 
 
 compras_router = APIRouter(prefix="/api/compras", tags=["Compras"])
@@ -72,6 +78,43 @@ async def listar_compras(
     _: tuple[int, str] = Depends(require_admin),
 ):
     return await CompraService(db).listar(limite)
+
+
+@compras_router.post("/leer-comprobante", response_model=LecturaCompraOut)
+async def leer_foto_compra(
+    imagen: UploadFile = File(...),
+    _: tuple[int, str] = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        contenido = await imagen.read(12 * 1024 * 1024 + 1)
+    finally:
+        await imagen.close()
+    if len(contenido) > 12 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="La foto debe pesar como máximo 12 MB.")
+    try:
+        lectura = await run_in_threadpool(leer_comprobante, contenido)
+    except LecturaCompraError as exc:
+        raise HTTPException(status_code=exc.estado, detail=str(exc)) from exc
+    productos = list((await db.execute(select(Producto).where(Producto.activo.is_(True)))).scalars())
+    for detalle in lectura.detalles:
+        candidatos = [
+            producto for producto in productos
+            if (detalle.codigo and detalle.codigo.casefold() in {
+                (producto.sku or "").casefold(), (producto.codigo_barras or "").casefold(),
+            }) or producto.nombre.casefold() == detalle.descripcion.casefold()
+        ]
+        if len(candidatos) == 1:
+            detalle.producto_id = candidatos[0].id
+    if lectura.proveedor_nombre:
+        proveedores = list((await db.execute(select(Proveedor).where(Proveedor.activo.is_(True)))).scalars())
+        candidatos = [
+            proveedor for proveedor in proveedores
+            if " ".join(proveedor.nombre.casefold().split()) == " ".join(lectura.proveedor_nombre.casefold().split())
+        ]
+        if len(candidatos) == 1:
+            lectura.proveedor_id = candidatos[0].id
+    return lectura
 
 
 @compras_router.get("/{compra_id}", response_model=CompraOut)

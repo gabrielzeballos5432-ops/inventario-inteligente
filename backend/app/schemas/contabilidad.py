@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Porcentaje = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
 MontoBob = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]
@@ -28,10 +28,41 @@ class BonoSueldoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CategoriaGastoCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=100)
+    periodicidad: Literal["sin_periodicidad", "mensual", "semanal", "anual"]
+    tipo_importe: Literal["fijo", "variable"]
+    monto_habitual: Optional[MontoBob] = None
+
+    @field_validator("nombre")
+    @classmethod
+    def limpiar_nombre(cls, valor: str) -> str:
+        valor = " ".join(valor.split())
+        if not valor:
+            raise ValueError("Escribe el nombre de la categoría.")
+        return valor
+
+    @model_validator(mode="after")
+    def validar_monto(self):
+        if self.tipo_importe == "variable" and self.monto_habitual is not None:
+            raise ValueError("Un importe variable no debe tener monto fijo habitual.")
+        return self
+
+
+class CategoriaGastoUpdate(CategoriaGastoCreate):
+    activo: bool = True
+
+
+class CategoriaGastoOut(CategoriaGastoUpdate):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 class GastoCreate(BaseModel):
-    categoria: Literal[
+    categoria: Optional[Literal[
         "servicio", "alquiler", "insumo_limpieza", "mantenimiento", "otro"
-    ]
+    ]] = None
+    categoria_gasto_id: Optional[int] = Field(default=None, gt=0)
     concepto: str = Field(min_length=1, max_length=200)
     proveedor_id: Optional[int] = Field(default=None, gt=0)
     fecha_documento: Optional[date] = None
@@ -46,6 +77,8 @@ class GastoCreate(BaseModel):
 
     @model_validator(mode="after")
     def validar_periodo(self):
+        if self.categoria is None and self.categoria_gasto_id is None:
+            raise ValueError("Selecciona la categoría del gasto.")
         if (
             self.periodo_desde is not None
             and self.periodo_hasta is not None
@@ -75,9 +108,23 @@ class PagoGastoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PagoGastoMixtoCreate(BaseModel):
+    pagos: list[PagoGastoCreate] = Field(min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def validar_metodos(self):
+        metodos = [p.metodo_pago for p in self.pagos]
+        if any(m not in ("efectivo", "qr") for m in metodos):
+            raise ValueError("Solo se admite efectivo o QR.")
+        if len(set(metodos)) != len(metodos):
+            raise ValueError("No repitas el método de pago.")
+        return self
+
+
 class GastoOut(BaseModel):
     id: int
     categoria: str
+    categoria_gasto_id: Optional[int] = None
     concepto: str
     proveedor_id: Optional[int]
     usuario_id: int

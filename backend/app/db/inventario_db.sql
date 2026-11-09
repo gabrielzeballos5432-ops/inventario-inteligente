@@ -205,7 +205,7 @@ CREATE TABLE moneda (
 
 CREATE TABLE compra (
     id SERIAL PRIMARY KEY,
-    proveedor_id INTEGER NOT NULL REFERENCES proveedor(id),
+    proveedor_id INTEGER REFERENCES proveedor(id),
     usuario_id INTEGER NOT NULL REFERENCES usuario(id),
     moneda_codigo VARCHAR(3) NOT NULL REFERENCES moneda(codigo),
     tipo_cambio_ext DECIMAL(18,6) NOT NULL CHECK (tipo_cambio_ext > 0),
@@ -340,11 +340,33 @@ CREATE TABLE bono_sueldo (
     fecha_registro TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE categoria_gasto (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    periodicidad VARCHAR(20) NOT NULL DEFAULT 'sin_periodicidad',
+    tipo_importe VARCHAR(10) NOT NULL DEFAULT 'variable',
+    monto_habitual NUMERIC(14,2),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT chk_categoria_gasto_periodicidad CHECK (
+        periodicidad IN ('sin_periodicidad', 'mensual', 'semanal', 'anual')
+    ),
+    CONSTRAINT chk_categoria_gasto_tipo_importe CHECK (tipo_importe IN ('fijo', 'variable')),
+    CONSTRAINT chk_categoria_gasto_monto CHECK (
+        monto_habitual IS NULL OR (monto_habitual > 0 AND tipo_importe = 'fijo')
+    )
+);
+CREATE UNIQUE INDEX uq_categoria_gasto_nombre_lower ON categoria_gasto(lower(nombre));
+INSERT INTO categoria_gasto (nombre, periodicidad, tipo_importe) VALUES
+    ('Luz', 'mensual', 'variable'), ('Agua', 'mensual', 'fijo'),
+    ('Wifi', 'mensual', 'fijo'), ('Alquiler', 'mensual', 'fijo'),
+    ('Scotch', 'sin_periodicidad', 'variable'),
+    ('Papel para tickets', 'sin_periodicidad', 'variable'),
+    ('Etiquetas', 'sin_periodicidad', 'variable');
+
 CREATE TABLE gasto (
     id SERIAL PRIMARY KEY,
-    categoria VARCHAR(30) NOT NULL CHECK (
-        categoria IN ('servicio', 'alquiler', 'insumo_limpieza', 'mantenimiento', 'otro')
-    ),
+    categoria VARCHAR(100) NOT NULL,
+    categoria_gasto_id INTEGER REFERENCES categoria_gasto(id) ON DELETE RESTRICT,
     concepto VARCHAR(200) NOT NULL,
     proveedor_id INTEGER REFERENCES proveedor(id),
     usuario_id INTEGER NOT NULL REFERENCES usuario(id),
@@ -411,6 +433,7 @@ CREATE INDEX idx_bono_sueldo_usuario_fecha
     ON bono_sueldo(usuario_id, fecha_registro);
 CREATE INDEX idx_gasto_periodo_categoria ON gasto(periodo_desde, categoria);
 CREATE INDEX idx_gasto_proveedor ON gasto(proveedor_id);
+CREATE INDEX idx_gasto_categoria_gasto ON gasto(categoria_gasto_id);
 CREATE INDEX idx_pago_gasto_gasto_fecha ON pago_gasto(gasto_id, fecha_pago);
 CREATE INDEX idx_pago_gasto_sesion ON pago_gasto(sesion_caja_id);
 CREATE INDEX idx_compra_proveedor_fecha ON compra(proveedor_id, fecha_creacion);

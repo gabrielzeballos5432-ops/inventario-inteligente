@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     Date,
@@ -46,14 +47,34 @@ class BonoSueldo(Base):
     )
 
 
+class CategoriaGasto(Base):
+    __tablename__ = "categoria_gasto"
+    __table_args__ = (
+        Index("uq_categoria_gasto_nombre_lower", text("lower(nombre)"), unique=True),
+        CheckConstraint(
+            "periodicidad IN ('sin_periodicidad', 'mensual', 'semanal', 'anual')",
+            name="chk_categoria_gasto_periodicidad",
+        ),
+        CheckConstraint(
+            "tipo_importe IN ('fijo', 'variable')", name="chk_categoria_gasto_tipo_importe",
+        ),
+        CheckConstraint(
+            "monto_habitual IS NULL OR (monto_habitual > 0 AND tipo_importe = 'fijo')",
+            name="chk_categoria_gasto_monto",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(100), nullable=False)
+    periodicidad = Column(String(20), nullable=False, server_default=text("'sin_periodicidad'"))
+    tipo_importe = Column(String(10), nullable=False, server_default=text("'variable'"))
+    monto_habitual = Column(Numeric(14, 2))
+    activo = Column(Boolean, nullable=False, server_default=text("true"), default=True)
+
+
 class Gasto(Base):
     __tablename__ = "gasto"
     __table_args__ = (
-        CheckConstraint(
-            "categoria IN ('servicio', 'alquiler', 'insumo_limpieza', "
-            "'mantenimiento', 'otro')",
-            name="chk_gasto_categoria",
-        ),
         CheckConstraint("monto > 0", name="chk_gasto_monto"),
         CheckConstraint("monto_bob > 0", name="chk_gasto_monto_bob"),
         CheckConstraint("tipo_cambio_ext > 0", name="chk_gasto_tipo_cambio_ext"),
@@ -69,10 +90,12 @@ class Gasto(Base):
         ),
         Index("idx_gasto_periodo_categoria", "periodo_desde", "categoria"),
         Index("idx_gasto_proveedor", "proveedor_id"),
+        Index("idx_gasto_categoria_gasto", "categoria_gasto_id"),
     )
 
     id = Column(Integer, primary_key=True)
-    categoria = Column(String(30), nullable=False)
+    categoria = Column(String(100), nullable=False)
+    categoria_gasto_id = Column(Integer, ForeignKey("categoria_gasto.id", ondelete="RESTRICT"))
     concepto = Column(String(200), nullable=False)
     proveedor_id = Column(Integer, ForeignKey("proveedor.id"))
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False)

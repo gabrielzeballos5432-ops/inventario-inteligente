@@ -4,6 +4,7 @@ __pycache__/
 .env
 .env.prod
 venv/
+venv-ocr/
 .venv/
 *.pt
 *.pkl

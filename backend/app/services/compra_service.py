@@ -86,9 +86,10 @@ class CompraService:
                 f"El descuento admite como máximo {moneda.decimales} decimales "
                 "para esta moneda."
             )
-        proveedor = await self.db.get(Proveedor, data.proveedor_id)
-        if proveedor is None or not proveedor.activo:
-            raise CompraValidationError("El proveedor no existe o está inactivo.")
+        if data.proveedor_id is not None:
+            proveedor = await self.db.get(Proveedor, data.proveedor_id)
+            if proveedor is None or not proveedor.activo:
+                raise CompraValidationError("El proveedor no existe o está inactivo.")
 
         producto_ids = sorted(detalle.producto_id for detalle in data.detalles)
         result_productos = await self.db.execute(
@@ -139,7 +140,7 @@ class CompraService:
             )
 
         compra = Compra(
-            proveedor_id=proveedor.id,
+            proveedor_id=data.proveedor_id,
             usuario_id=usuario_id,
             moneda_codigo=moneda.codigo,
             tipo_cambio_ext=data.tipo_cambio_ext,

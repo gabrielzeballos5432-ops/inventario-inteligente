@@ -8,11 +8,15 @@ from app.core.security import require_admin
 from app.schemas.contabilidad import (
     BonoSueldoCreate,
     BonoSueldoOut,
+    CategoriaGastoCreate,
+    CategoriaGastoUpdate,
+    CategoriaGastoOut,
     GastoAnular,
     GastoCreate,
     GastoOut,
     PagoGastoCreate,
     PagoGastoOut,
+    PagoGastoMixtoCreate,
     ReporteFinancieroOut,
 )
 from app.services.contabilidad_service import (
@@ -22,6 +26,51 @@ from app.services.contabilidad_service import (
 
 
 router = APIRouter(prefix="/api/contabilidad", tags=["Contabilidad"])
+
+
+@router.get("/categorias-gasto", response_model=list[CategoriaGastoOut])
+async def listar_categorias_gasto(
+    incluir_inactivas: bool = False,
+    _: tuple[int, str] = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    return await ContabilidadService(db).listar_categorias_gasto(incluir_inactivas)
+
+
+@router.post("/categorias-gasto", response_model=CategoriaGastoOut, status_code=201)
+async def crear_categoria_gasto(
+    body: CategoriaGastoCreate,
+    _: tuple[int, str] = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await ContabilidadService(db).guardar_categoria_gasto(body)
+    except ContabilidadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.put("/categorias-gasto/{categoria_id}", response_model=CategoriaGastoOut)
+async def actualizar_categoria_gasto(
+    categoria_id: int, body: CategoriaGastoUpdate,
+    _: tuple[int, str] = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await ContabilidadService(db).guardar_categoria_gasto(body, categoria_id)
+    except ContabilidadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/categorias-gasto/{categoria_id}", status_code=204)
+async def eliminar_categoria_gasto(
+    categoria_id: int,
+    _: tuple[int, str] = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await ContabilidadService(db).eliminar_categoria_gasto(categoria_id)
+    except ContabilidadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/bonos", response_model=BonoSueldoOut, status_code=201)
@@ -133,6 +182,21 @@ async def registrar_pago_gasto(
     try:
         return await ContabilidadService(db).registrar_pago_gasto(
             gasto_id, body, administrador[0]
+        )
+    except ContabilidadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/gastos/{gasto_id}/pagos/mixto", response_model=list[PagoGastoOut], status_code=201)
+async def registrar_pagos_gasto(
+    gasto_id: int,
+    body: PagoGastoMixtoCreate,
+    administrador: tuple[int, str] = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await ContabilidadService(db).registrar_pagos_gasto(
+            gasto_id, body.pagos, administrador[0]
         )
     except ContabilidadValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

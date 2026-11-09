@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/destino_app.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/models/categoria_gasto.dart';
+import 'categorias_gasto_dialog.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/boton_seguro.dart';
@@ -363,7 +367,7 @@ class _ComprasTabState extends State<_ComprasTab> {
           _EncabezadoSeccion(
             titulo: 'Compras e ingresos de mercadería',
             descripcion:
-                'Registra factura, descuentos y envío. El costo y el stock se actualizan al guardar.',
+                'Registra compras con proveedor o como compra propia. El costo y el stock se actualizan al guardar.',
             accion: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -375,10 +379,7 @@ class _ComprasTabState extends State<_ComprasTab> {
                   child: const Text('Monedas'),
                 ),
                 BotonSeguro(
-                  onPressed:
-                      _proveedores.isEmpty ||
-                          _productos.isEmpty ||
-                          _monedas.isEmpty
+                  onPressed: _productos.isEmpty || _monedas.isEmpty
                       ? null
                       : _registrar,
                   icon: const Icon(Icons.add_shopping_cart),
@@ -387,13 +388,6 @@ class _ComprasTabState extends State<_ComprasTab> {
               ],
             ),
           ),
-          if (_proveedores.isEmpty && !_cargando)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Primero registra un proveedor en Administración → Proveedores.',
-              ),
-            ),
           const SizedBox(height: 12),
           if (_cargando)
             const Center(child: CircularProgressIndicator())
@@ -414,6 +408,7 @@ class _ComprasTabState extends State<_ComprasTab> {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     subtitle: Text(
+                      '${compra['proveedor_id'] == null ? 'Sin proveedor' : 'Proveedor #${compra['proveedor_id']}'} · '
                       '${compra['numero_factura'] ?? 'Sin factura'} · '
                       '${compra['moneda_codigo']} ${_numero(compra['total_moneda'])} '
                       '(Bs ${_numero(compra['total_bob'])})',
@@ -468,6 +463,9 @@ class _CompraDialogState extends State<_CompraDialog> {
   int? _proveedorId;
   String _moneda = 'BOB';
   bool _guardando = false;
+  bool _leyendo = false;
+  bool _lecturaRevisada = false;
+  Map<String, dynamic>? _lectura;
   // Los errores de producto (vacio o repetido) solo se pintan despues del
   // primer intento de guardar, para no recibir al usuario con la fila en rojo.
   bool _validar = false;
@@ -570,15 +568,170 @@ class _CompraDialogState extends State<_CompraDialog> {
         .toList(),
   };
 
+  Future<void> _leerFoto(ImageSource fuente) async {
+    if (_leyendo || _guardando) return;
+    setState(() {
+      _leyendo = true;
+      _error = null;
+    });
+    try {
+      final archivo = await ImagePicker().pickImage(source: fuente);
+      if (archivo == null || !mounted) return;
+      final bytes = await archivo.readAsBytes();
+      if (bytes.length > 12 * 1024 * 1024) {
+        setState(() => _error = 'La foto debe pesar como máximo 12 MB.');
+        return;
+      }
+      if (!mounted) return;
+      final lectura = await context.read<OperacionesService>().leerComprobante(
+        bytes: bytes,
+        nombre: archivo.name,
+      );
+      if (!mounted) return;
+      final aceptar = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Usar datos del comprobante'),
+          content: const Text(
+            'Se reemplazarán las líneas actuales por el borrador leído. '
+            'Después revisa cada producto, la moneda y los tipos de cambio. '
+            'Todavía no se registrará ninguna compra.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Usar borrador'),
+            ),
+          ],
+        ),
+      );
+      if (aceptar != true || !mounted) return;
+      final anteriores = List<_DetalleCompraEditor>.of(_detalles);
+      setState(() {
+        _lectura = lectura;
+        _lecturaRevisada = false;
+        _validar = false;
+        _factura.text = lectura['numero_factura'] as String? ?? '';
+        _proveedorId = lectura['proveedor_id'] as int?;
+        final moneda = lectura['moneda_codigo'] as String?;
+        if (moneda != null &&
+            widget.monedas.any((item) => item['codigo'] == moneda)) {
+          _moneda = moneda;
+        }
+        _descuento.text = '0';
+        _porcentajeEnvio.text = '0';
+        _tcExt.text = _moneda == 'USD' || _moneda == 'BOB' ? '1' : '';
+        _tcBob.text = _moneda == 'BOB' ? '1' : '';
+        _detalles.clear();
+        for (final item
+            in (lectura['detalles'] as List).cast<Map<String, dynamic>>()) {
+          final fila = _nuevaFila();
+          final id = item['producto_id'] as int?;
+          fila.buscador.text = _nombres[id] ?? '';
+          fila.productoId = _nombres.containsKey(id) ? id : null;
+          fila.cantidad.text = '${item['cantidad']}';
+          fila.costo.text = '${item['costo_unitario_moneda']}';
+          fila.descripcion.text = item['descripcion'] as String;
+          fila.conDescripcion = true;
+          _detalles.add(fila);
+        }
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final fila in anteriores) {
+          fila.dispose();
+        }
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = _detalleError(error));
+    } finally {
+      if (mounted) setState(() => _leyendo = false);
+    }
+  }
+
+  Widget _lectorComprobante() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Wrap(
+        spacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _leyendo || _guardando
+                ? null
+                : () => _leerFoto(ImageSource.gallery),
+            icon: const Icon(Icons.document_scanner_outlined),
+            label: Text(_leyendo ? 'Leyendo comprobante…' : 'Leer comprobante'),
+          ),
+          if (!kIsWeb &&
+              (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS))
+            OutlinedButton.icon(
+              onPressed: _leyendo || _guardando
+                  ? null
+                  : () => _leerFoto(ImageSource.camera),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Tomar foto'),
+            ),
+        ],
+      ),
+      if (_leyendo) ...[
+        const LinearProgressIndicator(),
+        const Text(
+          'Lectura local. La primera vez puede tardar varios minutos.',
+        ),
+      ],
+      if (_lectura case final lectura?) ...[
+        Text(
+          'Total impreso: ${lectura['total_impreso'] ?? 'No identificado'} · '
+          'Suma leída: ${lectura['subtotal_calculado']} (moneda de origen)',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        if (lectura['proveedor_nombre'] != null)
+          Text('Proveedor leído: ${lectura['proveedor_nombre']}'),
+        for (final aviso in (lectura['advertencias'] as List).cast<String>())
+          Text('• $aviso'),
+        const Text(
+          'Selecciona los productos sin coincidencia y confirma la moneda. '
+          'Descuento y envío se completan manualmente.',
+        ),
+        ExpansionTile(
+          title: const Text('Ver texto detectado'),
+          children: [SelectableText(lectura['texto_detectado'] as String)],
+        ),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _lecturaRevisada,
+          onChanged: _guardando
+              ? null
+              : (value) => setState(() => _lecturaRevisada = value ?? false),
+          title: const Text(
+            'He revisado productos, cantidades, costos, total, moneda y tipos de cambio.',
+          ),
+        ),
+      ],
+      const SizedBox(height: 12),
+    ],
+  );
+
   Future<void> _guardar() async {
-    if (_guardando) return;
+    if (_guardando || _leyendo) return;
+    if (_lectura != null && !_lecturaRevisada) {
+      setState(
+        () => _error =
+            'Revisa el borrador y confirma los datos leídos antes de registrar.',
+      );
+      return;
+    }
     setState(() {
       _validar = true;
       _error = null;
     });
     final formularioOk = _formKey.currentState!.validate();
     final productosOk = _detalles.every((f) => _errorProducto(f) == null);
-    if (!formularioOk || !productosOk || _proveedorId == null) {
+    if (!formularioOk || !productosOk) {
       setState(() => _error = 'Revisa los campos marcados en rojo.');
       return;
     }
@@ -623,6 +776,7 @@ class _CompraDialogState extends State<_CompraDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _lectorComprobante(),
                   _tituloSeccion('Factura'),
                   _datosFactura(),
                   const SizedBox(height: 16),
@@ -716,23 +870,28 @@ class _CompraDialogState extends State<_CompraDialog> {
           children: [
             ocupa(
               2,
-              DropdownButtonFormField<int>(
+              DropdownButtonFormField<int?>(
+                key: ValueKey('proveedor-$_proveedorId'),
                 initialValue: _proveedorId,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Proveedor'),
-                items: widget.proveedores
-                    .map(
-                      (item) => DropdownMenuItem<int>(
-                        value: item['id'] as int,
-                        child: Text(
-                          item['nombre'] as String,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                decoration: const InputDecoration(
+                  labelText: 'Proveedor (opcional)',
+                ),
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Sin proveedor'),
+                  ),
+                  ...widget.proveedores.map(
+                    (item) => DropdownMenuItem<int?>(
+                      value: item['id'] as int,
+                      child: Text(
+                        item['nombre'] as String,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    )
-                    .toList(),
-                validator: (value) =>
-                    value == null ? 'Elige un proveedor' : null,
+                    ),
+                  ),
+                ],
                 onChanged: (value) => setState(() => _proveedorId = value),
               ),
             ),
@@ -752,6 +911,7 @@ class _CompraDialogState extends State<_CompraDialog> {
             ocupa(
               1,
               DropdownButtonFormField<String>(
+                key: ValueKey('moneda-$_moneda'),
                 initialValue: _moneda,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Moneda'),
@@ -1118,7 +1278,7 @@ class _CompraDialogState extends State<_CompraDialog> {
       child: const Text('Cancelar'),
     );
     final registrar = BotonSeguro(
-      onPressed: _guardando ? null : _guardar,
+      onPressed: _guardando || _leyendo ? null : _guardar,
       icon: const Icon(Icons.check),
       child: const Text('Registrar'),
     );
@@ -1166,9 +1326,14 @@ class _CompraDialogState extends State<_CompraDialog> {
 
 class _DetalleCompraEditor {
   _DetalleCompraEditor({required VoidCallback alCambiar}) {
-    buscador.addListener(alCambiar);
-    cantidad.addListener(alCambiar);
-    costo.addListener(alCambiar);
+    for (final controlador in [buscador, cantidad, costo]) {
+      var textoAnterior = controlador.text;
+      controlador.addListener(() {
+        if (controlador.text == textoAnterior) return;
+        textoAnterior = controlador.text;
+        alCambiar();
+      });
+    }
   }
 
   int? productoId;
@@ -2545,9 +2710,34 @@ class _GastosTab extends StatefulWidget {
 
 class _GastosTabState extends State<_GastosTab> {
   List<Map<String, dynamic>> _gastos = [];
-  List<Map<String, dynamic>> _monedas = [];
+  List<CategoriaGasto> _categorias = [];
+  DateTime _mes = DateTime(DateTime.now().year, DateTime.now().month);
+  String? _categoriaFiltro;
+  String _estadoFiltro = 'todos';
   bool _cargando = true;
   String? _error;
+
+  String _iso(DateTime fecha) =>
+      '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
+
+  String get _nombreMes {
+    const meses = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    final nombre = meses[_mes.month - 1];
+    return '${nombre[0].toUpperCase()}${nombre.substring(1)} ${_mes.year}';
+  }
 
   @override
   void initState() {
@@ -2561,14 +2751,21 @@ class _GastosTabState extends State<_GastosTab> {
       _error = null;
     });
     try {
-      final resultados = await Future.wait([
-        context.read<OperacionesService>().listarGastos(),
-        context.read<OperacionesService>().listarMonedas(),
+      final servicio = context.read<OperacionesService>();
+      final inicio = DateTime(_mes.year, _mes.month);
+      final fin = DateTime(_mes.year, _mes.month + 1, 0);
+      final resultados = await Future.wait<Object>([
+        servicio.listarGastos(
+          fechaInicio: _iso(inicio),
+          fechaFin: _iso(fin),
+          limite: 500,
+        ),
+        servicio.listarCategoriasGasto(),
       ]);
       if (!mounted) return;
       setState(() {
-        _gastos = resultados[0];
-        _monedas = resultados[1].where((m) => m['activa'] == true).toList();
+        _gastos = resultados[0] as List<Map<String, dynamic>>;
+        _categorias = resultados[1] as List<CategoriaGasto>;
         _cargando = false;
       });
     } catch (error) {
@@ -2580,20 +2777,46 @@ class _GastosTabState extends State<_GastosTab> {
     }
   }
 
+  List<Map<String, dynamic>> get _gastosVisibles => _gastos.where((gasto) {
+    final coincideCategoria =
+        _categoriaFiltro == null || gasto['categoria'] == _categoriaFiltro;
+    final coincideEstado =
+        _estadoFiltro == 'todos' || gasto['estado'] == _estadoFiltro;
+    return coincideCategoria && coincideEstado;
+  }).toList();
+
+  double _pagado(Map<String, dynamic> gasto) {
+    final pagos = (gasto['pagos'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>();
+    return pagos.fold<double>(
+      0,
+      (total, pago) => total + _aNumero(pago['monto_bob'] ?? pago['monto']),
+    );
+  }
+
+  void _cambiarMes(int delta) {
+    setState(() {
+      _mes = DateTime(_mes.year, _mes.month + delta);
+      _categoriaFiltro = null;
+    });
+    _cargar();
+  }
+
   Future<void> _crear() async {
     final gasto = await showDialog<_GastoFormulario>(
       context: context,
-      builder: (_) => _GastoDialog(monedas: _monedas),
+      builder: (_) => _GastoDialog(categorias: _categorias),
     );
     if (gasto == null || !mounted) return;
     try {
       await context.read<OperacionesService>().crearGasto(
-        categoria: gasto.categoria,
+        categoriaGastoId: gasto.categoriaId,
         concepto: gasto.concepto,
-        monedaCodigo: gasto.moneda,
+        monedaCodigo: 'BOB',
         monto: gasto.monto,
-        tipoCambioExt: gasto.tipoCambioExt,
-        tipoCambioBob: gasto.tipoCambioBob,
+        // Tasas iguales mantienen el importe en BOB sin conversion.
+        tipoCambioExt: 1,
+        tipoCambioBob: 1,
         numeroDocumento: gasto.numeroDocumento,
         periodoDesde: gasto.periodoDesde,
         periodoHasta: gasto.periodoHasta,
@@ -2604,6 +2827,14 @@ class _GastosTabState extends State<_GastosTab> {
     }
   }
 
+  Future<void> _gestionarCategorias() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const CategoriasGastoDialog(),
+    );
+    if (mounted) await _cargar();
+  }
+
   Future<void> _pagar(Map<String, dynamic> gasto) async {
     final pago = await showDialog<_PagoFormulario>(
       context: context,
@@ -2611,11 +2842,9 @@ class _GastosTabState extends State<_GastosTab> {
     );
     if (pago == null || !mounted) return;
     try {
-      await context.read<OperacionesService>().pagarGasto(
+      await context.read<OperacionesService>().pagarGastoCombinado(
         gastoId: gasto['id'] as int,
-        monto: pago.monto,
-        metodoPago: pago.metodo,
-        referencia: pago.referencia,
+        pagos: pago.pagos,
       );
       await _cargar();
     } catch (error) {
@@ -2639,6 +2868,19 @@ class _GastosTabState extends State<_GastosTab> {
 
   @override
   Widget build(BuildContext context) {
+    final noAnulados = _gastos.where((g) => g['estado'] != 'anulado');
+    final totalMes = noAnulados.fold<double>(
+      0,
+      (total, gasto) => total + _aNumero(gasto['monto_bob'] ?? gasto['monto']),
+    );
+    final pagadoMes = noAnulados.fold<double>(
+      0,
+      (total, gasto) => total + _pagado(gasto),
+    );
+    final pendienteMes = (totalMes - pagadoMes)
+        .clamp(0, double.infinity)
+        .toDouble();
+    final visibles = _gastosVisibles;
     return RefreshIndicator(
       onRefresh: _cargar,
       child: ListView(
@@ -2648,36 +2890,277 @@ class _GastosTabState extends State<_GastosTab> {
           _EncabezadoSeccion(
             titulo: 'Gastos del negocio',
             descripcion:
-                'Servicios, alquiler, limpieza y otros. Los pagos parciales conservan su moneda.',
-            accion: BotonSeguro(
-              onPressed: _monedas.isEmpty ? null : _crear,
-              icon: const Icon(Icons.add),
-              child: const Text('Nuevo gasto'),
+                'Control mensual de gastos, pagos y saldos pendientes.',
+            accion: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                BotonSeguro(
+                  variante: VarianteBoton.outlined,
+                  onPressed: _gestionarCategorias,
+                  icon: const Icon(Icons.category_outlined),
+                  child: const Text('Categorías de gasto'),
+                ),
+                BotonSeguro(
+                  onPressed: _cargando || _categorias.isEmpty ? null : _crear,
+                  icon: const Icon(Icons.add),
+                  child: const Text('Nuevo gasto'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),
+          _resumenGastos(totalMes, pagadoMes, pendienteMes),
+          const SizedBox(height: 8),
+          _filtrosGastos(),
+          const SizedBox(height: 8),
+          if (!_cargando && _error == null && _categorias.isEmpty)
+            const Text('Añade o reactiva una categoría para registrar gastos.'),
           if (_cargando)
             const Center(child: CircularProgressIndicator())
           else if (_error != null)
             _ErrorPanel(mensaje: _error!, reintentar: _cargar)
           else if (_gastos.isEmpty)
-            const SectionCard(child: Text('Aún no se han registrado gastos.'))
+            SectionCard(
+              child: Text(
+                'No hay gastos para $_nombreMes. Registra uno para comenzar.',
+              ),
+            )
+          else if (visibles.isEmpty)
+            const SectionCard(child: Text('No hay gastos para estos filtros.'))
+          else if (MediaQuery.sizeOf(context).width >= 760)
+            _tablaGastos(visibles)
           else
-            ..._gastos.map(_tarjetaGasto),
+            ...visibles.map(_tarjetaGasto),
         ],
       ),
     );
   }
 
-  Widget _tarjetaGasto(Map<String, dynamic> gasto) {
+  Widget _resumenGastos(double total, double pagado, double pendiente) {
+    final ancho = MediaQuery.sizeOf(context).width;
+    final columnas = ancho >= 760
+        ? 3
+        : ancho >= 600
+        ? 2
+        : 1;
+    final tarjetas = [
+      ('Total del mes', total, Icons.receipt_long_outlined),
+      ('Pagado', pagado, Icons.check_circle_outline),
+      ('Pendiente', pendiente, Icons.pending_actions_outlined),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final (titulo, monto, icono) in tarjetas)
+            SizedBox(
+              width: columnas == 1
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 8 * (columnas - 1)) / columnas,
+              child: _ResumenGasto(
+                titulo: titulo,
+                valor: 'Bs ${monto.toStringAsFixed(2)}',
+                icono: icono,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filtrosGastos() {
+    final compacto = MediaQuery.sizeOf(context).width < 760;
+    final mes = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Mes anterior',
+          onPressed: () => _cambiarMes(-1),
+          icon: const Icon(Icons.chevron_left),
+        ),
+        Flexible(
+          child: Text(
+            _nombreMes,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Mes siguiente',
+          onPressed:
+              _mes.year == DateTime.now().year &&
+                  _mes.month == DateTime.now().month
+              ? null
+              : () => _cambiarMes(1),
+          icon: const Icon(Icons.chevron_right),
+        ),
+      ],
+    );
+    final categoria = DropdownButtonFormField<String?>(
+      initialValue: _categoriaFiltro,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Categoría'),
+      items: [
+        const DropdownMenuItem<String?>(value: null, child: Text('Todas')),
+        for (final item in _categorias)
+          DropdownMenuItem<String?>(
+            value: item.nombre,
+            child: Text(item.nombre, overflow: TextOverflow.ellipsis),
+          ),
+      ],
+      onChanged: (value) => setState(() => _categoriaFiltro = value),
+    );
+    final estado = DropdownButtonFormField<String>(
+      initialValue: _estadoFiltro,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Estado'),
+      items: const [
+        DropdownMenuItem(value: 'todos', child: Text('Todos')),
+        DropdownMenuItem(value: 'pendiente', child: Text('Pendientes')),
+        DropdownMenuItem(value: 'pagado', child: Text('Pagados')),
+        DropdownMenuItem(value: 'anulado', child: Text('Anulados')),
+      ],
+      onChanged: (value) => setState(() => _estadoFiltro = value ?? 'todos'),
+    );
+    return SectionCard(
+      child: compacto
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(child: mes),
+                const SizedBox(height: 8),
+                categoria,
+                const SizedBox(height: 8),
+                estado,
+              ],
+            )
+          : Row(
+              children: [
+                SizedBox(width: 220, child: mes),
+                const SizedBox(width: 12),
+                Expanded(child: categoria),
+                const SizedBox(width: 12),
+                Expanded(child: estado),
+              ],
+            ),
+    );
+  }
+
+  Widget _tablaGastos(List<Map<String, dynamic>> gastos) {
+    return SectionCard(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: const [
+            DataColumn(label: Text('Categoría')),
+            DataColumn(label: Text('Concepto')),
+            DataColumn(label: Text('Período')),
+            DataColumn(label: Text('Total (Bs)'), numeric: true),
+            DataColumn(label: Text('Pagado'), numeric: true),
+            DataColumn(label: Text('Pendiente'), numeric: true),
+            DataColumn(label: Text('Estado')),
+            DataColumn(label: Text('Acciones')),
+          ],
+          rows: [
+            for (final gasto in gastos)
+              DataRow(
+                cells: [
+                  DataCell(Text(_categoria(gasto['categoria']))),
+                  DataCell(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: Text(
+                        gasto['concepto'] as String? ?? '',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  DataCell(Text(_periodoGasto(gasto))),
+                  DataCell(Text(_numero(gasto['monto_bob'] ?? gasto['monto']))),
+                  DataCell(Text(_pagado(gasto).toStringAsFixed(2))),
+                  DataCell(Text(_numero(gasto['saldo_pendiente_bob']))),
+                  DataCell(
+                    _estadoGasto(gasto['estado'] as String? ?? 'pendiente'),
+                  ),
+                  DataCell(_accionesGasto(gasto, compacto: true)),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _periodoGasto(Map<String, dynamic> gasto) {
+    final inicio = gasto['periodo_desde']?.toString();
+    final fin = gasto['periodo_hasta']?.toString();
+    if (inicio == null && fin == null) return 'Sin período';
+    if (inicio != null &&
+        fin != null &&
+        inicio.substring(0, 7) == fin.substring(0, 7)) {
+      return inicio.substring(0, 7);
+    }
+    return '${inicio ?? '—'} – ${fin ?? '—'}';
+  }
+
+  Widget _estadoGasto(String estado) {
+    final (texto, color) = switch (estado) {
+      'pagado' => ('Pagado', context.paleta.positivo),
+      'anulado' => ('Anulado', context.paleta.textoTerciario),
+      _ => ('Pendiente', context.paleta.aviso),
+    };
+    return Chip(
+      visualDensity: VisualDensity.compact,
+      label: Text(texto),
+      side: BorderSide(color: color.withValues(alpha: 0.35)),
+    );
+  }
+
+  Widget _accionesGasto(Map<String, dynamic> gasto, {bool compacto = false}) {
+    final estado = gasto['estado'] as String? ?? 'pendiente';
     final pagos = (gasto['pagos'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>();
+    if (estado == 'pendiente') {
+      return Wrap(
+        spacing: compacto ? 0 : 8,
+        children: [
+          if (compacto)
+            BotonIconoSeguro(
+              tooltip: 'Registrar pago',
+              onPressed: () => _pagar(gasto),
+              icon: const Icon(Icons.payments_outlined),
+            )
+          else
+            BotonSeguro(
+              variante: VarianteBoton.outlined,
+              onPressed: () => _pagar(gasto),
+              icon: const Icon(Icons.payments_outlined),
+              child: const Text('Registrar pago'),
+            ),
+          if (pagos.isEmpty)
+            compacto
+                ? BotonIconoSeguro(
+                    tooltip: 'Anular gasto',
+                    onPressed: () => _anular(gasto),
+                    icon: const Icon(Icons.block_outlined),
+                  )
+                : BotonSeguro(
+                    variante: VarianteBoton.text,
+                    onPressed: () => _anular(gasto),
+                    icon: const Icon(Icons.block_outlined),
+                    child: const Text('Anular'),
+                  ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _tarjetaGasto(Map<String, dynamic> gasto) {
     final estado = gasto['estado'] as String? ?? 'pendiente';
-    final moneda = gasto['moneda_codigo'] as String? ?? 'BOB';
-    final pagado = pagos.fold<double>(
-      0,
-      (total, pago) => total + _aNumero(pago['monto']),
-    );
+    final pagado = _pagado(gasto);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: SectionCard(
@@ -2697,42 +3180,33 @@ class _GastosTabState extends State<_GastosTab> {
                         gasto['concepto'] as String? ?? '',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      Text('${_categoria(gasto['categoria'])} · $estado'),
+                      Text(_categoria(gasto['categoria'])),
                     ],
                   ),
                 ),
                 Text(
-                  '$moneda ${_numero(gasto['monto'])}',
+                  'Bs ${_numero(gasto['monto_bob'] ?? gasto['monto'])}',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Pagado: $moneda ${pagado.toStringAsFixed(2)} · '
+              'Pagado: Bs ${pagado.toStringAsFixed(2)} · '
               'Pendiente: Bs ${_numero(gasto['saldo_pendiente_bob'])}',
               style: TextStyle(color: Theme.of(context).hintColor),
             ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _estadoGasto(estado),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_periodoGasto(gasto))),
+              ],
+            ),
             if (estado == 'pendiente') ...[
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  BotonSeguro(
-                    variante: VarianteBoton.outlined,
-                    onPressed: () => _pagar(gasto),
-                    icon: const Icon(Icons.payments_outlined),
-                    child: const Text('Registrar pago'),
-                  ),
-                  if (pagos.isEmpty)
-                    BotonSeguro(
-                      variante: VarianteBoton.text,
-                      onPressed: () => _anular(gasto),
-                      icon: const Icon(Icons.block_outlined),
-                      child: const Text('Anular'),
-                    ),
-                ],
-              ),
+              _accionesGasto(gasto),
             ],
           ],
         ),
@@ -2741,24 +3215,42 @@ class _GastosTabState extends State<_GastosTab> {
   }
 }
 
+class _ResumenGasto extends StatelessWidget {
+  const _ResumenGasto({
+    required this.titulo,
+    required this.valor,
+    required this.icono,
+  });
+
+  final String titulo;
+  final String valor;
+  final IconData icono;
+
+  @override
+  Widget build(BuildContext context) => SectionCard(
+    child: Row(
+      children: [
+        Icon(icono, color: context.paleta.info),
+        const SizedBox(width: 10),
+        Expanded(child: Text(titulo)),
+        Text(valor, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ],
+    ),
+  );
+}
+
 class _GastoFormulario {
-  final String categoria;
+  final int categoriaId;
   final String concepto;
-  final String moneda;
   final double monto;
-  final double tipoCambioExt;
-  final double tipoCambioBob;
   final String? numeroDocumento;
   final String? periodoDesde;
   final String? periodoHasta;
 
   const _GastoFormulario({
-    required this.categoria,
+    required this.categoriaId,
     required this.concepto,
-    required this.moneda,
     required this.monto,
-    required this.tipoCambioExt,
-    required this.tipoCambioBob,
     required this.numeroDocumento,
     required this.periodoDesde,
     required this.periodoHasta,
@@ -2766,9 +3258,8 @@ class _GastoFormulario {
 }
 
 class _GastoDialog extends StatefulWidget {
-  final List<Map<String, dynamic>> monedas;
-
-  const _GastoDialog({required this.monedas});
+  const _GastoDialog({required this.categorias});
+  final List<CategoriaGasto> categorias;
 
   @override
   State<_GastoDialog> createState() => _GastoDialogState();
@@ -2778,32 +3269,41 @@ class _GastoDialogState extends State<_GastoDialog> {
   final _formKey = GlobalKey<FormState>();
   final _concepto = TextEditingController();
   final _monto = TextEditingController();
-  final _tipoCambioExt = TextEditingController(text: '1');
-  final _tipoCambioBob = TextEditingController(text: '6.96');
   final _documento = TextEditingController();
   final _desde = TextEditingController();
   final _hasta = TextEditingController();
-  String _categoria = 'servicio';
-  String _moneda = 'BOB';
+  CategoriaGasto? _categoria;
+
+  String _fechaTexto(DateTime fecha) =>
+      '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
+
+  void _seleccionarCategoria(int? id) {
+    final anterior = _categoria;
+    final nueva = widget.categorias.firstWhere(
+      (categoria) => categoria.id == id,
+    );
+    setState(() {
+      _categoria = nueva;
+      if (_concepto.text.trim().isEmpty || _concepto.text == anterior?.nombre) {
+        _concepto.text = nueva.nombre;
+      }
+      _monto.text = nueva.tipoImporte == 'fijo'
+          ? nueva.montoHabitual?.toStringAsFixed(2) ?? ''
+          : '';
+      final periodo = nueva.periodoSugerido(DateTime.now());
+      _desde.text = periodo == null ? '' : _fechaTexto(periodo.desde);
+      _hasta.text = periodo == null ? '' : _fechaTexto(periodo.hasta);
+    });
+  }
 
   @override
   void dispose() {
     _concepto.dispose();
     _monto.dispose();
-    _tipoCambioExt.dispose();
-    _tipoCambioBob.dispose();
     _documento.dispose();
     _desde.dispose();
     _hasta.dispose();
     super.dispose();
-  }
-
-  int _decimales() {
-    return widget.monedas
-            .where((moneda) => moneda['codigo'] == _moneda)
-            .map((moneda) => moneda['decimales'] as int? ?? 2)
-            .firstOrNull ??
-        2;
   }
 
   Future<void> _elegirFecha(TextEditingController controller) async {
@@ -2822,12 +3322,6 @@ class _GastoDialogState extends State<_GastoDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final codigos = widget.monedas
-        .map((moneda) => moneda['codigo'] as String)
-        .toList();
-    if (!codigos.contains(_moneda) && codigos.isNotEmpty) {
-      _moneda = codigos.first;
-    }
     return AlertDialog(
       title: const Text('Registrar gasto'),
       content: Form(
@@ -2838,32 +3332,27 @@ class _GastoDialogState extends State<_GastoDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: _categoria,
+                DropdownButtonFormField<int>(
+                  initialValue: _categoria?.id,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Categoría'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'servicio',
-                      child: Text('Servicio: agua, luz, internet'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'alquiler',
-                      child: Text('Alquiler'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'insumo_limpieza',
-                      child: Text('Insumos de limpieza'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'mantenimiento',
-                      child: Text('Mantenimiento'),
-                    ),
-                    DropdownMenuItem(value: 'otro', child: Text('Otro')),
+                  items: [
+                    for (final categoria in widget.categorias)
+                      DropdownMenuItem(
+                        value: categoria.id,
+                        child: Text(categoria.nombre),
+                      ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => _categoria = value);
-                  },
+                  onChanged: _seleccionarCategoria,
+                  validator: (value) =>
+                      value == null ? 'Selecciona una categoría' : null,
                 ),
+                if (_categoria != null)
+                  Text(
+                    '${CategoriaGasto.periodos[_categoria!.periodicidad]} · '
+                    'Importe ${_categoria!.tipoImporte == 'fijo' ? 'fijo sugerido (editable)' : 'variable'}. '
+                    'No se generan gastos automáticamente.',
+                  ),
                 TextFormField(
                   controller: _concepto,
                   maxLength: 200,
@@ -2872,77 +3361,19 @@ class _GastoDialogState extends State<_GastoDialog> {
                       ? 'Escribe el concepto'
                       : null,
                 ),
-                DropdownButtonFormField<String>(
-                  initialValue: _moneda,
-                  decoration: const InputDecoration(labelText: 'Moneda'),
-                  items: widget.monedas
-                      .map(
-                        (moneda) => DropdownMenuItem(
-                          value: moneda['codigo'] as String,
-                          child: Text(
-                            '${moneda['codigo']} · ${moneda['nombre']}',
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _moneda = value);
-                    if (value == 'BOB') {
-                      _tipoCambioExt.text = _tipoCambioBob.text;
-                    } else if (value == 'USD') {
-                      _tipoCambioExt.text = '1';
-                    }
-                  },
-                ),
                 TextFormField(
                   controller: _monto,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: InputDecoration(labelText: 'Importe ($_moneda)'),
+                  decoration: const InputDecoration(labelText: 'Importe (Bs)'),
                   validator: (value) {
                     final monto = double.tryParse(value ?? '');
                     if (monto == null || monto <= 0) return 'Importe inválido';
                     final decimales =
                         value!.split('.').elementAtOrNull(1)?.length ?? 0;
-                    return decimales > _decimales()
-                        ? 'Esta moneda admite ${_decimales()} decimales'
-                        : null;
+                    return decimales > 2 ? 'Usa hasta 2 decimales' : null;
                   },
-                ),
-                if (_moneda != 'BOB')
-                  TextFormField(
-                    controller: _tipoCambioExt,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: _moneda == 'USD'
-                          ? 'Tipo de cambio externo (USD = 1)'
-                          : 'Unidades de $_moneda por USD',
-                    ),
-                    validator: (value) {
-                      final tasa = double.tryParse(value ?? '');
-                      if (tasa == null || tasa <= 0) return 'Tasa inválida';
-                      if (_moneda == 'USD' && tasa != 1) {
-                        return 'Para USD, esta tasa debe ser 1';
-                      }
-                      return null;
-                    },
-                  ),
-                TextFormField(
-                  controller: _tipoCambioBob,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: _moneda == 'BOB'
-                        ? 'Tipo de cambio BOB por USD'
-                        : 'Bolivianos por dólar (tipo de cambio BOB/USD)',
-                  ),
-                  validator: (value) => (double.tryParse(value ?? '') ?? 0) <= 0
-                      ? 'Ingresa un tipo de cambio válido'
-                      : null,
                 ),
                 TextFormField(
                   controller: _documento,
@@ -2998,18 +3429,12 @@ class _GastoDialogState extends State<_GastoDialog> {
               );
               return;
             }
-            final tcBob = double.parse(_tipoCambioBob.text);
             Navigator.pop(
               context,
               _GastoFormulario(
-                categoria: _categoria,
+                categoriaId: _categoria!.id,
                 concepto: _concepto.text.trim(),
-                moneda: _moneda,
                 monto: double.parse(_monto.text),
-                tipoCambioExt: _moneda == 'BOB'
-                    ? tcBob
-                    : double.parse(_tipoCambioExt.text),
-                tipoCambioBob: tcBob,
                 numeroDocumento: _documento.text,
                 periodoDesde: _desde.text.isEmpty ? null : _desde.text,
                 periodoHasta: _hasta.text.isEmpty ? null : _hasta.text,
@@ -3024,11 +3449,9 @@ class _GastoDialogState extends State<_GastoDialog> {
 }
 
 class _PagoFormulario {
-  final double monto;
-  final String metodo;
-  final String? referencia;
+  final List<Map<String, dynamic>> pagos;
 
-  const _PagoFormulario(this.monto, this.metodo, this.referencia);
+  const _PagoFormulario(this.pagos);
 }
 
 class _PagoGastoDialog extends StatefulWidget {
@@ -3043,12 +3466,28 @@ class _PagoGastoDialog extends StatefulWidget {
 class _PagoGastoDialogState extends State<_PagoGastoDialog> {
   final _monto = TextEditingController();
   final _referencia = TextEditingController();
-  String _metodo = 'efectivo';
+  final _efectivo = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _pagoEfectivo = true;
+  bool _pagoQr = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final pagos = (widget.gasto['pagos'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>();
+    final restante = pagos.fold<double>(
+      _aNumero(widget.gasto['monto']),
+      (saldo, pago) => saldo - _aNumero(pago['monto']),
+    );
+    _monto.text = restante.toStringAsFixed(2);
+  }
 
   @override
   void dispose() {
     _monto.dispose();
     _referencia.dispose();
+    _efectivo.dispose();
     super.dispose();
   }
 
@@ -3062,42 +3501,92 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
       (saldo, pago) => saldo - _aNumero(pago['monto']),
     );
     final moneda = gasto['moneda_codigo'] as String? ?? 'BOB';
+    final mixto = _pagoEfectivo && _pagoQr;
+    final total = double.tryParse(_monto.text.replaceAll(',', '.')) ?? 0;
+    final efectivo = double.tryParse(_efectivo.text.replaceAll(',', '.')) ?? 0;
     return AlertDialog(
       scrollable: true,
       title: const Text('Registrar pago'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Saldo aproximado: $moneda ${restante.toStringAsFixed(2)}'),
-          TextField(
-            controller: _monto,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: 'Importe a pagar ($moneda)'),
-          ),
-          DropdownButtonFormField<String>(
-            initialValue: _metodo,
-            decoration: const InputDecoration(labelText: 'Método de pago'),
-            items: const [
-              DropdownMenuItem(value: 'efectivo', child: Text('Efectivo')),
-              DropdownMenuItem(
-                value: 'transferencia',
-                child: Text('Transferencia'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Saldo pendiente: $moneda ${restante.toStringAsFixed(2)}'),
+            TextFormField(
+              controller: _monto,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
               ),
-              DropdownMenuItem(value: 'qr', child: Text('QR')),
-              DropdownMenuItem(value: 'otro', child: Text('Otro')),
-            ],
-            onChanged: (value) {
-              if (value != null) setState(() => _metodo = value);
-            },
-          ),
-          TextField(
-            controller: _referencia,
-            maxLength: 150,
-            decoration: const InputDecoration(
-              labelText: 'Referencia (opcional)',
+              decoration: InputDecoration(
+                labelText: 'Importe a pagar ($moneda)',
+              ),
+              onChanged: (_) => setState(() {}),
+              validator: (valor) {
+                final texto = (valor ?? '').trim().replaceAll(',', '.');
+                final monto = double.tryParse(texto);
+                if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(texto) ||
+                    monto == null ||
+                    monto <= 0 ||
+                    monto > restante) {
+                  return 'Ingresa hasta el saldo, con máximo 2 decimales.';
+                }
+                return null;
+              },
             ),
-          ),
-        ],
+            const Text('Puedes pagar todo o hacer un abono parcial.'),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Efectivo'),
+              value: _pagoEfectivo,
+              onChanged: (valor) => setState(() => _pagoEfectivo = valor!),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('QR'),
+              value: _pagoQr,
+              onChanged: (valor) => setState(() => _pagoQr = valor!),
+            ),
+            if (mixto) ...[
+              TextFormField(
+                controller: _efectivo,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Parte en efectivo',
+                  errorMaxLines: 3,
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (valor) {
+                  final texto = (valor ?? '').trim().replaceAll(',', '.');
+                  final monto = double.tryParse(texto);
+                  return RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(texto) &&
+                          monto != null &&
+                          monto > 0 &&
+                          monto <
+                              (double.tryParse(
+                                    _monto.text.replaceAll(',', '.'),
+                                  ) ??
+                                  0)
+                      ? null
+                      : 'El efectivo debe ser mayor a 0 y menor al importe a pagar.';
+                },
+              ),
+              Text(
+                'Parte por QR: $moneda ${(total > efectivo ? total - efectivo : 0).toStringAsFixed(2)}',
+              ),
+            ],
+            if (_pagoQr)
+              TextField(
+                controller: _referencia,
+                maxLength: 150,
+                decoration: const InputDecoration(
+                  labelText: 'Referencia QR (opcional)',
+                ),
+              ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -3106,17 +3595,33 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
         ),
         BotonSeguro(
           onPressed: () {
-            final monto = double.tryParse(_monto.text);
-            if (monto == null || monto <= 0 || monto > restante) {
-              _mensaje(
-                context,
-                'El pago debe ser mayor a cero y no superar el saldo.',
-              );
+            if (!_formKey.currentState!.validate()) return;
+            final total = double.parse(_monto.text.trim().replaceAll(',', '.'));
+            final efectivo = mixto
+                ? double.parse(_efectivo.text.trim().replaceAll(',', '.'))
+                : 0.0;
+            if (!_pagoEfectivo && !_pagoQr) {
+              _mensaje(context, 'Selecciona Efectivo, QR o ambos.');
               return;
             }
             Navigator.pop(
               context,
-              _PagoFormulario(monto, _metodo, _referencia.text),
+              _PagoFormulario([
+                if (_pagoEfectivo)
+                  {
+                    'metodo_pago': 'efectivo',
+                    'monto': (mixto ? efectivo : total).toStringAsFixed(2),
+                  },
+                if (_pagoQr)
+                  {
+                    'metodo_pago': 'qr',
+                    'monto': (mixto ? total - efectivo : total).toStringAsFixed(
+                      2,
+                    ),
+                    if (_referencia.text.trim().isNotEmpty)
+                      'referencia': _referencia.text.trim(),
+                  },
+              ]),
             );
           },
           child: const Text('Registrar pago'),
@@ -3540,10 +4045,5 @@ String _nombreBono(dynamic tipo) => switch (tipo) {
   _ => 'Otro bono',
 };
 
-String _categoria(dynamic categoria) => switch (categoria) {
-  'servicio' => 'Servicio',
-  'alquiler' => 'Alquiler',
-  'insumo_limpieza' => 'Insumos de limpieza',
-  'mantenimiento' => 'Mantenimiento',
-  _ => 'Otro',
-};
+String _categoria(dynamic categoria) =>
+    nombreCategoriaGasto(categoria as String? ?? 'otro');
