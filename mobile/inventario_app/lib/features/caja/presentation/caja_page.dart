@@ -139,7 +139,9 @@ class _CajaPageState extends State<CajaPage> {
       'Bs ${(double.tryParse('$valor') ?? 0).toStringAsFixed(2)}';
 
   String _fecha(dynamic fecha) {
-    final valor = DateTime.tryParse(fecha?.toString() ?? '');
+    // El backend manda la hora en UTC ("...Z"): sin toLocal() la caja abierta
+    // a las 16:46 en Bolivia se mostraba como 20:46.
+    final valor = DateTime.tryParse(fecha?.toString() ?? '')?.toLocal();
     if (valor == null) return '—';
     return '${valor.day.toString().padLeft(2, '0')}/'
         '${valor.month.toString().padLeft(2, '0')}/${valor.year} '

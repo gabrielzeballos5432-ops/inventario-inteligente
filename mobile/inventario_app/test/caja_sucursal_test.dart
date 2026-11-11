@@ -34,7 +34,7 @@ Future<void> _montar(WidgetTester tester, {required int activa}) async {
           'estado': 'abierta',
           'sucursal_id': 1,
           'monto_inicial': '20.00',
-          'fecha_apertura': '2026-11-11T09:00:00',
+          'fecha_apertura': '2026-11-11T20:46:00Z',
         }),
         200,
         headers: {'content-type': 'application/json'},
@@ -69,5 +69,16 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('la hora de apertura se muestra en hora local, no en UTC', (
+    tester,
+  ) async {
+    await _montar(tester, activa: 1);
+    final local = DateTime.utc(2026, 11, 11, 20, 46).toLocal();
+    final hora =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    expect(find.textContaining('Abierta: '), findsOneWidget);
+    expect(find.textContaining(hora), findsOneWidget);
   });
 }

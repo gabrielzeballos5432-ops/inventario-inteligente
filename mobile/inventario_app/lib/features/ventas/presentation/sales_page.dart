@@ -638,7 +638,22 @@ class _SalesPageState extends State<SalesPage> {
 
   /// Campo de solo lectura: no recibe foco (Tab lo salta) y tiene un fondo
   /// distinto al de los campos editables.
-  Widget _lectura(String etiqueta, String valor, {Color? color}) {
+  /// [ajustar]: para importes cortos (precios, saldo) que en el teléfono van
+  /// tres por fila. En vez de cortarse en "Bs 7…", el número se achica un poco
+  /// hasta caber; los textos largos (descripción) sí se cortan con "…".
+  Widget _lectura(
+    String etiqueta,
+    String valor, {
+    Color? color,
+    bool ajustar = false,
+  }) {
+    final texto = Text(
+      valor.isEmpty ? '—' : valor,
+      maxLines: 1,
+      overflow: ajustar ? TextOverflow.visible : TextOverflow.ellipsis,
+      softWrap: false,
+      style: TextStyle(fontWeight: FontWeight.w600, color: color),
+    );
     return InputDecorator(
       decoration: InputDecoration(
         labelText: etiqueta,
@@ -650,12 +665,13 @@ class _SalesPageState extends State<SalesPage> {
           color: context.paleta.textoTerciario,
         ),
       ),
-      child: Text(
-        valor.isEmpty ? '—' : valor,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontWeight: FontWeight.w600, color: color),
-      ),
+      child: ajustar
+          ? FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: texto,
+            )
+          : texto,
     );
   }
 
@@ -686,12 +702,14 @@ class _SalesPageState extends State<SalesPage> {
     final publico = _lectura(
       'P. público',
       producto == null ? '' : 'Bs ${producto.precioVenta.toStringAsFixed(2)}',
+      ajustar: true,
     );
     final mayor = _lectura(
       'P. mayor',
       producto?.precioMayor == null
           ? ''
           : 'Bs ${producto!.precioMayor!.toStringAsFixed(2)}',
+      ajustar: true,
     );
     final saldo = _lectura(
       'Saldo',
@@ -701,6 +719,7 @@ class _SalesPageState extends State<SalesPage> {
       color: producto != null && producto.stockBajo
           ? context.paleta.stockBajo
           : null,
+      ajustar: true,
     );
 
     final noEncontrado =
@@ -911,8 +930,16 @@ class _SalesPageState extends State<SalesPage> {
         ),
       ),
     );
-    Widget cabecera(String texto, {bool derecha = false}) =>
-        celda(Text(texto, style: estiloCabecera), derecha: derecha);
+    // Una sola línea: en la columna angosta del teléfono "Promo" se partía
+    // en "Prom / o".
+    Widget cabecera(String texto, {bool derecha = false}) => celda(
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: derecha ? Alignment.centerRight : Alignment.centerLeft,
+        child: Text(texto, style: estiloCabecera, maxLines: 1),
+      ),
+      derecha: derecha,
+    );
     Widget numero(String texto, {bool fuerte = false}) => celda(
       Text(
         texto,
@@ -1277,7 +1304,12 @@ class _SalesPageState extends State<SalesPage> {
               _codigoFocus.requestFocus();
             },
       icon: const Icon(Icons.cleaning_services_outlined),
-      label: const Text('Limpiar'),
+      // En el teléfono el botón ocupa un tercio del ancho y "Limpiar" se
+      // partía en "Limpi / ar": se achica antes de cortar la palabra.
+      label: const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text('Limpiar', maxLines: 1),
+      ),
     );
     final registrar = BotonSeguro(
       onPressed:
