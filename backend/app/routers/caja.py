@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user_id, require_admin
+from app.core.sucursal import get_sucursal_activa
 from app.schemas.caja import (
     ClienteCreate,
     ClienteOut,
@@ -22,9 +23,10 @@ async def abrir_sesion(
     body: SesionCajaAbrir,
     usuario_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
     try:
-        return await CajaService(db).abrir(usuario_id, body)
+        return await CajaService(db).abrir(usuario_id, body, sucursal_id)
     except CajaValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -46,8 +48,10 @@ async def listar_sesiones(
     limite: int = Query(default=50, ge=1, le=200),
     _: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
-    return await CajaService(db).listar(limite)
+    """Sesiones de caja de la sucursal activa."""
+    return await CajaService(db).listar(limite, sucursal_id)
 
 
 @caja_router.get("/sesiones/actual", response_model=SesionCajaOut | None)

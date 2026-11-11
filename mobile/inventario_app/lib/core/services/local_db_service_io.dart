@@ -21,18 +21,6 @@ class LocalDbService {
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE cola_sincronizacion (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        producto_id INTEGER NOT NULL,
-        tipo TEXT NOT NULL,
-        cantidad INTEGER NOT NULL,
-        origen TEXT DEFAULT 'offline',
-        creado_en TEXT NOT NULL,
-        sincronizado INTEGER DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
       CREATE TABLE cache_inventario (
         producto_id INTEGER PRIMARY KEY,
         nombre TEXT NOT NULL,
@@ -43,41 +31,6 @@ class LocalDbService {
         actualizado_en TEXT NOT NULL
       )
     ''');
-  }
-
-  Future<void> encolarMovimiento(
-    int productoId,
-    String tipo,
-    int cantidad,
-  ) async {
-    final db = await database;
-    await db.insert('cola_sincronizacion', {
-      'producto_id': productoId,
-      'tipo': tipo,
-      'cantidad': cantidad,
-      'origen': 'offline',
-      'creado_en': DateTime.now().toIso8601String(),
-      'sincronizado': 0,
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> obtenerPendientes() async {
-    final db = await database;
-    return db.query(
-      'cola_sincronizacion',
-      where: 'sincronizado = ?',
-      whereArgs: [0],
-    );
-  }
-
-  Future<void> marcarSincronizado(int id) async {
-    final db = await database;
-    await db.update(
-      'cola_sincronizacion',
-      {'sincronizado': 1},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
   }
 
   Future<void> cachearInventario(List<Map<String, dynamic>> productos) async {

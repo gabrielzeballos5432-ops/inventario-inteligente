@@ -24,7 +24,7 @@ def test_rechaza_combinaciones_invalidas(pagos):
 def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
     gasto = SimpleNamespace(
         id=1, estado="pendiente", moneda_codigo="BOB", monto=Decimal("100"),
-        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"),
+        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"), sucursal_id=1,
     )
     db = SimpleNamespace(
         execute=AsyncMock(side_effect=[
@@ -50,7 +50,7 @@ def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
 def test_sin_caja_no_guarda_ni_la_parte_qr():
     gasto = SimpleNamespace(
         id=1, estado="pendiente", moneda_codigo="BOB", monto=Decimal("100"),
-        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"),
+        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"), sucursal_id=1,
     )
     db = SimpleNamespace(
         execute=AsyncMock(side_effect=[

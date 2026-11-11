@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../app/theme.dart';
 import '../../../app/destino_app.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/models/categoria_gasto.dart';
 import 'categorias_gasto_dialog.dart';
 import '../../../core/network/api_client.dart';
@@ -3641,6 +3642,8 @@ class _ReporteTab extends StatefulWidget {
 class _ReporteTabState extends State<_ReporteTab> {
   late DateTime _inicio;
   late DateTime _fin;
+  // Arranca en la sucursal activa; null = todas las sucursales.
+  int? _sucursalId = SucursalController.instance.activaId;
   Map<String, dynamic>? _reporte;
   bool _cargando = false;
   String? _error;
@@ -3683,7 +3686,11 @@ class _ReporteTabState extends State<_ReporteTab> {
     try {
       final reporte = await context
           .read<OperacionesService>()
-          .reporteFinanciero(fechaInicio: _iso(_inicio), fechaFin: _iso(_fin));
+          .reporteFinanciero(
+            fechaInicio: _iso(_inicio),
+            fechaFin: _iso(_fin),
+            sucursalId: _sucursalId,
+          );
       if (!mounted) return;
       setState(() {
         _reporte = reporte;
@@ -3740,6 +3747,26 @@ class _ReporteTabState extends State<_ReporteTab> {
               ),
             ],
           ),
+          if (SucursalController.instance.sucursales.length > 1) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int?>(
+              initialValue: _sucursalId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Sucursal'),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Todas las sucursales'),
+                ),
+                for (final s in SucursalController.instance.sucursales)
+                  DropdownMenuItem<int?>(value: s.id, child: Text(s.nombre)),
+              ],
+              onChanged: (id) {
+                _sucursalId = id;
+                _cargar();
+              },
+            ),
+          ],
           const SizedBox(height: 12),
           if (_cargando)
             const Center(child: CircularProgressIndicator())
@@ -3783,6 +3810,11 @@ class _ReporteTabState extends State<_ReporteTab> {
         titulo: 'Sueldos y bonos',
         valor: _bs(r['sueldos_y_bonos_bob']),
         icono: Icons.groups_outlined,
+        // Son del personal, no de un local: el backend no los carga a una
+        // sucursal para no inflar su utilidad.
+        detalle: r['sucursal_id'] != null
+            ? 'Solo en el reporte de todas las sucursales.'
+            : null,
       ),
       _ResultadoCard(
         titulo: 'Utilidad operativa estimada',

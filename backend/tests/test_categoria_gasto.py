@@ -107,7 +107,7 @@ def test_no_registra_gastos_con_categoria_inactiva_o_inexistente(categoria):
         monto="100", tipo_cambio_ext="1", tipo_cambio_bob="1",
     )
     with pytest.raises(ContabilidadValidationError, match="inactiva"):
-        asyncio.run(ContabilidadService(db).registrar_gasto(datos, 1))
+        asyncio.run(ContabilidadService(db).registrar_gasto(datos, 1, 1))
     db.commit.assert_not_awaited()
 
 
@@ -123,8 +123,9 @@ def test_gasto_guarda_nombre_historico_y_monto_editado():
         categoria_gasto_id=1, concepto="Wifi", moneda_codigo="BOB",
         monto="125", tipo_cambio_ext="1", tipo_cambio_bob="1",
     )
-    asyncio.run(servicio.registrar_gasto(datos, 1))
+    asyncio.run(servicio.registrar_gasto(datos, 1, 1))
     gasto = db.add.call_args.args[0]
+    assert gasto.sucursal_id == 1
     assert gasto.categoria == "Wifi"
     assert gasto.categoria_gasto_id == 1
     assert gasto.monto_bob == Decimal("125.00")

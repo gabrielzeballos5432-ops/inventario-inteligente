@@ -99,17 +99,21 @@ class VentaService:
                 raise VentaValidationError("El cliente no existe o está inactivo.")
         sesion_caja_id = body.sesion_caja_id
         if sesion_caja_id is None:
+            # Solo la caja abierta en la sucursal de la venta: si el usuario
+            # tiene caja en otro local, la venta queda sin caja en vez de
+            # sumar efectivo a una caja que no lo recibió.
             abierta = await self.db.execute(
                 select(SesionCaja.id).where(
                     SesionCaja.usuario_apertura_id == usuario_id,
                     SesionCaja.estado == "abierta",
+                    SesionCaja.sucursal_id == sucursal_id,
                 )
             )
             sesion_caja_id = abierta.scalar_one_or_none()
         if sesion_caja_id is not None:
             try:
                 await CajaService(self.db).validar_caja_venta(
-                    usuario_id, sesion_caja_id
+                    usuario_id, sesion_caja_id, sucursal_id
                 )
             except CajaValidationError as exc:
                 raise VentaValidationError(str(exc)) from exc

@@ -1,39 +1,8 @@
 // Implementacion web de la base de datos local (sin SQLite).
-// La cola de sincronizacion y el cache viven solo en memoria: en web la
-// sesion siempre esta en linea con el backend, por lo que no se pierde nada
-// relevante al recargar la pagina.
+// El cache de inventario vive solo en memoria: en web la sesion siempre esta
+// en linea con el backend, por lo que no se pierde nada al recargar la pagina.
 class LocalDbService {
-  final List<Map<String, dynamic>> _cola = [];
   final Map<int, Map<String, dynamic>> _cache = {};
-  int _siguienteId = 1;
-
-  Future<void> encolarMovimiento(
-    int productoId,
-    String tipo,
-    int cantidad,
-  ) async {
-    _cola.add({
-      'id': _siguienteId++,
-      'producto_id': productoId,
-      'tipo': tipo,
-      'cantidad': cantidad,
-      'origen': 'offline',
-      'creado_en': DateTime.now().toIso8601String(),
-      'sincronizado': 0,
-    });
-  }
-
-  Future<List<Map<String, dynamic>>> obtenerPendientes() async {
-    return _cola.where((m) => m['sincronizado'] == 0).toList();
-  }
-
-  Future<void> marcarSincronizado(int id) async {
-    for (final item in _cola) {
-      if (item['id'] == id) {
-        item['sincronizado'] = 1;
-      }
-    }
-  }
 
   Future<void> cachearInventario(List<Map<String, dynamic>> productos) async {
     _cache.clear();

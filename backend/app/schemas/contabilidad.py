@@ -128,6 +128,7 @@ class GastoOut(BaseModel):
     concepto: str
     proveedor_id: Optional[int]
     usuario_id: int
+    sucursal_id: Optional[int] = None
     fecha_documento: Optional[date]
     periodo_desde: Optional[date]
     periodo_hasta: Optional[date]
@@ -167,4 +168,6 @@ class ReporteFinancieroOut(BaseModel):
     cargos_adicionales_bob: Decimal
     utilidad_neta_estimada_bob: Optional[Decimal]
     moneda: str = "BOB"
+    # None = todas las sucursales.
+    sucursal_id: Optional[int] = None
     nota: str

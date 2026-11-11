@@ -22,7 +22,9 @@ class CajaService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def abrir(self, usuario_id: int, data: SesionCajaAbrir) -> SesionCaja:
+    async def abrir(
+        self, usuario_id: int, data: SesionCajaAbrir, sucursal_id: int
+    ) -> SesionCaja:
         usuario = await self.db.get(Usuario, usuario_id)
         if usuario is None or not usuario.activo:
             raise CajaValidationError("El usuario no existe o está inactivo.")
@@ -33,9 +35,14 @@ class CajaService:
             )
         )
         if result.scalar_one_or_none() is not None:
-            raise CajaValidationError("Ya tienes una sesión de caja abierta.")
+            # Una persona maneja una sola caja a la vez, aunque sea admin y
+            # cambie de sucursal: primero cierra la que tiene abierta.
+            raise CajaValidationError(
+                "Ya tienes una sesión de caja abierta. Ciérrala antes de abrir otra."
+            )
         sesion = SesionCaja(
             usuario_apertura_id=usuario_id,
+            sucursal_id=sucursal_id,
             monto_inicial=data.monto_inicial,
             estado="abierta",
         )
@@ -108,6 +115,7 @@ class CajaService:
         return {
             "id": sesion.id,
             "usuario_apertura_id": sesion.usuario_apertura_id,
+            "sucursal_id": sesion.sucursal_id,
             "usuario_cierre_id": sesion.usuario_cierre_id,
             "fecha_apertura": sesion.fecha_apertura,
             "fecha_cierre": sesion.fecha_cierre,
@@ -119,10 +127,14 @@ class CajaService:
             "estado": sesion.estado,
         }
 
-    async def listar(self, limite: int = 100) -> list[dict]:
+    async def listar(
+        self, limite: int = 100, sucursal_id: int | None = None
+    ) -> list[dict]:
+        query = select(SesionCaja)
+        if sucursal_id is not None:
+            query = query.where(SesionCaja.sucursal_id == sucursal_id)
         result = await self.db.execute(
-            select(SesionCaja)
-            .order_by(SesionCaja.fecha_apertura.desc(), SesionCaja.id.desc())
+            query.order_by(SesionCaja.fecha_apertura.desc(), SesionCaja.id.desc())
             .limit(limite)
         )
         return [self._salida(sesion) for sesion in result.scalars().all()]
@@ -152,7 +164,7 @@ class CajaService:
         return list(result.scalars().all())
 
     async def validar_caja_venta(
-        self, usuario_id: int, sesion_caja_id: int
+        self, usuario_id: int, sesion_caja_id: int, sucursal_id: int | None = None
     ) -> SesionCaja:
         result = await self.db.execute(
             select(SesionCaja)
@@ -167,5 +179,10 @@ class CajaService:
         if sesion is None:
             raise CajaValidationError(
                 "La sesión de caja no existe, no está abierta o no pertenece al usuario."
+            )
+        if sucursal_id is not None and sesion.sucursal_id != sucursal_id:
+            raise CajaValidationError(
+                "La caja abierta es de otra sucursal: el efectivo de cada local "
+                "se registra en su propia caja."
             )
         return sesion

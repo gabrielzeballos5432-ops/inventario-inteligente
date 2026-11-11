@@ -15,7 +15,6 @@ import 'package:inventario_app/core/services/detection_service.dart';
 import 'package:inventario_app/core/services/local_db_service.dart';
 import 'package:inventario_app/core/services/operaciones_service.dart';
 import 'package:inventario_app/core/services/product_service.dart';
-import 'package:inventario_app/core/services/sync_service.dart';
 import 'package:inventario_app/features/ventas/presentation/sales_page.dart';
 import 'package:provider/provider.dart';
 
@@ -25,7 +24,6 @@ class _InventarioPrueba extends InventarioProvider {
         ProductService(api),
         DetectionService(api),
         LocalDbService(),
-        SyncService(api, LocalDbService()),
       );
 
   final ventas = <Map<String, dynamic>>[];

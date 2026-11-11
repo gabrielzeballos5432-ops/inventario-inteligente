@@ -62,6 +62,9 @@ class SesionCaja(Base):
 
     id = Column(Integer, primary_key=True)
     usuario_apertura_id = Column(Integer, ForeignKey("usuario.id"), nullable=False)
+    # La caja es de un local: las ventas y pagos en efectivo solo se ligan a
+    # una sesión de la misma sucursal, para que el cierre de cada local cuadre.
+    sucursal_id = Column(Integer, ForeignKey("sucursal.id"), nullable=False)
     usuario_cierre_id = Column(Integer, ForeignKey("usuario.id"))
     fecha_apertura = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

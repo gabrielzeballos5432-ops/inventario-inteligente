@@ -8,13 +8,11 @@ import '../network/api_client.dart';
 import '../services/product_service.dart';
 import '../services/detection_service.dart';
 import '../services/local_db_service.dart';
-import '../services/sync_service.dart';
 
 class InventarioProvider extends ChangeNotifier {
   final ProductService _productService;
   final DetectionService _detectionService;
   final LocalDbService _localDb;
-  final SyncService _syncService;
 
   List<ProductoConStock> _productos = [];
   List<Movimiento> _historial = [];
@@ -28,7 +26,6 @@ class InventarioProvider extends ChangeNotifier {
     this._productService,
     this._detectionService,
     this._localDb,
-    this._syncService,
   );
 
   List<ProductoConStock> get productos => _productos;
@@ -176,14 +173,6 @@ class InventarioProvider extends ChangeNotifier {
       cargarValorizacion(),
       consultarEstadoServidor(),
     ]);
-  }
-
-  Future<int> sincronizar() async {
-    final count = await _syncService.sincronizarPendientes();
-    if (count > 0) {
-      await cargarInventario();
-    }
-    return count;
   }
 
   Future<bool> crearProducto(Map<String, dynamic> payload) async {

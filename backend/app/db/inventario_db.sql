@@ -152,6 +152,7 @@ CREATE UNIQUE INDEX uq_cliente_email_lower ON cliente (LOWER(email));
 CREATE TABLE sesion_caja (
     id SERIAL PRIMARY KEY,
     usuario_apertura_id INTEGER NOT NULL REFERENCES usuario(id),
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
     usuario_cierre_id INTEGER REFERENCES usuario(id),
     fecha_apertura TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_cierre TIMESTAMPTZ,
@@ -419,6 +420,7 @@ CREATE TABLE gasto (
     concepto VARCHAR(200) NOT NULL,
     proveedor_id INTEGER REFERENCES proveedor(id),
     usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
     fecha_documento DATE,
     periodo_desde DATE,
     periodo_hasta DATE,
@@ -483,6 +485,8 @@ CREATE UNIQUE INDEX uq_venta_clave_idempotencia
     ON venta(usuario_id, clave_idempotencia)
     WHERE clave_idempotencia IS NOT NULL;
 CREATE INDEX idx_sesion_caja_fecha ON sesion_caja(fecha_apertura);
+CREATE INDEX idx_sesion_caja_sucursal ON sesion_caja(sucursal_id);
+CREATE INDEX idx_gasto_sucursal ON gasto(sucursal_id);
 CREATE INDEX idx_bono_sueldo_usuario_fecha
     ON bono_sueldo(usuario_id, fecha_registro);
 CREATE INDEX idx_gasto_periodo_categoria ON gasto(periodo_desde, categoria);

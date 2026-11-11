@@ -12,11 +12,9 @@ import 'core/providers/sucursal_controller.dart';
 import 'core/providers/theme_controller.dart';
 import 'core/network/api_client.dart';
 import 'core/services/local_db_service.dart';
-import 'core/services/sync_service.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/product_service.dart';
 import 'core/services/detection_service.dart';
-import 'core/services/connectivity_service.dart';
 import 'core/services/operaciones_service.dart';
 import 'core/services/configuracion_service.dart';
 
@@ -35,20 +33,11 @@ void main() async {
 
   final apiClient = ApiClient();
   final localDb = LocalDbService();
-  final syncService = SyncService(apiClient, localDb);
   final inventarioProvider = InventarioProvider(
     ProductService(apiClient),
     DetectionService(apiClient),
     localDb,
-    syncService,
   );
-
-  final connectivityService = ConnectivityService(
-    syncService: syncService,
-    localDb: localDb,
-    onSyncComplete: () => inventarioProvider.cargarInventario(),
-  );
-  connectivityService.iniciar();
 
   // Vigila que el backend responda (la laptop puede suspenderse y "desaparecer"
   // aunque el telefono siga con Wi-Fi). Al reconectar, recarga el inventario.

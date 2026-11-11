@@ -17,6 +17,7 @@ class SesionCajaCerrar(BaseModel):
 class SesionCajaOut(BaseModel):
     id: int
     usuario_apertura_id: int
+    sucursal_id: Optional[int] = None
     usuario_cierre_id: Optional[int]
     fecha_apertura: datetime
     fecha_cierre: Optional[datetime]

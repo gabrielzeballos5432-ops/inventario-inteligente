@@ -12,7 +12,6 @@ import 'package:inventario_app/core/services/auth_service.dart';
 import 'package:inventario_app/core/services/detection_service.dart';
 import 'package:inventario_app/core/services/local_db_service.dart';
 import 'package:inventario_app/core/services/product_service.dart';
-import 'package:inventario_app/core/services/sync_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,12 +28,10 @@ double _ratio(Color a, Color b) {
 Future<void> _montarApp(WidgetTester tester, ThemeMode modo) async {
   final apiClient = ApiClient();
   final localDb = LocalDbService();
-  final syncService = SyncService(apiClient, localDb);
   final inventarioProvider = InventarioProvider(
     ProductService(apiClient),
     DetectionService(apiClient),
     localDb,
-    syncService,
   );
 
   await tester.pumpWidget(

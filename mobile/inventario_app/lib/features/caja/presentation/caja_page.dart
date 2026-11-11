@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/boton_seguro.dart';
@@ -422,6 +423,7 @@ class _CajaAbierta extends StatelessWidget {
             ],
           ),
           Text('Abierta: $fecha'),
+          ..._sucursalDeLaCaja(context, sesion),
           const SizedBox(height: 12),
           _DatoCaja(
             etiqueta: 'Efectivo inicial',
@@ -442,6 +444,31 @@ class _CajaAbierta extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Sucursal de la caja abierta y, si no es la activa, un aviso: las ventas y
+/// pagos en efectivo de esta sucursal no entran en una caja de otro local.
+List<Widget> _sucursalDeLaCaja(
+  BuildContext context,
+  Map<String, dynamic> sesion,
+) {
+  final control = SucursalController.instance;
+  final sucursalCaja = control.porId(sesion['sucursal_id'] as int?);
+  if (sucursalCaja == null) return const [];
+  final esOtra = control.activaId != null && sucursalCaja.id != control.activaId;
+  return [
+    const SizedBox(height: 4),
+    Text('Sucursal: ${sucursalCaja.nombre}'),
+    if (esOtra) ...[
+      const SizedBox(height: 8),
+      Text(
+        'Esta caja es de ${sucursalCaja.nombre}. Las ventas en efectivo de '
+        '${control.activa?.nombre ?? 'esta sucursal'} no se suman a ella: '
+        'ciérrala y abre una aquí si vas a cobrar en este local.',
+        style: TextStyle(color: context.paleta.stockBajo),
+      ),
+    ],
+  ];
 }
 
 class _DatoCaja extends StatelessWidget {

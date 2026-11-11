@@ -16,7 +16,6 @@ import 'package:inventario_app/core/services/detection_service.dart';
 import 'package:inventario_app/core/services/local_db_service.dart';
 import 'package:inventario_app/core/services/operaciones_service.dart';
 import 'package:inventario_app/core/services/product_service.dart';
-import 'package:inventario_app/core/services/sync_service.dart';
 import 'package:inventario_app/features/shell/presentation/shell_page.dart';
 import 'package:inventario_app/features/contabilidad/presentation/finanzas_page.dart';
 import 'package:inventario_app/features/productos/presentation/products_page.dart';
@@ -40,7 +39,6 @@ class _InventarioPrueba extends InventarioProvider {
         ProductService(api),
         DetectionService(api),
         LocalDbService(),
-        SyncService(api, LocalDbService()),
       );
 
   @override

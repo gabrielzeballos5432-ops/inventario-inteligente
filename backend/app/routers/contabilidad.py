@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
 from app.core.security import require_admin
+from app.core.sucursal import get_sucursal_activa
 from app.schemas.contabilidad import (
     BonoSueldoCreate,
     BonoSueldoOut,
@@ -116,10 +117,11 @@ async def registrar_gasto(
     body: GastoCreate,
     administrador: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
     try:
         return await ContabilidadService(db).registrar_gasto(
-            body, administrador[0]
+            body, administrador[0], sucursal_id
         )
     except ContabilidadValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -133,11 +135,13 @@ async def listar_gastos(
     limite: int = Query(default=100, ge=1, le=500),
     _: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
+    """Gastos de la sucursal activa."""
     if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
         raise HTTPException(status_code=400, detail="Rango de fechas inválido.")
     return await ContabilidadService(db).listar_gastos(
-        fecha_inicio, fecha_fin, categoria, limite
+        fecha_inicio, fecha_fin, categoria, limite, sucursal_id
     )
 
 
@@ -206,12 +210,15 @@ async def registrar_pagos_gasto(
 async def reporte_financiero(
     fecha_inicio: date,
     fecha_fin: date,
+    sucursal_id: int | None = Query(
+        default=None, description="Sin valor: todas las sucursales"
+    ),
     _: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
         return await ContabilidadService(db).reporte_financiero(
-            fecha_inicio, fecha_fin
+            fecha_inicio, fecha_fin, sucursal_id
         )
     except ContabilidadValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

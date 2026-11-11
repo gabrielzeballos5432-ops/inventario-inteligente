@@ -80,6 +80,14 @@ class _ShellPageState extends State<ShellPage> {
     });
   }
 
+  static bool _dependeDeSucursal(DestinoApp destino) => const {
+    DestinoApp.ventas,
+    DestinoApp.caja,
+    DestinoApp.compras,
+    DestinoApp.gastos,
+    DestinoApp.resultados,
+  }.contains(destino);
+
   Widget _pagina(DestinoApp destino, bool esAdmin) => switch (destino) {
     DestinoApp.panel => DashboardPage(onNavegar: _navegar),
     DestinoApp.productos => const ProductsPage(),
@@ -103,6 +111,7 @@ class _ShellPageState extends State<ShellPage> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final esNoche = context.watch<ThemeController>().esNoche;
+    final sucursalActiva = context.watch<SucursalController>().activaId;
     final destinos = DestinoApp.disponibles(auth.isAdmin);
     if (!destinos.contains(_seleccion)) _seleccion = DestinoApp.panel;
 
@@ -184,7 +193,17 @@ class _ShellPageState extends State<ShellPage> {
                               key: ValueKey(destino),
                               enabled: destino == _seleccion,
                               child: _visitados.contains(destino)
-                                  ? _pagina(destino, auth.isAdmin)
+                                  // Las pantallas con datos de una sucursal
+                                  // se reconstruyen al cambiarla, para no
+                                  // mostrar la caja o los gastos de otro local.
+                                  ? KeyedSubtree(
+                                      key: ValueKey(
+                                        _dependeDeSucursal(destino)
+                                            ? sucursalActiva
+                                            : null,
+                                      ),
+                                      child: _pagina(destino, auth.isAdmin),
+                                    )
                                   : const SizedBox.shrink(),
                             ),
                         ],
