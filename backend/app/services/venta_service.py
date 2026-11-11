@@ -12,6 +12,7 @@ from app.models.caja import Cliente
 from app.models.inventario import Inventario
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
+from app.models.razon_movimiento import razon_sistema
 from app.models.caja import SesionCaja
 from app.models.venta import PagoVenta, Venta, VentaDetalle
 from app.schemas.venta import VentaCreate
@@ -70,6 +71,8 @@ class VentaService:
         body: VentaCreate,
         usuario_id: int,
         clave_idempotencia: str | None = None,
+        *,
+        sucursal_id: int,
     ) -> Venta:
         clave = clave_idempotencia or body.clave_idempotencia
         if (
@@ -135,7 +138,10 @@ class VentaService:
 
         resultado_inventario = await self.db.execute(
             select(Inventario)
-            .where(Inventario.producto_id.in_(producto_ids))
+            .where(
+                Inventario.producto_id.in_(producto_ids),
+                Inventario.sucursal_id == sucursal_id,
+            )
             .order_by(Inventario.producto_id)
             .with_for_update()
         )
@@ -176,6 +182,7 @@ class VentaService:
 
         venta = Venta(
             usuario_id=usuario_id,
+            sucursal_id=sucursal_id,
             cliente_id=body.cliente_id,
             sesion_caja_id=sesion_caja_id,
             clave_idempotencia=clave,
@@ -248,6 +255,8 @@ class VentaService:
             self.db.add(
                 Movimiento(
                     producto_id=detalle.producto_id,
+                    sucursal_id=sucursal_id,
+                    razon_movimiento_id=razon_sistema("venta"),
                     usuario_id=usuario_id,
                     tipo="salida",
                     cantidad_anterior=cantidad_anterior,
@@ -298,7 +307,10 @@ class VentaService:
         ):
             inventario_resultado = await self.db.execute(
                 select(Inventario)
-                .where(Inventario.producto_id == detalle.producto_id)
+                .where(
+                    Inventario.producto_id == detalle.producto_id,
+                    Inventario.sucursal_id == venta.sucursal_id,
+                )
                 .with_for_update()
             )
             inventario = inventario_resultado.scalar_one_or_none()
@@ -326,6 +338,8 @@ class VentaService:
             self.db.add(
                 Movimiento(
                     producto_id=detalle.producto_id,
+                    sucursal_id=venta.sucursal_id,
+                    razon_movimiento_id=razon_sistema("anulacion_venta"),
                     usuario_id=usuario_id,
                     tipo="entrada",
                     cantidad_anterior=anterior,
@@ -349,11 +363,15 @@ class VentaService:
         )
         return resultado.scalar_one()
 
-    async def listar(self, limite: int = 50) -> list[Venta]:
+    async def listar(
+        self, limite: int = 50, sucursal_id: int | None = None
+    ) -> list[Venta]:
+        query = select(Venta).options(
+            selectinload(Venta.detalles), selectinload(Venta.pagos)
+        )
+        if sucursal_id is not None:
+            query = query.where(Venta.sucursal_id == sucursal_id)
         resultado = await self.db.execute(
-            select(Venta)
-            .options(selectinload(Venta.detalles), selectinload(Venta.pagos))
-            .order_by(Venta.fecha_creacion.desc(), Venta.id.desc())
-            .limit(limite)
+            query.order_by(Venta.fecha_creacion.desc(), Venta.id.desc()).limit(limite)
         )
         return list(resultado.scalars().all())

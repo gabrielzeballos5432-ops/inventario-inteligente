@@ -36,6 +36,7 @@ class Venta(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False)
+    sucursal_id = Column(Integer, ForeignKey("sucursal.id"), nullable=False)
     cliente_id = Column(Integer, ForeignKey("cliente.id"))
     sesion_caja_id = Column(Integer, ForeignKey("sesion_caja.id"))
     clave_idempotencia = Column(String(100))

@@ -7,6 +7,13 @@ class MovimientoOut(BaseModel):
     id: int
     producto_id: int
     producto_nombre: Optional[str] = None
+    sucursal_id: Optional[int] = None
+    sucursal_nombre: Optional[str] = None
+    razon_movimiento_id: Optional[int] = None
+    razon_nombre: Optional[str] = None
+    # En un traspaso: destino (salida) u origen (entrada).
+    sucursal_relacionada_id: Optional[int] = None
+    sucursal_relacionada_nombre: Optional[str] = None
     usuario_id: Optional[int] = None
     usuario_nombre: Optional[str] = None
     sesion_id: Optional[int] = None
@@ -31,6 +38,11 @@ class MovimientoCreate(BaseModel):
     cantidad: int = Field(ge=0)
     origen: str = Field(default="manual", pattern="^(manual|ia)$")
     sesion_id: Optional[int] = None
+    # Obligatoria en los movimientos manuales; la valida el servicio para
+    # devolver un mensaje claro (la IA usa una razón del sistema).
+    razon_movimiento_id: Optional[int] = None
+    # Solo para razones que envían a otra sucursal ("Salida a sucursal").
+    sucursal_destino_id: Optional[int] = None
 
     @model_validator(mode="after")
     def _validar_cantidad(self) -> "MovimientoCreate":
@@ -59,6 +71,9 @@ class MovimientoLoteCreate(BaseModel):
     # detecta varios productos y se guarda todo junto con su sesion de camara.
     origen: str = Field(default="manual", pattern="^(manual|ia)$")
     sesion_id: Optional[int] = None
+    # Una razón para todo el lote (mismo tipo, mismo motivo).
+    razon_movimiento_id: Optional[int] = None
+    sucursal_destino_id: Optional[int] = None
 
 
 class MovimientoLoteResultado(BaseModel):
@@ -74,3 +89,31 @@ class MovimientoLoteOut(BaseModel):
     tipo: str
     guardados: int
     resultados: list[MovimientoLoteResultado]
+
+def movimiento_out(m) -> MovimientoOut:
+    """Arma la salida desde un Movimiento con sus relaciones ya cargadas
+    (ver `opciones_detalle_movimiento` en el repositorio)."""
+    return MovimientoOut(
+        id=m.id,
+        producto_id=m.producto_id,
+        producto_nombre=m.producto.nombre if m.producto else None,
+        sucursal_id=m.sucursal_id,
+        sucursal_nombre=m.sucursal.nombre if m.sucursal else None,
+        razon_movimiento_id=m.razon_movimiento_id,
+        razon_nombre=m.razon.nombre if m.razon else None,
+        sucursal_relacionada_id=m.sucursal_relacionada_id,
+        sucursal_relacionada_nombre=(
+            m.sucursal_relacionada.nombre if m.sucursal_relacionada else None
+        ),
+        usuario_id=m.usuario_id,
+        usuario_nombre=m.usuario.nombre if m.usuario else None,
+        sesion_id=m.sesion_id,
+        venta_detalle_id=m.venta_detalle_id,
+        compra_detalle_id=m.compra_detalle_id,
+        tipo=m.tipo,
+        cantidad_anterior=m.cantidad_anterior,
+        cantidad=m.cantidad,
+        stock_resultante=m.stock_resultante,
+        origen=m.origen,
+        creado_en=m.creado_en,
+    )

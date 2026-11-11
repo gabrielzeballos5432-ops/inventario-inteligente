@@ -49,10 +49,21 @@ class Movimiento(Base):
             "venta_detalle_id IS NULL OR compra_detalle_id IS NULL",
             name="chk_movimiento_un_solo_documento",
         ),
+        # En un traspaso, la sucursal relacionada es la otra punta: el destino
+        # de la salida o el origen de la entrada. Nunca la misma sucursal.
+        CheckConstraint(
+            "sucursal_relacionada_id IS NULL OR sucursal_relacionada_id <> sucursal_id",
+            name="chk_movimiento_sucursal_relacionada",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     producto_id = Column(Integer, ForeignKey("producto.id"), nullable=False)
+    sucursal_id = Column(Integer, ForeignKey("sucursal.id"), nullable=False)
+    razon_movimiento_id = Column(
+        Integer, ForeignKey("razon_movimiento.id"), nullable=False
+    )
+    sucursal_relacionada_id = Column(Integer, ForeignKey("sucursal.id"))
     usuario_id = Column(Integer, ForeignKey("usuario.id"))
     sesion_id = Column(
         Integer, ForeignKey("sesion_camara.id", ondelete="SET NULL")
@@ -74,6 +85,11 @@ class Movimiento(Base):
     creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     producto = relationship("Producto", back_populates="movimientos")
+    sucursal = relationship("Sucursal", foreign_keys=[sucursal_id])
+    sucursal_relacionada = relationship(
+        "Sucursal", foreign_keys=[sucursal_relacionada_id]
+    )
+    razon = relationship("RazonMovimiento")
     usuario = relationship("Usuario", back_populates="movimientos")
     sesion = relationship("SesionCamara", back_populates="movimientos")
     venta_detalle = relationship("VentaDetalle", back_populates="movimientos")

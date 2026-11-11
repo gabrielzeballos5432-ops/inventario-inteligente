@@ -24,6 +24,7 @@ from app.routers import (
     sueldos,
     caja,
     contabilidad,
+    configuracion,
 )
 from app.services.seed_service import SeedService
 from app.yolo.inference_service import InferenceService
@@ -79,6 +80,9 @@ app.include_router(sueldos.router)
 app.include_router(caja.caja_router)
 app.include_router(caja.clientes_router)
 app.include_router(contabilidad.router)
+app.include_router(configuracion.sucursales_router)
+app.include_router(configuracion.configuracion_router)
+app.include_router(configuracion.razones_router)
 
 
 @app.exception_handler(IntegrityError)
@@ -102,6 +106,10 @@ async def manejar_error_integridad(request: Request, exc: IntegrityError):
         )
     elif "uq_usuario_email_lower" in detalle or "uq_usuarios_email_lower" in detalle:
         mensaje = "Ya existe un usuario registrado con ese correo."
+    elif "uq_sucursal_nombre_lower" in detalle:
+        mensaje = "Ya existe una sucursal con ese nombre."
+    elif "uq_razon_movimiento_nombre_tipo" in detalle:
+        mensaje = "Ya existe una razón con ese nombre para ese tipo de movimiento."
     elif "codigo_barras" in detalle:
         mensaje = "Ese codigo de barras ya pertenece a otro producto."
     elif "sku" in detalle:

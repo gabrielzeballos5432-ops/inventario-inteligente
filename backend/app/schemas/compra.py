@@ -61,6 +61,7 @@ class CompraOut(BaseModel):
     id: int
     proveedor_id: Optional[int]
     usuario_id: int
+    sucursal_id: int
     moneda_codigo: str
     tipo_cambio_ext: Decimal
     tipo_cambio_bob: Decimal

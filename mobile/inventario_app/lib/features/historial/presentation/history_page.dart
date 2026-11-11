@@ -204,8 +204,13 @@ class _HistoryPageState extends State<HistoryPage> {
             final accion = esAjuste
                 ? 'Ajuste · stock ${m.stockResultante}'
                 : '${esEntrada ? 'Entrada' : 'Salida'} de ${m.cantidad} '
-                    '· stock ${m.stockResultante}'
-                    '${m.origen != null ? ' · ${m.origen}' : ''}';
+                    '· stock ${m.stockResultante}';
+            final relacionada = m.sucursalRelacionadaNombre;
+            final razon = [
+              m.razonNombre ?? 'Sin razón',
+              if (relacionada != null) '${esEntrada ? 'desde' : 'hacia'} $relacionada',
+              if (m.origen == 'ia') 'IA',
+            ].join(' · ');
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -240,6 +245,15 @@ class _HistoryPageState extends State<HistoryPage> {
                           Text(
                             accion,
                             maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.textoSecundario,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            razon,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: context.textoSecundario,

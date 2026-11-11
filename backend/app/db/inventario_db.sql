@@ -54,6 +54,43 @@ CREATE TABLE usuario (
     )
 );
 
+-- 5b. Sucursales y configuración del sistema (una sola fila)
+CREATE TABLE sucursal (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL, -- Sin UNIQUE: la unicidad no distingue mayusculas (ver indice LOWER)
+    direccion VARCHAR(200),
+    telefono VARCHAR(30),
+    activo BOOLEAN NOT NULL DEFAULT true,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX uq_sucursal_nombre_lower ON sucursal(LOWER(nombre));
+
+CREATE TABLE configuracion_sistema (
+    id INTEGER PRIMARY KEY,
+    sucursal_predeterminada_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_configuracion_sistema_unica CHECK (id = 1)
+);
+
+-- 5c. Razones de movimiento (las de sistema = true las asigna el backend)
+CREATE TABLE razon_movimiento (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(40) UNIQUE,
+    nombre VARCHAR(100) NOT NULL,
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    sistema BOOLEAN NOT NULL DEFAULT false,
+    requiere_sucursal_destino BOOLEAN NOT NULL DEFAULT false,
+    activo BOOLEAN NOT NULL DEFAULT true,
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_razon_movimiento_tipo CHECK (tipo_movimiento IN ('entrada', 'salida', 'ajuste')),
+    CONSTRAINT chk_razon_movimiento_destino_salida CHECK (
+        NOT requiere_sucursal_destino OR tipo_movimiento = 'salida'
+    )
+);
+CREATE UNIQUE INDEX uq_razon_movimiento_nombre_tipo
+    ON razon_movimiento(LOWER(nombre), tipo_movimiento);
+
 -- 6. Tabla de producto (Stock mínimo obligatorio)
 CREATE TABLE producto (
     id SERIAL PRIMARY KEY,
@@ -80,10 +117,13 @@ CREATE TABLE producto (
 -- 7. Tabla de inventario
 CREATE TABLE inventario (
     id SERIAL PRIMARY KEY,
-    producto_id INTEGER UNIQUE NOT NULL REFERENCES producto(id) ON DELETE CASCADE,
+    producto_id INTEGER NOT NULL REFERENCES producto(id) ON DELETE CASCADE,
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
     cantidad INTEGER NOT NULL DEFAULT 0,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_inventario_cantidad_no_negativa CHECK (cantidad >= 0)
+    CONSTRAINT chk_inventario_cantidad_no_negativa CHECK (cantidad >= 0),
+    -- Stock por sucursal: una fila por (producto, sucursal)
+    CONSTRAINT uq_inventario_producto_sucursal UNIQUE (producto_id, sucursal_id)
 );
 
 -- 8. Tabla de sesión_cámara
@@ -134,6 +174,7 @@ CREATE TABLE venta (
     id SERIAL PRIMARY KEY,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
     cliente_id INTEGER REFERENCES cliente(id),
     sesion_caja_id INTEGER REFERENCES sesion_caja(id),
     clave_idempotencia VARCHAR(100),
@@ -207,6 +248,7 @@ CREATE TABLE compra (
     id SERIAL PRIMARY KEY,
     proveedor_id INTEGER REFERENCES proveedor(id),
     usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
     moneda_codigo VARCHAR(3) NOT NULL REFERENCES moneda(codigo),
     tipo_cambio_ext DECIMAL(18,6) NOT NULL CHECK (tipo_cambio_ext > 0),
     tipo_cambio_bob DECIMAL(18,6) NOT NULL CHECK (tipo_cambio_bob > 0),
@@ -248,6 +290,10 @@ CREATE TABLE compra_detalle (
 CREATE TABLE movimiento (
     id SERIAL PRIMARY KEY,
     producto_id INTEGER NOT NULL REFERENCES producto(id),
+    sucursal_id INTEGER NOT NULL REFERENCES sucursal(id) ON DELETE RESTRICT,
+    razon_movimiento_id INTEGER NOT NULL REFERENCES razon_movimiento(id) ON DELETE RESTRICT,
+    -- En un traspaso: destino de la salida u origen de la entrada
+    sucursal_relacionada_id INTEGER REFERENCES sucursal(id) ON DELETE RESTRICT,
     usuario_id INTEGER REFERENCES usuario(id),
     sesion_id INTEGER REFERENCES sesion_camara(id) ON DELETE SET NULL,
     venta_detalle_id INTEGER REFERENCES venta_detalle(id) ON DELETE RESTRICT,
@@ -276,6 +322,9 @@ CREATE TABLE movimiento (
     ),
     CONSTRAINT chk_movimiento_reversion_tipo CHECK (
         movimiento_revertido_id IS NULL OR tipo IN ('entrada', 'salida')
+    ),
+    CONSTRAINT chk_movimiento_sucursal_relacionada CHECK (
+        sucursal_relacionada_id IS NULL OR sucursal_relacionada_id <> sucursal_id
     )
 );
 
@@ -412,6 +461,11 @@ CREATE INDEX idx_movimiento_producto ON movimiento(producto_id);
 CREATE INDEX idx_movimiento_usuario ON movimiento(usuario_id);
 CREATE INDEX idx_movimiento_sesion ON movimiento(sesion_id);
 CREATE INDEX idx_movimiento_fecha ON movimiento(creado_en);
+CREATE INDEX idx_movimiento_sucursal ON movimiento(sucursal_id);
+CREATE INDEX idx_movimiento_razon ON movimiento(razon_movimiento_id);
+CREATE INDEX idx_inventario_sucursal ON inventario(sucursal_id);
+CREATE INDEX idx_venta_sucursal ON venta(sucursal_id);
+CREATE INDEX idx_compra_sucursal ON compra(sucursal_id);
 CREATE INDEX idx_deteccion_sesion ON deteccion(sesion_id);
 CREATE INDEX idx_deteccion_producto ON deteccion(producto_id);
 CREATE INDEX idx_usuario_rol ON usuario(rol_id);
@@ -454,4 +508,27 @@ INSERT INTO moneda (codigo, nombre, simbolo, pais, decimales)
 VALUES
     ('BOB', 'Boliviano', 'Bs', 'Bolivia', 2),
     ('USD', 'Dólar estadounidense', '$', 'Estados Unidos', 2)
+ON CONFLICT (codigo) DO NOTHING;INSERT INTO sucursal (nombre) VALUES ('Sucursal principal');
+INSERT INTO configuracion_sistema (id, sucursal_predeterminada_id) SELECT 1, min(id) FROM sucursal;
+INSERT INTO razon_movimiento (codigo, nombre, tipo_movimiento, sistema, requiere_sucursal_destino) VALUES
+    ('ingreso_proveedor', 'Ingreso desde proveedor', 'entrada', false, false),
+    ('devolucion_sucursal', 'Devolución de sucursal', 'entrada', false, false),
+    ('devolucion_cliente', 'Devolución de cliente', 'entrada', false, false),
+    ('reposicion_falla', 'Reposición por falla', 'entrada', false, false),
+    ('salida_sucursal', 'Salida a sucursal', 'salida', false, true),
+    ('salida_falla', 'Salida por falla', 'salida', false, false),
+    ('salida_cambio_cliente', 'Salida por cambio a cliente', 'salida', false, false),
+    ('salida_tester', 'Salida para tester', 'salida', false, false),
+    ('salida_extravio', 'Salida por extravío', 'salida', false, false),
+    ('ajuste_desglose', 'Ajuste por desglose', 'ajuste', false, false),
+    ('venta', 'Venta', 'salida', true, false),
+    ('anulacion_venta', 'Anulación de venta', 'entrada', true, false),
+    ('compra', 'Compra', 'entrada', true, false),
+    ('stock_inicial', 'Stock inicial', 'entrada', true, false),
+    ('deteccion_ia_entrada', 'Detección IA', 'entrada', true, false),
+    ('deteccion_ia_salida', 'Detección IA', 'salida', true, false),
+    ('traspaso_entrada', 'Ingreso por traspaso', 'entrada', true, false),
+    ('historico_entrada', 'Registro previo', 'entrada', true, false),
+    ('historico_salida', 'Registro previo', 'salida', true, false),
+    ('historico_ajuste', 'Registro previo', 'ajuste', true, false)
 ON CONFLICT (codigo) DO NOTHING;

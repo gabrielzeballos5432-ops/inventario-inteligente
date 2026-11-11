@@ -73,6 +73,23 @@ class Validaciones {
     return null;
   }
 
+  /// Mayor entero que guarda la columna de stock (INTEGER de PostgreSQL).
+  static const int stockMaximo = 2147483647;
+
+  /// Cantidad inicial al crear un producto.
+  ///
+  /// Opcional: vacio cuenta como 0 (el producto nace sin stock). No admite
+  /// negativos; si es mayor a 0 se registra una entrada automatica.
+  static String? cantidadInicial(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return null;
+    final numero = int.tryParse(texto);
+    if (numero == null) return 'La cantidad inicial debe ser un numero entero';
+    if (numero < 0) return 'La cantidad inicial no puede ser negativa';
+    if (numero > stockMaximo) return 'La cantidad inicial es demasiado grande';
+    return null;
+  }
+
   /// Cantidad de un movimiento.
   ///
   /// Entrada y salida exigen mas de 0. El ajuste fija el stock exacto, asi

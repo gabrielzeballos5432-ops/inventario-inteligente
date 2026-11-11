@@ -1,4 +1,6 @@
 from app.models.usuario import Usuario
+from app.models.sucursal import Sucursal, ConfiguracionSistema
+from app.models.razon_movimiento import RazonMovimiento
 from app.models.categoria import Categoria
 from app.models.marca import Marca
 from app.models.proveedor import Proveedor
@@ -15,6 +17,9 @@ from app.models.caja import Cliente, SesionCaja
 from app.models.contabilidad import BonoSueldo, CategoriaGasto, Gasto, PagoGasto
 
 __all__ = [
+    "Sucursal",
+    "ConfiguracionSistema",
+    "RazonMovimiento",
     "Usuario",
     "Categoria",
     "Marca",

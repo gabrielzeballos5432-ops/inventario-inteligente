@@ -5,8 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/models/product.dart';
+import '../../../core/models/sucursal.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/providers/inventario_provider.dart';
+import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/utils/validaciones.dart';
 import '../../../shared/widgets/boton_seguro.dart';
 
@@ -15,6 +17,8 @@ typedef GuardarMovimiento =
     Future<int> Function({
       required String tipo,
       required List<ItemMovimiento> items,
+      required int razonId,
+      int? sucursalDestinoId,
     });
 
 Future<bool?> mostrarMovimientoLote(
@@ -24,12 +28,16 @@ Future<bool?> mostrarMovimientoLote(
   int? cantidadInicial,
 }) {
   final inventario = context.read<InventarioProvider>();
+  final sucursales = context.read<SucursalController>();
   return showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (_) => MovimientoDialog(
       productos: inventario.productos.where((p) => p.activo).toList(),
       enviar: inventario.registrarLote,
+      razones: sucursales.razones,
+      sucursales: sucursales.sucursales,
+      sucursalActualId: sucursales.activaId,
       productoInicial: producto,
       tipoInicial: tipoInicial ?? 'entrada',
       cantidadInicial: cantidadInicial,
@@ -45,10 +53,21 @@ class MovimientoDialog extends StatefulWidget {
     this.productoInicial,
     this.tipoInicial = 'entrada',
     this.cantidadInicial,
+    this.razones = const [],
+    this.sucursales = const [],
+    this.sucursalActualId,
   });
 
   final List<ProductoConStock> productos;
   final GuardarMovimiento enviar;
+
+  /// Razones activas elegibles a mano (de todos los tipos); se filtran por el
+  /// tipo elegido.
+  final List<RazonMovimiento> razones;
+
+  /// Sucursales activas, para elegir el destino de un traspaso.
+  final List<Sucursal> sucursales;
+  final int? sucursalActualId;
   final ProductoConStock? productoInicial;
   final String tipoInicial;
   final int? cantidadInicial;
@@ -75,6 +94,8 @@ class _FilaMovimiento {
 class _MovimientoDialogState extends State<MovimientoDialog> {
   final _filas = <_FilaMovimiento>[];
   late String _tipo;
+  int? _razonId;
+  int? _destinoId;
   bool _guardando = false;
   bool _validar = false;
   String? _error;
@@ -86,6 +107,7 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
   void initState() {
     super.initState();
     _tipo = widget.tipoInicial;
+    _razonPorDefecto();
     final fila = _nuevaFila();
     if (widget.productoInicial case final producto?) {
       fila.productoId = producto.id;
@@ -93,6 +115,45 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
       fila.cantidad.text = widget.cantidadInicial?.toString() ?? '';
     }
     _filas.add(fila);
+  }
+
+  List<RazonMovimiento> get _razonesTipo => widget.razones
+      .where((r) => r.tipoMovimiento == _tipo && r.activo && !r.sistema)
+      .toList();
+
+  RazonMovimiento? get _razon {
+    for (final razon in _razonesTipo) {
+      if (razon.id == _razonId) return razon;
+    }
+    return null;
+  }
+
+  List<Sucursal> get _destinos => widget.sucursales
+      .where((s) => s.activo && s.id != widget.sucursalActualId)
+      .toList();
+
+  /// Con una sola razón posible (por ejemplo el ajuste) no tiene sentido
+  /// obligar a elegirla; con varias hay que elegir a conciencia.
+  void _razonPorDefecto() {
+    final razones = _razonesTipo;
+    _razonId = razones.length == 1 ? razones.first.id : null;
+    _destinoId = null;
+  }
+
+  String? get _errorRazon {
+    final razon = _razon;
+    if (razon == null) {
+      return _razonesTipo.isEmpty
+          ? 'No hay razones activas para este tipo. Créalas en Configuración.'
+          : 'Elige la razón del movimiento.';
+    }
+    if (razon.requiereSucursalDestino &&
+        !_destinos.any((s) => s.id == _destinoId)) {
+      return _destinos.isEmpty
+          ? 'No hay otra sucursal activa a la cual enviar.'
+          : 'Elige la sucursal destino.';
+    }
+    return null;
   }
 
   _FilaMovimiento _nuevaFila() {
@@ -168,11 +229,16 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
       _validar = true;
       _error = null;
     });
-    if (_filas.any((fila) => _errorFila(fila) != null)) return;
+    if (_errorRazon != null || _filas.any((fila) => _errorFila(fila) != null)) {
+      return;
+    }
     setState(() => _guardando = true);
     try {
+      final razon = _razon!;
       final guardados = await widget.enviar(
         tipo: _tipo,
+        razonId: razon.id,
+        sucursalDestinoId: razon.requiereSucursalDestino ? _destinoId : null,
         items: [
           for (final fila in _filas)
             (
@@ -265,8 +331,10 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
                           selected: {_tipo},
                           onSelectionChanged: _guardando
                               ? null
-                              : (seleccion) =>
-                                    setState(() => _tipo = seleccion.first),
+                              : (seleccion) => setState(() {
+                                  _tipo = seleccion.first;
+                                  _razonPorDefecto();
+                                }),
                         );
                         return constraints.maxWidth < 300
                             ? SingleChildScrollView(
@@ -292,6 +360,8 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    _selectorRazon(),
+                    const SizedBox(height: 4),
                     for (var i = 0; i < _filas.length; i++) _fila(_filas[i], i),
                     BotonSeguro(
                       variante: VarianteBoton.outlined,
@@ -372,9 +442,68 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
           0.0,
           720.0,
         );
-    final altura = (380.0 + _filas.length * 90).clamp(0.0, alturaMaxima);
+    final altura = (460.0 +
+            (_razon?.requiereSucursalDestino == true ? 80 : 0) +
+            _filas.length * 90)
+        .clamp(0.0, alturaMaxima);
     return Dialog(
       child: SizedBox(width: 820, height: altura, child: contenido),
+    );
+  }
+
+  /// Razón (obligatoria) y, si la razón envía a otra sucursal, el destino.
+  Widget _selectorRazon() {
+    final razones = _razonesTipo;
+    final razon = _razon;
+    final error = _validar ? _errorRazon : null;
+    final pideDestino = razon?.requiereSucursalDestino == true;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<int>(
+          // La clave por tipo reconstruye el campo al cambiar de tipo: el
+          // valor anterior podría no estar entre las razones nuevas.
+          key: ValueKey('razon-$_tipo'),
+          initialValue: razon?.id,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: 'Razón del movimiento',
+            errorText: razon == null ? error : null,
+            errorMaxLines: 2,
+          ),
+          items: [
+            for (final r in razones)
+              DropdownMenuItem(value: r.id, child: Text(r.nombre)),
+          ],
+          onChanged: _guardando
+              ? null
+              : (id) => setState(() {
+                  _razonId = id;
+                  _destinoId = null;
+                }),
+        ),
+        if (pideDestino) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            key: ValueKey('destino-${razon!.id}'),
+            initialValue: _destinoId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Sucursal destino',
+              helperText: 'La entrada se registra sola en la sucursal destino.',
+              errorText: error,
+              errorMaxLines: 2,
+            ),
+            items: [
+              for (final s in _destinos)
+                DropdownMenuItem(value: s.id, child: Text(s.nombre)),
+            ],
+            onChanged: _guardando
+                ? null
+                : (id) => setState(() => _destinoId = id),
+          ),
+        ],
+      ],
     );
   }
 

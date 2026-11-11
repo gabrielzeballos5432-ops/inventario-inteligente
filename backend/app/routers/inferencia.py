@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user_id
+from app.core.sucursal import get_sucursal_activa
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.movimiento_repository import MovimientoRepository
 from app.repositories.sesion_repository import SesionRepository
@@ -20,6 +21,7 @@ async def realizar_inferencia(
     tipo_operacion: str = Form("entrada"),
     db: AsyncSession = Depends(get_db),
     usuario_id: int = Depends(get_current_user_id),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
     if tipo_operacion not in ("entrada", "salida", "conteo"):
         raise HTTPException(
@@ -57,6 +59,7 @@ async def realizar_inferencia(
         return await service.procesar_inferencia(
             image_bytes,
             usuario_id,
+            sucursal_id,
             imagen_url=imagen.filename,
             tipo_operacion=tipo_operacion,
         )

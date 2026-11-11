@@ -8,27 +8,53 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user_id, require_admin
-from app.models.inventario import Inventario
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
+from app.repositories.movimiento_repository import opciones_detalle_movimiento
 from app.repositories.producto_repository import ProductoRepository
 from app.schemas.producto import ProductoStockOut, ValorizacionOut
-from app.schemas.movimiento import MovimientoOut
+from app.schemas.movimiento import MovimientoOut, movimiento_out
+
+# Todos los reportes aceptan `sucursal_id`; sin él cubren todas las sucursales
+# (el stock se suma entre sucursales).
+FILTRO_SUCURSAL = Query(default=None, description="Sin valor: todas las sucursales")
+
+
+async def _movimientos(
+    db: AsyncSession,
+    fecha_desde: datetime | None,
+    fecha_hasta: datetime | None,
+    sucursal_id: int | None,
+    limite: int,
+) -> list[Movimiento]:
+    query = (
+        select(Movimiento)
+        .options(*opciones_detalle_movimiento())
+        .order_by(Movimiento.creado_en.desc())
+    )
+    if fecha_desde:
+        query = query.where(Movimiento.creado_en >= fecha_desde)
+    if fecha_hasta:
+        query = query.where(Movimiento.creado_en <= fecha_hasta)
+    if sucursal_id is not None:
+        query = query.where(Movimiento.sucursal_id == sucursal_id)
+    result = await db.execute(query.limit(limite))
+    return list(result.scalars().unique().all())
 
 router = APIRouter(prefix="/api/reportes", tags=["Reportes"])
 
 
 @router.get("/valorizacion", response_model=ValorizacionOut)
 async def valorizacion_inventario(
+    sucursal_id: int | None = FILTRO_SUCURSAL,
     _: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     repo = ProductoRepository(db)
-    datos = await repo.listar_con_stock()
+    datos = await repo.listar_con_stock(sucursal_id)
     unidades = 0
     costo = Decimal("0")
     venta = Decimal("0")
@@ -52,11 +78,12 @@ async def valorizacion_inventario(
 
 @router.get("/stock", response_model=list[ProductoStockOut])
 async def reporte_stock(
+    sucursal_id: int | None = FILTRO_SUCURSAL,
     db: AsyncSession = Depends(get_db),
     _: int = Depends(get_current_user_id),
 ):
     repo = ProductoRepository(db)
-    datos = await repo.listar_con_stock()
+    datos = await repo.listar_con_stock(sucursal_id)
     resultado = []
     for d in datos:
         prod = d["producto"]
@@ -87,43 +114,13 @@ async def reporte_stock(
 async def reporte_movimientos(
     fecha_desde: datetime | None = Query(default=None),
     fecha_hasta: datetime | None = Query(default=None),
+    sucursal_id: int | None = FILTRO_SUCURSAL,
     limite: int = 500,
     db: AsyncSession = Depends(get_db),
     _: int = Depends(get_current_user_id),
 ):
-    query = (
-        select(Movimiento)
-        .options(
-            joinedload(Movimiento.producto),
-            joinedload(Movimiento.usuario),
-        )
-        .order_by(Movimiento.creado_en.desc())
-    )
-    if fecha_desde:
-        query = query.where(Movimiento.creado_en >= fecha_desde)
-    if fecha_hasta:
-        query = query.where(Movimiento.creado_en <= fecha_hasta)
-    result = await db.execute(query.limit(limite))
-    movs = list(result.scalars().unique().all())
-    return [
-        MovimientoOut(
-            id=m.id,
-            producto_id=m.producto_id,
-            producto_nombre=m.producto.nombre if m.producto else None,
-            usuario_id=m.usuario_id,
-            usuario_nombre=m.usuario.nombre if m.usuario else None,
-            sesion_id=m.sesion_id,
-            venta_detalle_id=m.venta_detalle_id,
-            compra_detalle_id=m.compra_detalle_id,
-            tipo=m.tipo,
-            cantidad_anterior=m.cantidad_anterior,
-            cantidad=m.cantidad,
-            stock_resultante=m.stock_resultante,
-            origen=m.origen,
-            creado_en=m.creado_en,
-        )
-        for m in movs
-    ]
+    movs = await _movimientos(db, fecha_desde, fecha_hasta, sucursal_id, limite)
+    return [movimiento_out(m) for m in movs]
 
 
 def _csv_stock(datos: list[dict]) -> str:
@@ -149,14 +146,19 @@ def _csv_movimientos(movs: list[Movimiento]) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["id", "producto", "tipo", "cantidad_anterior", "cantidad",
-         "stock_resultante", "origen", "usuario", "fecha"]
+        ["id", "producto", "sucursal", "tipo", "razon", "sucursal_relacionada",
+         "cantidad_anterior", "cantidad", "stock_resultante", "origen",
+         "usuario", "fecha"]
     )
     for m in movs:
         writer.writerow([
             m.id,
             m.producto.nombre if m.producto else "",
-            m.tipo, m.cantidad_anterior, m.cantidad, m.stock_resultante,
+            m.sucursal.nombre if m.sucursal else "",
+            m.tipo,
+            m.razon.nombre if m.razon else "",
+            m.sucursal_relacionada.nombre if m.sucursal_relacionada else "",
+            m.cantidad_anterior, m.cantidad, m.stock_resultante,
             m.origen,
             m.usuario.nombre if m.usuario else "",
             m.creado_en.isoformat() if m.creado_en else "",
@@ -192,14 +194,19 @@ def _xlsx_movimientos(movs: list[Movimiento]) -> bytes:
     ws = wb.active
     ws.title = "Movimientos"
     ws.append(
-        ["id", "producto", "tipo", "cantidad_anterior", "cantidad",
-         "stock_resultante", "origen", "usuario", "fecha"]
+        ["id", "producto", "sucursal", "tipo", "razon", "sucursal_relacionada",
+         "cantidad_anterior", "cantidad", "stock_resultante", "origen",
+         "usuario", "fecha"]
     )
     for m in movs:
         ws.append([
             m.id,
             m.producto.nombre if m.producto else "",
-            m.tipo, m.cantidad_anterior, m.cantidad, m.stock_resultante,
+            m.sucursal.nombre if m.sucursal else "",
+            m.tipo,
+            m.razon.nombre if m.razon else "",
+            m.sucursal_relacionada.nombre if m.sucursal_relacionada else "",
+            m.cantidad_anterior, m.cantidad, m.stock_resultante,
             m.origen,
             m.usuario.nombre if m.usuario else "",
             m.creado_en.isoformat() if m.creado_en else "",
@@ -212,11 +219,12 @@ def _xlsx_movimientos(movs: list[Movimiento]) -> bytes:
 @router.get("/exportar-stock")
 async def exportar_stock(
     formato: str = Query(default="csv", pattern="^(csv|xlsx)$"),
+    sucursal_id: int | None = FILTRO_SUCURSAL,
     _: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     repo = ProductoRepository(db)
-    datos = await repo.listar_con_stock()
+    datos = await repo.listar_con_stock(sucursal_id)
     if formato == "xlsx":
         return StreamingResponse(
             io.BytesIO(_xlsx_stock(datos)),
@@ -239,25 +247,13 @@ async def exportar_stock(
 async def exportar_movimientos(
     fecha_desde: datetime | None = Query(default=None),
     fecha_hasta: datetime | None = Query(default=None),
+    sucursal_id: int | None = FILTRO_SUCURSAL,
     limite: int = 500,
     formato: str = Query(default="csv", pattern="^(csv|xlsx)$"),
     _: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(Movimiento)
-        .options(
-            joinedload(Movimiento.producto),
-            joinedload(Movimiento.usuario),
-        )
-        .order_by(Movimiento.creado_en.desc())
-    )
-    if fecha_desde:
-        query = query.where(Movimiento.creado_en >= fecha_desde)
-    if fecha_hasta:
-        query = query.where(Movimiento.creado_en <= fecha_hasta)
-    result = await db.execute(query.limit(limite))
-    movs = list(result.scalars().unique().all())
+    movs = await _movimientos(db, fecha_desde, fecha_hasta, sucursal_id, limite)
     if formato == "xlsx":
         return StreamingResponse(
             io.BytesIO(_xlsx_movimientos(movs)),

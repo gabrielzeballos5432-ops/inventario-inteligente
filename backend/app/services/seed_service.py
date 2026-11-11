@@ -10,6 +10,8 @@ from app.models.marca import Marca
 from app.models.usuario import Usuario
 from app.models.compra import Moneda
 from app.models.contabilidad import CategoriaGasto
+from app.models.razon_movimiento import RAZONES_PREDEFINIDAS, RazonMovimiento
+from app.models.sucursal import ConfiguracionSistema, Sucursal
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,8 @@ class SeedService:
         await self._asegurar_marcas()
         await self._asegurar_monedas()
         await self._asegurar_categorias_gasto()
+        await self._asegurar_sucursal_predeterminada()
+        await self._asegurar_razones_movimiento()
         await self._asegurar_admin()
         await self.db.commit()
         logger.info("Datos iniciales verificados")
@@ -88,6 +92,37 @@ class SeedService:
                 nombre=nombre, periodicidad=periodicidad, tipo_importe=tipo,
                 activo=True,
             ))
+
+    async def _asegurar_sucursal_predeterminada(self) -> None:
+        # Base nueva (create_all): sin sucursal no se puede registrar nada,
+        # porque toda operación lleva una. La migración hace lo mismo con una
+        # base existente.
+        config = await self.db.get(ConfiguracionSistema, 1)
+        if config is not None:
+            return
+        resultado = await self.db.execute(
+            select(Sucursal).order_by(Sucursal.id).limit(1)
+        )
+        sucursal = resultado.scalar_one_or_none()
+        if sucursal is None:
+            sucursal = Sucursal(nombre="Sucursal principal", activo=True)
+            self.db.add(sucursal)
+            await self.db.flush()
+        self.db.add(
+            ConfiguracionSistema(id=1, sucursal_predeterminada_id=sucursal.id)
+        )
+        logger.info("Sucursal predeterminada: %s", sucursal.nombre)
+
+    async def _asegurar_razones_movimiento(self) -> None:
+        resultado = await self.db.execute(select(RazonMovimiento.codigo))
+        existentes = {codigo for codigo in resultado.scalars() if codigo}
+        for codigo, nombre, tipo, sistema, destino in RAZONES_PREDEFINIDAS:
+            if codigo not in existentes:
+                self.db.add(RazonMovimiento(
+                    codigo=codigo, nombre=nombre, tipo_movimiento=tipo,
+                    sistema=sistema, requiere_sucursal_destino=destino,
+                    activo=True,
+                ))
 
     async def _asegurar_admin(self) -> None:
         existe = await self.db.execute(

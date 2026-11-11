@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../providers/sucursal_controller.dart';
 import '../session/session_controller.dart';
 
 class ApiClient {
@@ -40,6 +41,12 @@ class ApiClient {
     final token = _token ?? SessionController.instance.token;
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
+    }
+    // Sucursal en la que se registra la operacion. El backend solo la
+    // respeta para el administrador; al vendedor lo deja en la predeterminada.
+    final sucursalId = SucursalController.instance.activaId;
+    if (sucursalId != null) {
+      headers['X-Sucursal-Id'] = '$sucursalId';
     }
     return headers;
   }

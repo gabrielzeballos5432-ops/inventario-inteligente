@@ -8,6 +8,7 @@ import 'core/db/db_bootstrap.dart'
 import 'core/providers/auth_provider.dart';
 import 'core/providers/inventario_provider.dart';
 import 'core/providers/servidor_controller.dart';
+import 'core/providers/sucursal_controller.dart';
 import 'core/providers/theme_controller.dart';
 import 'core/network/api_client.dart';
 import 'core/services/local_db_service.dart';
@@ -17,6 +18,7 @@ import 'core/services/product_service.dart';
 import 'core/services/detection_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/operaciones_service.dart';
+import 'core/services/configuracion_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +67,10 @@ void main() async {
         ChangeNotifierProvider.value(value: inventarioProvider),
         ChangeNotifierProvider.value(value: themeController),
         ChangeNotifierProvider.value(value: servidorController),
+        ChangeNotifierProvider.value(value: SucursalController.instance),
+        Provider<ConfiguracionService>(
+          create: (_) => ConfiguracionService(apiClient),
+        ),
         Provider<OperacionesService>(
           create: (_) => OperacionesService(apiClient),
         ),

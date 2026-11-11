@@ -114,4 +114,22 @@ void main() {
       expect(Validaciones.correo('', obligatorio: false), isNull);
     });
   });
+
+  group('cantidadInicial', () {
+    test('es opcional: vacio cuenta como 0', () {
+      expect(Validaciones.cantidadInicial(''), isNull);
+      expect(Validaciones.cantidadInicial(null), isNull);
+      expect(Validaciones.cantidadInicial('0'), isNull);
+      expect(Validaciones.cantidadInicial('12'), isNull);
+    });
+
+    test('rechaza negativos, texto y valores fuera de rango', () {
+      expect(Validaciones.cantidadInicial('-3'),
+          'La cantidad inicial no puede ser negativa');
+      expect(Validaciones.cantidadInicial('doce'),
+          'La cantidad inicial debe ser un numero entero');
+      expect(Validaciones.cantidadInicial('2147483648'),
+          'La cantidad inicial es demasiado grande');
+    });
+  });
 }

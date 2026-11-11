@@ -46,6 +46,9 @@ class ProductoCreate(BaseModel):
     precio_venta: Decimal = Field(gt=0)
     precio_mayor: Optional[Decimal] = Field(default=None, gt=0)
     stock_minimo: int = Field(default=5, ge=0)
+    # Stock con el que arranca el producto en la sucursal activa. Si es > 0 se
+    # registra una entrada automática con la razón "Stock inicial".
+    cantidad_inicial: int = Field(default=0, ge=0, le=2_147_483_647)
 
 
 class ProductoUpdate(BaseModel):

@@ -9,6 +9,7 @@ import '../../../core/models/marca.dart';
 import '../../../core/models/proveedor.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/providers/inventario_provider.dart';
+import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/services/catalog_service.dart';
 import '../../../core/services/product_service.dart';
 import '../../../core/session/session_controller.dart';
@@ -639,6 +640,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController _codigoController;
   late final TextEditingController _stockMinimoController;
   late final TextEditingController _codigoBarrasController;
+  // Solo al crear: stock con el que arranca en la sucursal activa.
+  final _cantidadInicialController = TextEditingController();
   int? _categoriaId;
   // Marca y proveedor son catalogos OPCIONALES: null significa "sin asignar"
   // y es un valor legitimo, no un campo pendiente.
@@ -684,6 +687,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _codigoController.dispose();
     _stockMinimoController.dispose();
     _codigoBarrasController.dispose();
+    _cantidadInicialController.dispose();
     super.dispose();
   }
 
@@ -822,6 +826,11 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       'codigo_barras': _codigoBarrasController.text.trim().isEmpty
           ? null
           : _codigoBarrasController.text.trim(),
+      // Al crear: si es > 0 el backend registra una entrada "Stock inicial"
+      // en la sucursal activa. Vacio cuenta como 0.
+      if (!_isEditing)
+        'cantidad_inicial':
+            int.tryParse(_cantidadInicialController.text.trim()) ?? 0,
     };
 
     final ok = _isEditing
@@ -859,6 +868,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
+            // La etiqueta flotante del primer campo (Codigo) se dibuja por
+            // encima del borde del campo. Sin este margen, el recorte del
+            // scroll la cortaba al desplazarse y volver arriba.
+            padding: const EdgeInsets.only(top: 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -950,6 +963,23 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   ),
                   validator: Validaciones.stockMinimo,
                 ),
+                if (!_isEditing) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _cantidadInicialController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: 'Cantidad inicial',
+                      hintText: '0',
+                      helperText: 'Se registra como entrada en '
+                          '${SucursalController.instance.activa?.nombre ?? 'la sucursal activa'}.',
+                      helperMaxLines: 2,
+                      errorMaxLines: 2,
+                    ),
+                    validator: Validaciones.cantidadInicial,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 FutureBuilder<List<Categoria>>(
                   future: _futureCategorias,
@@ -1415,6 +1445,8 @@ class _ReportesDialog extends StatefulWidget {
 }
 
 class _ReportesDialogState extends State<_ReportesDialog> {
+  // Filtro de los reportes: arranca en la sucursal activa; null = todas.
+  int? _sucursalId = SucursalController.instance.activaId;
   late Future<List<ProductoConStock>> _futureStock;
   late Future<List<Movimiento>> _futureMovs;
   String? _mensaje;
@@ -1425,15 +1457,41 @@ class _ReportesDialogState extends State<_ReportesDialog> {
   @override
   void initState() {
     super.initState();
-    _futureStock = widget.service.reporteStock();
-    _futureMovs = widget.service.reporteMovimientos();
+    _futureStock = widget.service.reporteStock(sucursalId: _sucursalId);
+    _futureMovs = widget.service.reporteMovimientos(sucursalId: _sucursalId);
   }
 
   void _reload() {
     setState(() {
-      _futureStock = widget.service.reporteStock();
-      _futureMovs = widget.service.reporteMovimientos();
+      _futureStock = widget.service.reporteStock(sucursalId: _sucursalId);
+      _futureMovs = widget.service.reporteMovimientos(sucursalId: _sucursalId);
     });
+  }
+
+  /// Selector de sucursal del reporte. Con una sola sucursal no aporta nada.
+  Widget _filtroSucursal() {
+    final sucursales = SucursalController.instance.sucursales;
+    if (sucursales.length < 2) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DropdownButtonFormField<int?>(
+        initialValue: _sucursalId,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Sucursal'),
+        items: [
+          const DropdownMenuItem<int?>(
+            value: null,
+            child: Text('Todas las sucursales'),
+          ),
+          for (final s in sucursales)
+            DropdownMenuItem<int?>(value: s.id, child: Text(s.nombre)),
+        ],
+        onChanged: (id) {
+          _sucursalId = id;
+          _reload();
+        },
+      ),
+    );
   }
 
   Future<void> _exportar(
@@ -1458,7 +1516,10 @@ class _ReportesDialogState extends State<_ReportesDialog> {
 
   Future<void> _exportarStock(String formato) {
     return _exportar(
-      () => widget.service.exportarStock(formato: formato),
+      () => widget.service.exportarStock(
+        formato: formato,
+        sucursalId: _sucursalId,
+      ),
       'reporte_stock',
       formato,
     );
@@ -1466,7 +1527,10 @@ class _ReportesDialogState extends State<_ReportesDialog> {
 
   Future<void> _exportarMovimientos(String formato) {
     return _exportar(
-      () => widget.service.exportarMovimientos(formato: formato),
+      () => widget.service.exportarMovimientos(
+        formato: formato,
+        sucursalId: _sucursalId,
+      ),
       'reporte_movimientos',
       formato,
     );
@@ -1505,6 +1569,7 @@ class _ReportesDialogState extends State<_ReportesDialog> {
               ),
             ),
             const SizedBox(height: 8),
+            _filtroSucursal(),
             Row(
               children: [
                 const Text('Stock actual',
@@ -1613,7 +1678,9 @@ class _ReportesDialogState extends State<_ReportesDialog> {
                                 title: Text(
                                     '${m.productoNombre ?? "P#${m.productoId}"}'),
                                 subtitle: Text(
-                                    '${m.tipo} x${m.cantidad} -> ${m.stockResultante}'),
+                                    '${m.tipo} x${m.cantidad} -> ${m.stockResultante}'
+                                    '${m.razonNombre != null ? ' · ${m.razonNombre}' : ''}'
+                                    '${_sucursalId == null && m.sucursalNombre != null ? ' · ${m.sucursalNombre}' : ''}'),
                                 trailing: Text(m.origen ?? ''),
                               ))
                           .toList(),

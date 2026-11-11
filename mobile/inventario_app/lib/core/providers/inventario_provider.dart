@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'sucursal_controller.dart';
+
 import '../models/product.dart';
 import '../models/detection_record.dart';
 import '../network/api_client.dart';
@@ -143,7 +145,9 @@ class InventarioProvider extends ChangeNotifier {
 
   Future<void> cargarValorizacion() async {
     try {
-      _valorizacion = await _productService.valorizacion();
+      _valorizacion = await _productService.valorizacion(
+        sucursalId: SucursalController.instance.activaId,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('cargarValorizacion FALLA: $e');
@@ -235,6 +239,7 @@ class InventarioProvider extends ChangeNotifier {
     required int productoId,
     required String tipo,
     required int cantidad,
+    required int razonId,
     String origen = 'manual',
   }) async {
     try {
@@ -242,6 +247,7 @@ class InventarioProvider extends ChangeNotifier {
         productoId: productoId,
         tipo: tipo,
         cantidad: cantidad,
+        razonId: razonId,
         origen: origen,
       );
       await cargarInventario();
@@ -265,8 +271,15 @@ class InventarioProvider extends ChangeNotifier {
   Future<int> registrarLote({
     required String tipo,
     required List<({int productoId, int cantidad})> items,
+    required int razonId,
+    int? sucursalDestinoId,
   }) async {
-    final resultado = await _productService.registrarLote(tipo: tipo, items: items);
+    final resultado = await _productService.registrarLote(
+      tipo: tipo,
+      items: items,
+      razonId: razonId,
+      sucursalDestinoId: sucursalDestinoId,
+    );
     await cargarInventario();
     await cargarHistorial();
     return resultado.guardados;

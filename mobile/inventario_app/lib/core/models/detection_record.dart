@@ -58,6 +58,11 @@ class Movimiento {
   final int stockResultante;
   final String? origen;
   final String? creadoEn;
+  final String? sucursalNombre;
+  final String? razonNombre;
+
+  /// En un traspaso: la sucursal destino (salida) o de origen (entrada).
+  final String? sucursalRelacionadaNombre;
 
   Movimiento({
     required this.id,
@@ -70,6 +75,9 @@ class Movimiento {
     required this.stockResultante,
     this.origen,
     this.creadoEn,
+    this.sucursalNombre,
+    this.razonNombre,
+    this.sucursalRelacionadaNombre,
   });
 
   factory Movimiento.fromJson(Map<String, dynamic> json) {
@@ -84,6 +92,9 @@ class Movimiento {
       stockResultante: json['stock_resultante'] as int? ?? 0,
       origen: json['origen'] as String?,
       creadoEn: json['creado_en'] as String?,
+      sucursalNombre: json['sucursal_nombre'] as String?,
+      razonNombre: json['razon_nombre'] as String?,
+      sucursalRelacionadaNombre: json['sucursal_relacionada_nombre'] as String?,
     );
   }
 

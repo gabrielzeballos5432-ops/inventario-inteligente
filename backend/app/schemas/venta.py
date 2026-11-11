@@ -75,6 +75,7 @@ class VentaOut(BaseModel):
     id: int
     fecha_creacion: datetime
     usuario_id: int
+    sucursal_id: int
     cliente_id: Optional[int] = None
     sesion_caja_id: Optional[int] = None
     tipo_venta: str
