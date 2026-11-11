@@ -3,27 +3,19 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from ultralytics import YOLO
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-MAPA_CLASES_YOLO: dict[int, int] = {
-    # key: id de clase del modelo YOLO (entrenado)
-    # value: id del producto en la BD
-    # Se puede sobreescribir via la variable de entorno YOLO_CLASS_MAP
-    # EJEMPLO -- el usuario debe ajustar segun su modelo entrenado
-    0: 1,  # tinte negro -> producto_id=1
-    1: 2,  # tinte marron -> producto_id=2
-    2: 3,  # peroxido 20v -> producto_id=3
-    3: 4,  # peroxido 30v -> producto_id=4
-    4: 5,  # shampoo -> producto_id=5
-    5: 6,  # acondicionador -> producto_id=6
-}
+# Clase del modelo -> id del producto en la BD. Los ids dependen de cada base,
+# asi que se configuran en .env con YOLO_CLASS_MAP (p. ej. {"0": 25, "1": 26}).
+# Sin configuracion no se asigna nada: una deteccion sin mapa se ignora con un
+# aviso en el log, en vez de sumar stock a un producto equivocado.
+MAPA_CLASES_YOLO: dict[int, int] = {}
 
 
 class InferenceService:
@@ -68,10 +60,11 @@ class InferenceService:
                 f"{settings.YOLO_MODEL_PATH}"
             )
 
-        imagen = Image.open(io.BytesIO(image_bytes))
-        img_array = np.array(imagen)
-        if img_array.shape[-1] == 4:
-            img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
+        # La camara del celular suele guardar la foto "de costado" con una
+        # marca EXIF que dice como girarla. Sin aplicarla, el modelo recibe la
+        # imagen girada 90 grados.
+        imagen = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes)))
+        img_array = np.array(imagen.convert("RGB"))
 
         resultados = self.modelo(img_array, conf=settings.YOLO_CONFIDENCE_THRESHOLD)
 
