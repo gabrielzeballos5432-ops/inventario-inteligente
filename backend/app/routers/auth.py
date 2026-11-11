@@ -19,6 +19,15 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     return await service.login(body.email, body.password)
 
 
+@router.post("/renovar", response_model=TokenResponse)
+async def renovar_token(
+    usuario_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Token nuevo para una sesión vigente (un token vencido da 401)."""
+    return await AuthService(UsuarioRepository(db)).renovar(usuario_id)
+
+
 @router.post("/registro", response_model=UsuarioOut, status_code=201)
 async def registro(
     body: UsuarioCreate,

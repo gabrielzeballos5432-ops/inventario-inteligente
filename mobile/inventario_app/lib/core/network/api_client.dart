@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../providers/sucursal_controller.dart';
 import '../session/session_controller.dart';
+import '../session/token_jwt.dart';
 
 class ApiClient {
   final http.Client _httpClient;
@@ -22,6 +23,22 @@ class ApiClient {
 
   ApiClient({http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
+
+  /// Se llama cuando el servidor rechaza el token (401): la sesión venció o
+  /// dejó de ser válida. Lo registra AuthProvider para volver al login con
+  /// aviso, en vez de dejar la app abierta con todo vacío.
+  static void Function()? alSesionVencida;
+
+  /// Se llama tras una respuesta correcta si al token le queda poco: la app
+  /// lo renueva sola y quien está trabajando no termina en el login.
+  static void Function()? alRenovarSesion;
+
+  /// Con menos de esto por delante, el token se renueva.
+  static const Duration margenRenovacion = Duration(hours: 1);
+
+  /// Rutas donde un 401 no significa "sesión vencida": en el login es una
+  /// contraseña incorrecta, y la renovación maneja su propio rechazo.
+  static const _rutasSinSesion = {'/api/auth/login', '/api/auth/renovar'};
 
   void setToken(String? token) {
     _token = token;
@@ -51,18 +68,32 @@ class ApiClient {
     return headers;
   }
 
-  void _ensureSuccess(http.Response response) {
+  void _ensureSuccess(http.Response response, String ruta) {
+    final conSesion = !_rutasSinSesion.contains(ruta);
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (conSesion) _quizasRenovar();
       return;
     }
+    if (response.statusCode == 401 && conSesion) {
+      alSesionVencida?.call();
+    }
     throw ApiException(response.statusCode, response.body);
+  }
+
+  void _quizasRenovar() {
+    final vence = vencimientoToken(_token ?? SessionController.instance.token);
+    if (vence == null) return;
+    final restante = vence.difference(DateTime.now().toUtc());
+    if (restante > Duration.zero && restante < margenRenovacion) {
+      alRenovarSesion?.call();
+    }
   }
 
   Future<dynamic> getJson(String path, {Map<String, String>? query}) async {
     final response = await _httpClient
         .get(_buildUri(path, query), headers: _buildHeaders())
         .timeout(timeoutPeticion);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
@@ -71,7 +102,7 @@ class ApiClient {
     final response = await _httpClient
         .get(_buildUri(path), headers: _buildHeaders(includeJson: false))
         .timeout(timeoutPeticion);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     return utf8.decode(response.bodyBytes);
   }
 
@@ -80,7 +111,7 @@ class ApiClient {
       _buildUri(path, query),
       headers: _buildHeaders(includeJson: false),
     );
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     return response.bodyBytes;
   }
 
@@ -88,7 +119,7 @@ class ApiClient {
     final response = await _httpClient
         .post(_buildUri(path), headers: _buildHeaders(), body: jsonEncode(body))
         .timeout(timeoutPeticion);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
@@ -97,7 +128,7 @@ class ApiClient {
     final response = await _httpClient
         .put(_buildUri(path), headers: _buildHeaders(), body: jsonEncode(body))
         .timeout(timeoutPeticion);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
@@ -106,7 +137,7 @@ class ApiClient {
     final response = await _httpClient
         .delete(_buildUri(path), headers: _buildHeaders())
         .timeout(timeoutPeticion);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
@@ -119,7 +150,7 @@ class ApiClient {
           body: jsonEncode(body),
         )
         .timeout(timeoutPeticion);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
@@ -142,7 +173,7 @@ class ApiClient {
       final streamed = await _httpClient.send(request);
       return http.Response.fromStream(streamed);
     })().timeout(timeout);
-    _ensureSuccess(response);
+    _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
   }

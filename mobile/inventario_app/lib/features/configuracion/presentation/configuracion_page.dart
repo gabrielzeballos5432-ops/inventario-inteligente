@@ -301,14 +301,42 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
                       onPressed: () => _editarSucursal(sucursal),
                       icon: const Icon(Icons.edit_outlined),
                     ),
-                    Switch(
-                      value: sucursal.activo,
-                      // La predeterminada no se puede desactivar: primero hay
-                      // que elegir otra (el backend también lo rechaza).
-                      onChanged: sucursal.id == _predeterminadaId
-                          ? null
-                          : (_) => _alternarSucursal(sucursal),
-                    ),
+                    // La predeterminada no se puede desactivar (primero hay
+                    // que elegir otra; el backend también lo rechaza). Un
+                    // interruptor bloqueado se leía como "apagado", así que
+                    // en su lugar va una etiqueta explícita.
+                    if (sucursal.id == _predeterminadaId)
+                      Tooltip(
+                        message: 'Para desactivarla, elige otra sucursal '
+                            'predeterminada.',
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock_outline,
+                                size: 16,
+                                color: context.textoSecundario,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Siempre\nactiva',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.textoSecundario,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Switch(
+                        value: sucursal.activo,
+                        onChanged: (_) => _alternarSucursal(sucursal),
+                      ),
                   ],
                 ),
               ),

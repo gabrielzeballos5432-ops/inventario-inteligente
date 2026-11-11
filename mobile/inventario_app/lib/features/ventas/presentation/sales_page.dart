@@ -223,6 +223,36 @@ class _SalesPageState extends State<SalesPage> {
     return true;
   }
 
+  /// Enter en la captura avanza campo por campo: Código → Cantidad → Monto
+  /// → agrega la fila y vuelve a Código. Con Código vacío registra la venta
+  /// (Ctrl+Enter registra desde cualquier campo). Así un lector de códigos de
+  /// barras, que manda Enter al final, carga el producto pero no cobra solo.
+  void _alEnter() {
+    if (_guardando) return;
+    if (_codigoFocus.hasFocus) {
+      _enterEnCodigo();
+    } else if (_cantidadFocus.hasFocus) {
+      _enfocar(_montoFocus, _montoController);
+    } else if (_montoFocus.hasFocus) {
+      _agregarItem();
+    } else {
+      unawaited(_registrar());
+    }
+  }
+
+  void _enterEnCodigo() {
+    if (_codigoController.text.trim().isEmpty) {
+      unawaited(_registrar());
+      return;
+    }
+    if (_productoActual() == null) {
+      setState(() => _errorCaptura = 'No existe un producto con ese código.');
+      _enfocar(_codigoFocus, _codigoController);
+      return;
+    }
+    _enfocar(_cantidadFocus, _cantidadController);
+  }
+
   void _limpiarCaptura() {
     _codigoController.clear();
     _cantidadController.text = '1';
@@ -506,7 +536,11 @@ class _SalesPageState extends State<SalesPage> {
                   if (!widget.activa) return KeyEventResult.ignored;
                   if (evento.logicalKey == LogicalKeyboardKey.enter ||
                       evento.logicalKey == LogicalKeyboardKey.numpadEnter) {
-                    if (evento is KeyDownEvent) unawaited(_registrar());
+                    // Ctrl+Enter lo atiende CallbackShortcuts (registra).
+                    if (HardwareKeyboard.instance.isControlPressed) {
+                      return KeyEventResult.ignored;
+                    }
+                    if (evento is KeyDownEvent) _alEnter();
                     return KeyEventResult.handled;
                   }
                   return KeyEventResult.ignored;
@@ -587,11 +621,15 @@ class _SalesPageState extends State<SalesPage> {
         children: [
           Icon(icono, size: 20, color: context.textoSecundario),
           const SizedBox(width: 8),
-          Text(
-            texto,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          // Flexible: "Productos de la venta (N)" no cabe en una línea en
+          // teléfonos de 360-390 px y la fila se desbordaba; así se parte.
+          Flexible(
+            child: Text(
+              texto,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -625,7 +663,7 @@ class _SalesPageState extends State<SalesPage> {
     final codigo = TextField(
       controller: _codigoController,
       focusNode: _codigoFocus,
-      textInputAction: TextInputAction.done,
+      textInputAction: TextInputAction.next,
       textCapitalization: TextCapitalization.characters,
       decoration: const InputDecoration(
         labelText: 'Código',
@@ -633,7 +671,7 @@ class _SalesPageState extends State<SalesPage> {
       ),
       onChanged: _alCambiarCodigo,
       onEditingComplete: () {},
-      onSubmitted: (_) => _registrar(),
+      onSubmitted: (_) => _enterEnCodigo(),
     );
     final descripcion = _lectura(
       'Descripción',
@@ -726,7 +764,7 @@ class _SalesPageState extends State<SalesPage> {
       controller: _cantidadController,
       focusNode: _cantidadFocus,
       keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done,
+      textInputAction: TextInputAction.next,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: const InputDecoration(labelText: 'Cantidad'),
       onChanged: (_) => setState(() {
@@ -734,7 +772,7 @@ class _SalesPageState extends State<SalesPage> {
         _recalcularMonto();
       }),
       onEditingComplete: () {},
-      onSubmitted: (_) => _registrar(),
+      onSubmitted: (_) => _enfocar(_montoFocus, _montoController),
     );
     final campoMonto = TextField(
       controller: _montoController,
@@ -766,7 +804,7 @@ class _SalesPageState extends State<SalesPage> {
         _errorCaptura = null;
       }),
       onEditingComplete: () {},
-      onSubmitted: (_) => _registrar(),
+      onSubmitted: (_) => _agregarItem(),
     );
     final botonAgregar = FilledButton.tonalIcon(
       onPressed: _agregarItem,
@@ -1043,8 +1081,8 @@ class _SalesPageState extends State<SalesPage> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
-                'Escribe un código. Usa Agregar para acumular productos '
-                'o Enter para registrar.',
+                'Escribe un código y Enter: pasa a Cantidad, luego a Monto, '
+                'y Enter agrega el producto.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.textoSecundario),
               ),
@@ -1257,7 +1295,8 @@ class _SalesPageState extends State<SalesPage> {
       child: Text(_guardando ? 'Registrando…' : 'Registrar venta'),
     );
     final ayuda = Text(
-      'Tab avanza entre campos · Enter registra · Esc limpia la captura',
+      'Enter avanza y agrega · Enter con código vacío o Ctrl+Enter registra · '
+      'Esc limpia la captura',
       style: TextStyle(color: context.textoSecundario, fontSize: 13),
     );
 
