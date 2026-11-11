@@ -68,7 +68,7 @@ Orden recomendado tras tocar la app: `flutter analyze` → `flutter test` → (s
 - Plugins con código nativo: `mobile_scanner` (escáner de código de barras), `permission_handler` (permiso CAMERA), `share_plus` + `path_provider` (descargar y compartir el reporte exportado). El escáner **solo funciona en Android/iOS**: en web/escritorio el botón debe seguir ofreciendo el selector de archivos.
 - AndroidManifest: el permiso `CAMERA` está declarado y `android.hardware.camera` va con `required="false"` para no romper la instalación en dispositivos sin cámara.
 - `flutter run -d windows` requiere Visual Studio con carga "Desarrollo de escritorio con C++" (**no instalado** en esta máquina); `flutter run -d chrome` funciona sin nada extra.
-- CI (`.github/workflows/build-mobile.yml`) analiza y compila APK en cambios de `mobile/`; tiene **Flutter 3.29 fijado** mientras el repo usa local 3.41.6 / `sdk: ^3.11.4` — verificar que el CI verde coincida antes de confiar en él.
+- CI (`.github/workflows/build-mobile.yml`) analiza y compila APK en cambios de `mobile/`; tiene **Flutter 3.41.6 y Java 17 fijados**, igual que en local (con el Java 25 por defecto del runner, Gradle 8.14 fallaba con "What went wrong: 25.0.5"). Solo corre solo en `main` o PR a `main`; en otra rama se lanza a mano con `gh workflow run build-mobile.yml --ref <rama>`.
 
 ## Backend — datos y migraciones
 
