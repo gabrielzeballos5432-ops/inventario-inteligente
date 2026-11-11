@@ -66,6 +66,26 @@ class CajaService:
         if sesion is None:
             raise CajaValidationError("No tienes una sesión de caja abierta.")
 
+        esperado = await self.efectivo_en_caja(sesion)
+        if esperado < 0:
+            raise CajaValidationError(
+                "Los egresos en efectivo superan el efectivo inicial y los ingresos."
+            )
+
+        sesion.monto_esperado_cierre = esperado
+        sesion.monto_efectivo_contado = data.monto_efectivo_contado
+        sesion.observacion_cierre = data.observacion_cierre
+        sesion.usuario_cierre_id = usuario_id
+        sesion.fecha_cierre = datetime.now(timezone.utc)
+        sesion.estado = "cerrada"
+        await self.db.commit()
+        await self.db.refresh(sesion)
+        return self._salida(sesion)
+
+    async def efectivo_en_caja(self, sesion: SesionCaja) -> Decimal:
+        """Efectivo que debería haber en la caja: el inicial más las ventas en
+        efectivo, menos los gastos pagados en efectivo. Lo usan el cierre y el
+        pago de gastos (que no puede sacar más de lo que hay)."""
         ingresos = await self.db.execute(
             select(func.coalesce(func.sum(PagoVenta.monto), 0))
             .join(PagoVenta.venta)
@@ -82,25 +102,11 @@ class CajaService:
                 PagoGasto.metodo_pago == "efectivo",
             )
         )
-        esperado = (
-            sesion.monto_inicial
+        return (
+            Decimal(sesion.monto_inicial)
             + Decimal(ingresos.scalar_one())
             - Decimal(egresos.scalar_one())
         ).quantize(CENTAVO, rounding=ROUND_HALF_UP)
-        if esperado < 0:
-            raise CajaValidationError(
-                "Los egresos en efectivo superan el efectivo inicial y los ingresos."
-            )
-
-        sesion.monto_esperado_cierre = esperado
-        sesion.monto_efectivo_contado = data.monto_efectivo_contado
-        sesion.observacion_cierre = data.observacion_cierre
-        sesion.usuario_cierre_id = usuario_id
-        sesion.fecha_cierre = datetime.now(timezone.utc)
-        sesion.estado = "cerrada"
-        await self.db.commit()
-        await self.db.refresh(sesion)
-        return self._salida(sesion)
 
     @staticmethod
     def _salida(sesion: SesionCaja) -> dict:

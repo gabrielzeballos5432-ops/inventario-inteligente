@@ -39,7 +39,9 @@ def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
         {"metodo_pago": "efectivo", "monto": "20"},
         {"metodo_pago": "qr", "monto": str(Decimal(total) - 20)},
     ])
-    with patch("app.services.contabilidad_service.CajaService.validar_caja_venta", new_callable=AsyncMock):
+    with patch("app.services.contabilidad_service.CajaService.validar_caja_venta", new_callable=AsyncMock), \
+            patch("app.services.contabilidad_service.CajaService.efectivo_en_caja",
+                  new_callable=AsyncMock, return_value=Decimal("500")):
         pagos = asyncio.run(ContabilidadService(db).registrar_pagos_gasto(1, datos.pagos, 1))
     assert [p.sesion_caja_id for p in pagos] == [7, None]
     assert sum(p.monto_bob for p in pagos) == Decimal(total)

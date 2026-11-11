@@ -265,6 +265,11 @@ class ContabilidadService:
                 "El pago supera el saldo pendiente del gasto."
             )
         pagos = []
+        # Efectivo que este registro saca de cada caja: no puede superar lo
+        # que hay. Antes se aceptaba cualquier monto y la caja quedaba con un
+        # esperado negativo que ya no se podía cerrar nunca.
+        efectivo_por_caja: dict[int, Decimal] = {}
+        cajas: dict[int, SesionCaja] = {}
         for data in datos:
             sesion_caja_id = data.sesion_caja_id
             if data.metodo_pago == "efectivo" and sesion_caja_id is None:
@@ -284,7 +289,7 @@ class ContabilidadService:
                     )
             if sesion_caja_id is not None:
                 try:
-                    await CajaService(self.db).validar_caja_venta(
+                    cajas[sesion_caja_id] = await CajaService(self.db).validar_caja_venta(
                         usuario_id, sesion_caja_id, gasto.sucursal_id
                     )
                 except CajaValidationError as exc:
@@ -296,6 +301,10 @@ class ContabilidadService:
                 raise ContabilidadValidationError(
                     "El importe convertido del pago debe ser mayor que cero."
                 )
+            if data.metodo_pago == "efectivo" and sesion_caja_id is not None:
+                efectivo_por_caja[sesion_caja_id] = (
+                    efectivo_por_caja.get(sesion_caja_id, Decimal("0")) + monto_bob
+                )
             pagos.append(PagoGasto(
                 gasto_id=gasto.id,
                 sesion_caja_id=sesion_caja_id,
@@ -304,6 +313,16 @@ class ContabilidadService:
                 metodo_pago=data.metodo_pago,
                 referencia=data.referencia,
             ))
+        for sesion_caja_id, salida in efectivo_por_caja.items():
+            disponible = await CajaService(self.db).efectivo_en_caja(
+                cajas[sesion_caja_id]
+            )
+            if salida > disponible:
+                raise ContabilidadValidationError(
+                    f"No hay efectivo suficiente en la caja: disponible "
+                    f"Bs {max(disponible, Decimal('0')):.2f}, se quieren pagar "
+                    f"Bs {salida:.2f}. Paga el resto por transferencia o QR."
+                )
         self.db.add_all(pagos)
         if pagado + total == gasto.monto:
             gasto.estado = "pagado"
