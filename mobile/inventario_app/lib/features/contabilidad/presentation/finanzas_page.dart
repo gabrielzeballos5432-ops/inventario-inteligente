@@ -2837,9 +2837,21 @@ class _GastosTabState extends State<_GastosTab> {
   }
 
   Future<void> _pagar(Map<String, dynamic> gasto) async {
+    // ¿Hay una caja abierta en la sucursal del gasto? Solo entonces se ofrece
+    // "Se pagó con dinero de la caja". Si la consulta falla, el pago sigue
+    // siendo posible, solo que sin tocar la caja.
+    var cajaAbierta = false;
+    try {
+      final caja = await context.read<OperacionesService>().obtenerCajaActual();
+      cajaAbierta = caja != null &&
+          (gasto['sucursal_id'] == null ||
+              caja['sucursal_id'] == gasto['sucursal_id']);
+    } catch (_) {}
+    if (!mounted) return;
     final pago = await showDialog<_PagoFormulario>(
       context: context,
-      builder: (_) => _PagoGastoDialog(gasto: gasto),
+      builder: (_) =>
+          _PagoGastoDialog(gasto: gasto, cajaAbierta: cajaAbierta),
     );
     if (pago == null || !mounted) return;
     try {
@@ -3458,7 +3470,10 @@ class _PagoFormulario {
 class _PagoGastoDialog extends StatefulWidget {
   final Map<String, dynamic> gasto;
 
-  const _PagoGastoDialog({required this.gasto});
+  /// Hay una caja abierta del usuario en la sucursal del gasto.
+  final bool cajaAbierta;
+
+  const _PagoGastoDialog({required this.gasto, this.cajaAbierta = false});
 
   @override
   State<_PagoGastoDialog> createState() => _PagoGastoDialogState();
@@ -3471,6 +3486,9 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
   final _formKey = GlobalKey<FormState>();
   bool _pagoEfectivo = true;
   bool _pagoQr = false;
+  // Por defecto el efectivo NO sale de la caja: los gastos (alquiler, luz)
+  // se pagan aparte. Se marca solo cuando se sacan billetes del cajón.
+  bool _desdeCaja = false;
 
   @override
   void initState() {
@@ -3542,6 +3560,26 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
               value: _pagoEfectivo,
               onChanged: (valor) => setState(() => _pagoEfectivo = valor!),
             ),
+            if (_pagoEfectivo && widget.cajaAbierta)
+              CheckboxListTile(
+                contentPadding: const EdgeInsets.only(left: 24),
+                title: const Text('Se pagó con dinero de la caja'),
+                subtitle: Text(
+                  'Márcalo solo si sacaste los billetes del cajón: se '
+                  'descuenta en el cierre de la caja.',
+                  style: TextStyle(color: context.textoSecundario),
+                ),
+                value: _desdeCaja,
+                onChanged: (valor) => setState(() => _desdeCaja = valor!),
+              )
+            else if (_pagoEfectivo)
+              Padding(
+                padding: const EdgeInsets.only(left: 24, bottom: 8),
+                child: Text(
+                  'Efectivo pagado aparte: no toca ninguna caja.',
+                  style: TextStyle(color: context.textoSecundario),
+                ),
+              ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('QR'),
@@ -3612,6 +3650,7 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
                   {
                     'metodo_pago': 'efectivo',
                     'monto': (mixto ? efectivo : total).toStringAsFixed(2),
+                    'desde_caja': widget.cajaAbierta && _desdeCaja,
                   },
                 if (_pagoQr)
                   {

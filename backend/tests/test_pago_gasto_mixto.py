@@ -36,7 +36,7 @@ def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
         add_all=Mock(), commit=AsyncMock(), refresh=AsyncMock(),
     )
     datos = PagoGastoMixtoCreate(pagos=[
-        {"metodo_pago": "efectivo", "monto": "20"},
+        {"metodo_pago": "efectivo", "monto": "20", "desde_caja": True},
         {"metodo_pago": "qr", "monto": str(Decimal(total) - 20)},
     ])
     with patch("app.services.contabilidad_service.CajaService.validar_caja_venta", new_callable=AsyncMock), \
@@ -65,9 +65,9 @@ def test_sin_caja_no_guarda_ni_la_parte_qr():
     )
     datos = PagoGastoMixtoCreate(pagos=[
         {"metodo_pago": "qr", "monto": "30"},
-        {"metodo_pago": "efectivo", "monto": "20"},
+        {"metodo_pago": "efectivo", "monto": "20", "desde_caja": True},
     ])
-    with pytest.raises(ContabilidadValidationError, match="Abre"):
+    with pytest.raises(ContabilidadValidationError, match="No tienes una caja abierta"):
         asyncio.run(ContabilidadService(db).registrar_pagos_gasto(1, datos.pagos, 1))
     db.add_all.assert_not_called()
     db.commit.assert_not_awaited()

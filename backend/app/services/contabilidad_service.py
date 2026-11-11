@@ -271,8 +271,11 @@ class ContabilidadService:
         efectivo_por_caja: dict[int, Decimal] = {}
         cajas: dict[int, SesionCaja] = {}
         for data in datos:
-            sesion_caja_id = data.sesion_caja_id
-            if data.metodo_pago == "efectivo" and sesion_caja_id is None:
+            # Solo el efectivo marcado "desde la caja" se liga a una sesión:
+            # el resto (QR, transferencia, efectivo pagado aparte) no toca el
+            # cajón y no necesita caja abierta.
+            sesion_caja_id = data.sesion_caja_id if data.desde_caja else None
+            if data.desde_caja and sesion_caja_id is None:
                 # El efectivo sale de la caja del local del gasto.
                 abierta = await self.db.execute(
                     select(SesionCaja.id).where(
@@ -284,8 +287,9 @@ class ContabilidadService:
                 sesion_caja_id = abierta.scalar_one_or_none()
                 if sesion_caja_id is None:
                     raise ContabilidadValidationError(
-                        "Abre una sesión de caja en la sucursal del gasto para "
-                        "registrar un pago en efectivo."
+                        "No tienes una caja abierta en la sucursal del gasto. "
+                        "Desmarca \"Se pagó con dinero de la caja\" si el "
+                        "efectivo salió de otro lado."
                     )
             if sesion_caja_id is not None:
                 try:

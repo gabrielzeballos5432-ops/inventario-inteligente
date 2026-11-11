@@ -64,7 +64,7 @@ def test_pago_en_efectivo_sin_caja_en_la_sucursal_del_gasto():
     from app.services.contabilidad_service import ContabilidadValidationError
     with pytest.raises(ContabilidadValidationError, match="sucursal del gasto"):
         asyncio.run(ContabilidadService(db).registrar_pagos_gasto(
-            1, [PagoGastoCreate(metodo_pago="efectivo", monto="20")], 1
+            1, [PagoGastoCreate(metodo_pago="efectivo", monto="20", desde_caja=True)], 1
         ))
     db.commit.assert_not_awaited()
 
@@ -126,7 +126,42 @@ def test_pago_en_efectivo_no_puede_superar_el_efectivo_de_la_caja():
     ):
         with pytest.raises(ContabilidadValidationError, match="disponible Bs 130.00"):
             asyncio.run(ContabilidadService(db).registrar_pagos_gasto(
-                1, [PagoGastoCreate(metodo_pago="efectivo", monto="2000")], 1
+                1, [PagoGastoCreate(metodo_pago="efectivo", monto="2000", desde_caja=True)], 1
             ))
     db.add_all.assert_not_called()
     db.commit.assert_not_awaited()
+
+
+def test_efectivo_pagado_aparte_no_necesita_caja_ni_la_toca():
+    # El alquiler pagado un domingo, sin caja abierta: se registra igual y no
+    # se busca ninguna caja (solo se consultan el gasto y lo ya pagado).
+    from app.schemas.contabilidad import PagoGastoCreate
+    gasto = SimpleNamespace(
+        id=1, estado="pendiente", moneda_codigo="BOB", monto=Decimal("2000"),
+        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"), sucursal_id=1,
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(side_effect=[
+            Mock(scalar_one_or_none=Mock(return_value=gasto)),
+            Mock(scalar_one=Mock(return_value=Decimal("0"))),
+        ]),
+        get=AsyncMock(return_value=SimpleNamespace(decimales=2)),
+        add_all=Mock(), commit=AsyncMock(), refresh=AsyncMock(),
+    )
+    pagos = asyncio.run(ContabilidadService(db).registrar_pagos_gasto(
+        1, [PagoGastoCreate(metodo_pago="efectivo", monto="2000")], 1
+    ))
+    assert pagos[0].sesion_caja_id is None
+    assert pagos[0].metodo_pago == "efectivo"
+    assert gasto.estado == "pagado"
+    assert db.execute.await_count == 2
+    db.commit.assert_awaited_once()
+
+
+def test_solo_el_efectivo_puede_salir_de_la_caja():
+    from pydantic import ValidationError
+    from app.schemas.contabilidad import PagoGastoCreate
+    with pytest.raises(ValidationError, match="Solo un pago en efectivo"):
+        PagoGastoCreate(metodo_pago="qr", monto="10", desde_caja=True)
+    # Indicar la caja equivale a marcar que el efectivo salió de ella.
+    assert PagoGastoCreate(metodo_pago="efectivo", monto="10", sesion_caja_id=3).desde_caja
