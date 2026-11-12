@@ -254,11 +254,11 @@ class _DetectionPageState extends State<DetectionPage> {
             ),
           ),
         ],
-        if (inventario.error != null) ...[
+        if (inventario.errorDeteccion != null) ...[
           SizedBox(height: 16),
           SectionCard(
             child: Text(
-              inventario.error!,
+              inventario.errorDeteccion!,
               style: TextStyle(color: context.paleta.stockBajo),
             ),
           ),

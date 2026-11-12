@@ -22,6 +22,11 @@ class InventarioProvider extends ChangeNotifier {
   bool _cargando = false;
   String? _error;
 
+  /// Error de la ultima deteccion, aparte de [_error]: al volver de la
+  /// camara la app recarga el inventario, y esa recarga ponia `_error` en
+  /// null, asi que el rechazo de la deteccion no llegaba a verse.
+  String? _errorDeteccion;
+
   InventarioProvider(
     this._productService,
     this._detectionService,
@@ -35,6 +40,7 @@ class InventarioProvider extends ChangeNotifier {
   bool? get yoloDisponible => _yoloDisponible;
   bool get cargando => _cargando;
   String? get error => _error;
+  String? get errorDeteccion => _errorDeteccion;
   ProductService get productService => _productService;
 
   Future<void> cargarInventario() async {
@@ -113,27 +119,29 @@ class InventarioProvider extends ChangeNotifier {
 
   Future<bool> enviarImagen(List<int> bytes, String fileName) async {
     _cargando = true;
+    // Una foto nueva reemplaza el resultado anterior: si falla, no debe
+    // quedar en pantalla la deteccion de la foto previa para confirmarla.
+    _ultimaInferencia = null;
+    _errorDeteccion = null;
     notifyListeners();
 
     try {
       _ultimaInferencia =
           await _detectionService.detectFromUpload(bytes, fileName);
-      _error = null;
       _cargando = false;
       notifyListeners();
-      await cargarInventario();
       return true;
     } on ApiException catch (e) {
-      _error = e.statusCode == 503
+      _errorDeteccion = e.statusCode == 503
           ? 'El reconocimiento con IA aun no esta activo: falta el modelo '
               'entrenado en el servidor. Puedes registrar el producto a mano '
               'desde la pestaña Productos.'
-          : 'El servidor rechazo la peticion (HTTP ${e.statusCode}).';
+          : 'El servidor rechazo la foto: ${e.detalle}';
       _cargando = false;
       notifyListeners();
       return false;
     } catch (e) {
-      _error = 'Sin conexion. No se pudo procesar la deteccion.';
+      _errorDeteccion = 'Sin conexion. No se pudo procesar la deteccion.';
       _cargando = false;
       notifyListeners();
       return false;
@@ -307,6 +315,7 @@ class InventarioProvider extends ChangeNotifier {
   /// Descarta el resultado de la deteccion sin registrar nada.
   void descartarDeteccion() {
     _ultimaInferencia = null;
+    _errorDeteccion = null;
     notifyListeners();
   }
 

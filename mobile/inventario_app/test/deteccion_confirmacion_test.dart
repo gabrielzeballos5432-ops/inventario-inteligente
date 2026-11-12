@@ -19,7 +19,10 @@ import 'package:inventario_app/features/deteccion/presentation/detection_page.da
 void main() {
   late List<http.Request> peticiones;
 
-  Future<InventarioProvider> montar(WidgetTester tester) async {
+  Future<InventarioProvider> montar(
+    WidgetTester tester, {
+    bool rechazarFoto = false,
+  }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 1400);
     addTearDown(tester.view.reset);
@@ -28,6 +31,13 @@ void main() {
       httpClient: MockClient((peticion) async {
         peticiones.add(peticion);
         final ruta = peticion.url.path;
+        if (ruta == '/api/inference/' && rechazarFoto) {
+          return http.Response(
+            jsonEncode({'detail': 'El archivo debe ser una imagen'}),
+            400,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
         if (ruta == '/api/inference/') {
           return http.Response(
             jsonEncode({
@@ -134,5 +144,20 @@ void main() {
     await tester.tap(boton);
     await tester.pumpAndSettle();
     expect(peticiones.any((p) => p.url.path.contains('/movimiento')), isFalse);
+  });
+
+  testWidgets('si el servidor rechaza la foto, el motivo se ve aunque se recargue el inventario', (
+    tester,
+  ) async {
+    final inventario = await montar(tester, rechazarFoto: true);
+    // Al volver de la camara la app recarga datos que ponen `error` en null:
+    // antes eso borraba el rechazo y la pantalla quedaba muda.
+    await inventario.cargarHistorial();
+    await tester.pump();
+    expect(
+      find.text('El servidor rechazo la foto: El archivo debe ser una imagen'),
+      findsOneWidget,
+    );
+    expect(find.text('Revisa antes de registrar'), findsNothing);
   });
 }

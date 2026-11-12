@@ -68,3 +68,25 @@ def test_modelo_disponible_si_el_archivo_existe_aunque_no_este_cargado(tmp_path,
     monkeypatch.setattr(settings, "YOLO_MODEL_PATH", str(ruta))
     monkeypatch.setattr(InferenceService, "_modelo", None)
     assert InferenceService().modelo_disponible is existe
+
+
+def _jpeg():
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def test_la_foto_del_celular_sin_tipo_de_imagen_se_acepta_por_su_contenido():
+    # La app la sube como application/octet-stream; antes se rechazaba con 400.
+    from app.routers.inferencia import es_imagen
+    assert es_imagen("application/octet-stream", _jpeg()) is True
+    assert es_imagen(None, _jpeg()) is True
+    assert es_imagen("image/jpeg", b"") is True
+
+
+def test_un_archivo_que_no_es_imagen_se_rechaza():
+    from app.routers.inferencia import es_imagen
+    assert es_imagen("application/octet-stream", b"%PDF-1.4 no es una foto") is False
+    assert es_imagen("text/plain", b"hola") is False
