@@ -47,10 +47,14 @@ class InventarioService:
         sucursal_id: int,
         imagen_url: str | None = None,
         tipo_operacion: str = "entrada",
+        registrar: bool = True,
     ) -> InferenciaResponse:
         detecciones_raw = self.yolo.detectar(image_bytes)
 
         tipo_movimiento = "entrada" if tipo_operacion == "entrada" else "salida"
+        # Un conteo solo informa lo que hay: nunca mueve el stock (antes se
+        # registraba como salida).
+        mover_stock = registrar and tipo_operacion != "conteo"
 
         sesion_id = None
         if self.sesion_repo is not None and detecciones_raw:
@@ -84,6 +88,8 @@ class InventarioService:
                     imagen_url=imagen_url,
                 )
 
+            if not mover_stock:
+                continue
             await self.movimiento_repo.crear_movimiento(
                 producto_id=det["producto_id"],
                 usuario_id=usuario_id,
@@ -97,7 +103,14 @@ class InventarioService:
             movimientos_creados += 1
 
         if sesion_id is not None and self.sesion_repo is not None:
-            await self.sesion_repo.incrementar_detectados(sesion_id, movimientos_creados)
+            # Unidades detectadas, se registren o no (en "solo detectar" el
+            # usuario confirma despues y la sesion igual debe reflejarlas).
+            await self.sesion_repo.incrementar_detectados(
+                sesion_id, sum(d.cantidad for d in detecciones_out)
+            )
+            # Las detecciones y el conteo solo hacen flush: sin este commit se
+            # perdian cuando no se registraba ningun movimiento.
+            await self.db.commit()
 
         return InferenciaResponse(
             detecciones=detecciones_out,

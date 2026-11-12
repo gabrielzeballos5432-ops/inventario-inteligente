@@ -19,6 +19,9 @@ class DetectionService {
         .toList();
   }
 
+  /// Detecta productos en la foto SIN tocar el stock: el usuario revisa y
+  /// corrige el resultado, y la entrada se registra al confirmar
+  /// (`InventarioProvider.confirmarDeteccion`).
   Future<ResultadoInferencia> detectFromUpload(
     List<int> bytes,
     String fileName,
@@ -28,6 +31,7 @@ class DetectionService {
       fieldName: 'imagen',
       fileName: fileName,
       bytes: bytes,
+      fields: const {'tipo_operacion': 'entrada', 'registrar': 'false'},
     );
     return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
   }

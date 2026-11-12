@@ -1,0 +1,70 @@
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+
+from app.services.inventario_service import InventarioService
+
+
+def servicio(detecciones):
+    db = SimpleNamespace(commit=AsyncMock())
+    producto_repo = SimpleNamespace(
+        obtener_por_id=AsyncMock(side_effect=lambda pid: SimpleNamespace(id=pid, nombre=f"P{pid}"))
+    )
+    movimiento_repo = SimpleNamespace(db=db, crear_movimiento=AsyncMock())
+    sesion_repo = SimpleNamespace(
+        crear=AsyncMock(return_value=SimpleNamespace(id=7)),
+        incrementar_detectados=AsyncMock(),
+    )
+    deteccion_repo = SimpleNamespace(crear=AsyncMock())
+    yolo = SimpleNamespace(detectar=Mock(return_value=detecciones))
+    svc = InventarioService(producto_repo, movimiento_repo, yolo, sesion_repo, deteccion_repo)
+    return svc, movimiento_repo, sesion_repo, deteccion_repo, db
+
+
+DOS = [
+    {"producto_id": 21, "cantidad": 1, "confianza": 0.8},
+    {"producto_id": 22, "cantidad": 2, "confianza": 0.7},
+]
+
+
+def test_solo_detectar_no_mueve_stock_pero_guarda_la_auditoria():
+    svc, mov, sesion, det, db = servicio(DOS)
+    r = asyncio.run(svc.procesar_inferencia(b"img", 1, 1, registrar=False))
+    mov.crear_movimiento.assert_not_awaited()
+    assert r.movimientos_creados == 0
+    assert r.sesion_id == 7
+    assert [d.cantidad for d in r.detecciones] == [1, 2]
+    assert det.crear.await_count == 2
+    sesion.incrementar_detectados.assert_awaited_once_with(7, 3)
+    db.commit.assert_awaited()
+
+
+def test_registrar_directo_sigue_creando_entradas_ia():
+    svc, mov, *_ = servicio(DOS)
+    r = asyncio.run(svc.procesar_inferencia(b"img", 1, 1))
+    assert mov.crear_movimiento.await_count == 2
+    assert r.movimientos_creados == 2
+    assert all(c.kwargs["tipo"] == "entrada" and c.kwargs["origen"] == "ia"
+               for c in mov.crear_movimiento.await_args_list)
+
+
+def test_un_conteo_nunca_mueve_el_stock():
+    # Antes un conteo se registraba como salida de stock.
+    svc, mov, *_ = servicio(DOS)
+    r = asyncio.run(svc.procesar_inferencia(b"img", 1, 1, tipo_operacion="conteo"))
+    mov.crear_movimiento.assert_not_awaited()
+    assert r.movimientos_creados == 0
+
+
+@pytest.mark.parametrize("existe", [True, False])
+def test_modelo_disponible_si_el_archivo_existe_aunque_no_este_cargado(tmp_path, monkeypatch, existe):
+    from app.core.config import settings
+    from app.yolo.inference_service import InferenceService
+    ruta = tmp_path / "best.pt"
+    if existe:
+        ruta.write_bytes(b"x")
+    monkeypatch.setattr(settings, "YOLO_MODEL_PATH", str(ruta))
+    monkeypatch.setattr(InferenceService, "_modelo", None)
+    assert InferenceService().modelo_disponible is existe

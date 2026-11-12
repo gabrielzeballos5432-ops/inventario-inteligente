@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/models/detection_record.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/providers/inventario_provider.dart';
+import '../../../shared/widgets/boton_seguro.dart';
 import '../../../shared/widgets/section_card.dart';
 
 class DetectionPage extends StatefulWidget {
@@ -18,7 +21,17 @@ class _DetectionPageState extends State<DetectionPage> {
   final _picker = ImagePicker();
 
   bool _capturando = false;
+  bool _registrando = false;
   Uint8List? _imageBytes;
+
+  /// Cantidad a registrar por producto, editable antes de confirmar. Arranca
+  /// con lo que conto la IA; 0 quita el producto (deteccion equivocada).
+  final Map<int, int> _cantidades = {};
+  String? _errorRegistro;
+
+  /// Resultado al que corresponden [_cantidades]: con uno nuevo se reinician
+  /// a lo que conto la IA.
+  ResultadoInferencia? _resultadoEditado;
 
   @override
   void initState() {
@@ -54,10 +67,14 @@ class _DetectionPageState extends State<DetectionPage> {
       final bytes = await image.readAsBytes();
       setState(() => _imageBytes = bytes);
 
+      if (!mounted) return;
       await context.read<InventarioProvider>().enviarImagen(bytes, image.name);
 
       if (!mounted) return;
-      setState(() => _capturando = false);
+      setState(() {
+        _capturando = false;
+        _errorRegistro = null;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -66,10 +83,75 @@ class _DetectionPageState extends State<DetectionPage> {
     }
   }
 
+  int get _unidades => _cantidades.values.fold(0, (a, b) => a + b);
+
+  Future<void> _registrar() async {
+    if (_registrando || _unidades == 0) return;
+    setState(() {
+      _registrando = true;
+      _errorRegistro = null;
+    });
+    try {
+      final guardados = await context
+          .read<InventarioProvider>()
+          .confirmarDeteccion([
+            for (final e in _cantidades.entries)
+              (productoId: e.key, cantidad: e.value),
+          ]);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Entrada registrada: $_unidades unidad(es) en $guardados producto(s).',
+          ),
+        ),
+      );
+      setState(() {
+        _registrando = false;
+        _imageBytes = null;
+        _cantidades.clear();
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _registrando = false;
+          _errorRegistro = e.detalle;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _registrando = false;
+          _errorRegistro =
+              'No se pudo registrar. Revisa la conexion y el historial antes de reintentar.';
+        });
+      }
+    }
+  }
+
+  void _descartar() {
+    context.read<InventarioProvider>().descartarDeteccion();
+    setState(() {
+      _imageBytes = null;
+      _cantidades.clear();
+      _errorRegistro = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final inventario = context.watch<InventarioProvider>();
     final resultado = inventario.ultimaInferencia;
+    if (!identical(resultado, _resultadoEditado)) {
+      _resultadoEditado = resultado;
+      _cantidades
+        ..clear()
+        ..addEntries(
+          (resultado?.detecciones ?? const <Deteccion>[]).map(
+            (d) => MapEntry(d.productoId, d.cantidad),
+          ),
+        );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -77,8 +159,11 @@ class _DetectionPageState extends State<DetectionPage> {
         // El titulo de la pestana ya lo muestra la AppBar.
         Text(
           _soportaCamara
-              ? 'Toma una foto para detectar productos y registrar entrada de inventario.'
-              : 'Selecciona una imagen de los productos para detectarlos y registrar la entrada de inventario. La captura con camara esta disponible en la aplicacion movil.',
+              ? 'Toma una foto de los productos: la IA los cuenta y tu revisas '
+                  'el resultado antes de registrar la entrada.'
+              : 'Selecciona una imagen de los productos: la IA los cuenta y tu '
+                  'revisas el resultado antes de registrar la entrada. La captura '
+                  'con camara esta disponible en la aplicacion movil.',
           style: TextStyle(color: context.textoSecundario),
         ),
         const SizedBox(height: 20),
@@ -147,7 +232,11 @@ class _DetectionPageState extends State<DetectionPage> {
               children: [
                 Icon(Icons.check_circle, color: context.paleta.positivo, size: 20),
                 const SizedBox(width: 8),
-                const Text('Modelo de IA cargado. Deteccion activa.'),
+                // Expanded: sin el, el texto no se ajusta al ancho del
+                // telefono y la fila se desbordaba (franja amarilla).
+                const Expanded(
+                  child: Text('Modelo de IA cargado. Deteccion activa.'),
+                ),
               ],
             ),
           ),
@@ -187,49 +276,112 @@ class _DetectionPageState extends State<DetectionPage> {
         if (resultado != null && resultado.detecciones.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
-            'Resultado',
+            'Revisa antes de registrar',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Corrige la cantidad si la IA conto mal. Deja en 0 lo que no '
+            'corresponda. El stock no cambia hasta que confirmes.',
+            style: TextStyle(color: context.textoSecundario),
           ),
           const SizedBox(height: 10),
           ...resultado.detecciones.map(
             (d) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: SectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      d.productoNombre,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Cantidad detectada: ${d.cantidad}'),
-                    Text(
-                      'Confianza: ${(d.confianza * 100).toStringAsFixed(1)}%',
-                    ),
-                    if (d.confianza >= 0.5)
-                      Row(
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.check_circle, color: context.paleta.positivo, size: 16),
-                          SizedBox(width: 4),
-                          Text('Deteccion confiable'),
+                          Text(
+                            d.productoNombre,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'La IA conto ${d.cantidad} · confianza '
+                            '${(d.confianza * 100).toStringAsFixed(0)}%',
+                            style: TextStyle(color: context.textoSecundario),
+                          ),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      tooltip: 'Quitar una unidad de ${d.productoNombre}',
+                      onPressed: _registrando ||
+                              (_cantidades[d.productoId] ?? 0) == 0
+                          ? null
+                          : () => setState(
+                              () => _cantidades[d.productoId] =
+                                  (_cantidades[d.productoId] ?? 0) - 1,
+                            ),
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    SizedBox(
+                      width: 32,
+                      child: Text(
+                        '${_cantidades[d.productoId] ?? 0}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Agregar una unidad de ${d.productoNombre}',
+                      onPressed: _registrando
+                          ? null
+                          : () => setState(
+                              () => _cantidades[d.productoId] =
+                                  (_cantidades[d.productoId] ?? 0) + 1,
+                            ),
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-          if (resultado.movimientosCreados > 0)
-            SectionCard(
-              child: Text(
-                '${resultado.movimientosCreados} movimiento(s) de entrada registrado(s) automaticamente.',
-                style: TextStyle(color: context.paleta.positivo),
-              ),
+          if (_errorRegistro != null) ...[
+            Text(
+              _errorRegistro!,
+              style: TextStyle(color: context.paleta.negativo),
             ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _registrando ? null : _descartar,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 50),
+                  ),
+                  child: const Text('Descartar'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: BotonSeguro(
+                  onPressed: _registrando || _unidades == 0 ? null : _registrar,
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
+                  child: Text(
+                    _registrando
+                        ? 'Registrando...'
+                        : 'Registrar entrada ($_unidades)',
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );

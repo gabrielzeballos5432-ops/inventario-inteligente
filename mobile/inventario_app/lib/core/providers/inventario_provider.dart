@@ -274,6 +274,42 @@ class InventarioProvider extends ChangeNotifier {
     return resultado.guardados;
   }
 
+  /// Registra la entrada de lo detectado por la IA, ya revisado por el
+  /// usuario (cantidades corregidas; las filas en 0 no se envian). Va por
+  /// lote con origen "ia" y la sesion de camara: el backend asigna la razon
+  /// "Deteccion IA" y guarda todo o nada. Como en registrarLote, no se
+  /// atrapa ApiException para que el detalle llegue a la pantalla.
+  Future<int> confirmarDeteccion(
+    List<({int productoId, int cantidad})> items,
+  ) async {
+    final filas = items.where((i) => i.cantidad > 0).toList();
+    if (filas.isEmpty) return 0;
+    final resultado = await _productService.registrarLote(
+      tipo: 'entrada',
+      items: filas,
+      origen: 'ia',
+      sesionId: _ultimaInferencia?.sesionId,
+    );
+    _ultimaInferencia = null;
+    // La entrada ya quedo guardada: si falla la recarga (por ejemplo, se
+    // corta la red justo despues), no debe parecer que fallo el registro, o
+    // el usuario reintentaria y la duplicaria.
+    try {
+      await cargarInventario();
+      await cargarHistorial();
+    } catch (e) {
+      debugPrint('recargar tras confirmar deteccion: $e');
+      notifyListeners();
+    }
+    return resultado.guardados;
+  }
+
+  /// Descarta el resultado de la deteccion sin registrar nada.
+  void descartarDeteccion() {
+    _ultimaInferencia = null;
+    notifyListeners();
+  }
+
   Future<void> registrarVenta(Map<String, dynamic> payload) async {
     await _productService.registrarVenta(payload);
     await cargarInventario();

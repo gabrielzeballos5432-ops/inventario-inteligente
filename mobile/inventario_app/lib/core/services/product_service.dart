@@ -142,15 +142,20 @@ class ProductService {
   Future<ResultadoLote> registrarLote({
     required String tipo,
     required List<({int productoId, int cantidad})> items,
-    required int razonId,
+    int? razonId,
     int? sucursalDestinoId,
+    String origen = 'manual',
+    int? sesionId,
   }) async {
     final json = await _apiClient.postJson(
       ApiConfig.movimientoLote,
       {
         'tipo': tipo,
-        // Obligatoria: el backend rechaza un movimiento manual sin razon.
-        'razon_movimiento_id': razonId,
+        // Obligatoria en lo manual: el backend la rechaza si falta. Con
+        // origen "ia" el backend asigna sola la razon "Deteccion IA".
+        if (razonId != null) 'razon_movimiento_id': razonId,
+        'origen': origen,
+        if (sesionId != null) 'sesion_id': sesionId,
         // Solo en un traspaso ("Salida a sucursal"): el backend registra la
         // entrada en esta sucursal en la misma transaccion.
         if (sucursalDestinoId != null) 'sucursal_destino_id': sucursalDestinoId,

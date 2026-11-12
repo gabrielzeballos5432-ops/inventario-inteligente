@@ -28,10 +28,15 @@ class ResultadoInferencia {
   final int totalProductos;
   final int movimientosCreados;
 
+  /// Sesion de camara de la deteccion: la entrada confirmada se registra con
+  /// ella, para que quede trazado que salio de esta foto.
+  final int? sesionId;
+
   ResultadoInferencia({
     required this.detecciones,
     required this.totalProductos,
     required this.movimientosCreados,
+    this.sesionId,
   });
 
   factory ResultadoInferencia.fromJson(Map<String, dynamic> json) {
@@ -43,6 +48,7 @@ class ResultadoInferencia {
           [],
       totalProductos: json['total_productos'] as int? ?? 0,
       movimientosCreados: json['movimientos_creados'] as int? ?? 0,
+      sesionId: json['sesion_id'] as int?,
     );
   }
 }

@@ -19,6 +19,11 @@ router = APIRouter(prefix="/api/inference", tags=["Inferencia"])
 async def realizar_inferencia(
     imagen: UploadFile = File(...),
     tipo_operacion: str = Form("entrada"),
+    # False: solo detecta (y guarda la sesion y las detecciones como
+    # auditoria) sin mover el stock. La app muestra el resultado para que
+    # el usuario lo corrija y lo registra al confirmar, por lote con origen
+    # "ia". True conserva el comportamiento anterior: registra al instante.
+    registrar: bool = Form(True),
     db: AsyncSession = Depends(get_db),
     usuario_id: int = Depends(get_current_user_id),
     sucursal_id: int = Depends(get_sucursal_activa),
@@ -62,6 +67,7 @@ async def realizar_inferencia(
             sucursal_id,
             imagen_url=imagen.filename,
             tipo_operacion=tipo_operacion,
+            registrar=registrar,
         )
     except RuntimeError as exc:
         await db.rollback()

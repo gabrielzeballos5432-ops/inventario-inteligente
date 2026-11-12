@@ -29,7 +29,10 @@ class InferenceService:
 
     @property
     def modelo_disponible(self) -> bool:
-        return InferenceService._modelo is not None
+        # El modelo se carga en la primera deteccion; mientras tanto basta
+        # con que el archivo exista. Si no, /api/health decia "IA pendiente"
+        # aunque el modelo estuviera instalado.
+        return InferenceService._modelo is not None or Path(settings.YOLO_MODEL_PATH).exists()
 
     def cargar_modelo(self) -> None:
         ruta = settings.YOLO_MODEL_PATH
