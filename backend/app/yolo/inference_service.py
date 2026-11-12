@@ -64,7 +64,10 @@ class InferenceService:
         # marca EXIF que dice como girarla. Sin aplicarla, el modelo recibe la
         # imagen girada 90 grados.
         imagen = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes)))
-        img_array = np.array(imagen.convert("RGB"))
+        # Ultralytics interpreta un arreglo numpy como BGR (convencion de
+        # OpenCV). Pasarle RGB intercambia rojo y azul y el modelo, entrenado
+        # con colores reales, falla mas: se invierten los canales.
+        img_array = np.ascontiguousarray(np.array(imagen.convert("RGB"))[:, :, ::-1])
 
         resultados = self.modelo(img_array, conf=settings.YOLO_CONFIDENCE_THRESHOLD)
 
