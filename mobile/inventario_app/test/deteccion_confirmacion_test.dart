@@ -38,7 +38,7 @@ void main() {
             headers: {'content-type': 'application/json; charset=utf-8'},
           );
         }
-        if (ruta == '/api/inference/') {
+        if (ruta == '/api/inference/' || ruta == '/api/inference/vista-previa') {
           return http.Response(
             jsonEncode({
               'detecciones': [
@@ -55,8 +55,21 @@ void main() {
         }
         if (ruta == '/api/inventario/movimientos/lote') {
           return http.Response(
-            jsonEncode({'tipo': 'entrada', 'guardados': 1, 'resultados': []}),
+            jsonEncode({
+              'tipo': 'entrada',
+              'guardados': 1,
+              'resultados': [
+                {
+                  'fila': 1,
+                  'producto_id': 22,
+                  'producto_nombre': 'Sombra de ojos líquida',
+                  'correcto': true,
+                  'reactivado': true,
+                },
+              ],
+            }),
             201,
+            headers: {'content-type': 'application/json; charset=utf-8'},
           );
         }
         if (ruta == '/api/health') {
@@ -122,7 +135,15 @@ void main() {
       {'producto_id': 22, 'cantidad': 3},
     ]);
     expect(find.text('Revisa antes de registrar'), findsNothing);
-    expect(find.textContaining('Entrada registrada'), findsOneWidget);
+    // El total es el confirmado (no 0) y avisa que el producto, que estaba
+    // dado de baja, volvio a activarse.
+    expect(
+      find.text(
+        'Entrada registrada: 3 unidad(es) en 1 producto(s). '
+        'Se reactivo: Sombra de ojos líquida.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('descartar no registra nada', (tester) async {
@@ -159,5 +180,17 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Revisa antes de registrar'), findsNothing);
+  });
+
+  testWidgets('la vista previa en vivo usa su endpoint y no reemplaza la deteccion', (
+    tester,
+  ) async {
+    final inventario = await montar(tester);
+    final antes = inventario.ultimaInferencia;
+    final vista = await inventario.vistaPrevia([4, 5, 6]);
+    expect(peticiones.last.url.path, '/api/inference/vista-previa');
+    expect(vista.detecciones, isNotEmpty);
+    // La deteccion que se revisa y registra sigue siendo la de la foto final.
+    expect(identical(inventario.ultimaInferencia, antes), isTrue);
   });
 }

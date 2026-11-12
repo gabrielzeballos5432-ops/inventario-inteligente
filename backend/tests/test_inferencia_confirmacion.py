@@ -90,3 +90,18 @@ def test_un_archivo_que_no_es_imagen_se_rechaza():
     from app.routers.inferencia import es_imagen
     assert es_imagen("application/octet-stream", b"%PDF-1.4 no es una foto") is False
     assert es_imagen("text/plain", b"hola") is False
+
+
+def test_la_respuesta_trae_un_recuadro_por_unidad():
+    # La app los dibuja sobre la foto para que se vea que conto la IA.
+    caja = {"x1": 0.1, "y1": 0.2, "x2": 0.4, "y2": 0.8, "confianza": 0.8}
+    otra = {"x1": 0.5, "y1": 0.2, "x2": 0.9, "y2": 0.8, "confianza": 0.6}
+    svc, *_ = servicio([
+        {"producto_id": 21, "cantidad": 2, "confianza": 0.8, "cajas": [caja, otra]},
+    ])
+    r = asyncio.run(svc.procesar_inferencia(b"img", 1, 1, registrar=False))
+    cajas = r.detecciones[0].cajas
+    assert len(cajas) == r.detecciones[0].cantidad == 2
+    assert (cajas[0].x1, cajas[0].y2, cajas[1].confianza) == (0.1, 0.8, 0.6)
+    # Asi viajan en el JSON que recibe la app.
+    assert r.model_dump()["detecciones"][0]["cajas"][0]["x2"] == 0.4

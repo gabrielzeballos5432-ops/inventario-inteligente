@@ -58,6 +58,7 @@ class ApiConfig {
   static const String historial = '/api/inventario/historial';
   static const String stockBajo = '/api/inventario/stock-bajo';
   static const String inferencia = '/api/inference/';
+  static const String inferenciaVistaPrevia = '/api/inference/vista-previa';
   static const String productos = '/api/productos/';
   static const String ventas = '/api/ventas/';
   static const String movimiento = '/api/inventario/movimiento';

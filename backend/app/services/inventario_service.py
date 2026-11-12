@@ -77,6 +77,7 @@ class InventarioService:
                     producto_nombre=producto.nombre,
                     confianza=det["confianza"],
                     cantidad=det["cantidad"],
+                    cajas=det.get("cajas", []),
                 )
             )
 
@@ -211,6 +212,12 @@ class InventarioService:
         por_id = {p.id: p for p in productos}
         stocks = await self.producto_repo.obtener_stocks(ids_con_orden, sucursal_id)
 
+        # La entrada que confirma el usuario tras la deteccion IA reactiva el
+        # producto dado de baja: si la camara lo reconoce y alguien confirma
+        # que llego, vuelve a venderse. A mano se sigue rechazando, para no
+        # devolver un producto dado de baja por un descuido.
+        reactiva = origen == "ia" and tipo == "entrada"
+
         resultados: list[MovimientoLoteResultado] = []
         vistos: set[int] = set()
         for indice, item in enumerate(items, start=1):
@@ -219,7 +226,7 @@ class InventarioService:
             detalle: str | None = None
             if producto is None:
                 detalle = f"Fila {indice}: el producto {item.producto_id} no existe"
-            elif not producto.activo:
+            elif not producto.activo and not reactiva:
                 detalle = f"Fila {indice}: '{nombre}' esta dado de baja"
             elif item.producto_id in vistos:
                 detalle = f"Fila {indice}: '{nombre}' esta repetido en el lote"
@@ -239,6 +246,9 @@ class InventarioService:
                     producto_nombre=nombre,
                     correcto=detalle is None,
                     detalle=detalle,
+                    reactivado=(
+                        detalle is None and producto is not None and not producto.activo
+                    ),
                 )
             )
 
@@ -246,6 +256,12 @@ class InventarioService:
             # Nada se crea: devolvemos los rechazos para que el router muestre
             # de que se corregiria en cada fila.
             return resultados, []
+
+        # En la misma transaccion que los movimientos: crear_lote hace el
+        # commit, y si falla tampoco queda reactivado.
+        for resultado in resultados:
+            if resultado.reactivado:
+                por_id[resultado.producto_id].activo = True
 
         lineas = [(i.producto_id, i.cantidad) for i in items]
         movimientos = await self.movimiento_repo.crear_lote(

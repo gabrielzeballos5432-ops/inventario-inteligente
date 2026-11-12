@@ -166,10 +166,21 @@ class ProductoConStock extends Product {
 class ResultadoLote {
   final int guardados;
 
-  ResultadoLote({required this.guardados});
+  /// Productos que estaban dados de baja y esta entrada volvio a activar
+  /// (solo pasa al confirmar una deteccion de la IA).
+  final List<String> reactivados;
+
+  ResultadoLote({required this.guardados, this.reactivados = const []});
 
   factory ResultadoLote.fromJson(Map<String, dynamic> json) {
-    return ResultadoLote(guardados: json['guardados'] as int? ?? 0);
+    return ResultadoLote(
+      guardados: json['guardados'] as int? ?? 0,
+      reactivados: [
+        for (final r in json['resultados'] as List? ?? const [])
+          if ((r as Map<String, dynamic>)['reactivado'] == true)
+            r['producto_nombre'] as String? ?? 'Producto ${r['producto_id']}',
+      ],
+    );
   }
 }
 

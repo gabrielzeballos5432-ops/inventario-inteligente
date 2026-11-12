@@ -117,6 +117,11 @@ class InventarioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Recuadros en vivo mientras se apunta con la camara. No cambia el estado
+  /// del provider: la deteccion que cuenta es la de la foto final.
+  Future<ResultadoInferencia> vistaPrevia(List<int> bytes) =>
+      _detectionService.vistaPrevia(bytes);
+
   Future<bool> enviarImagen(List<int> bytes, String fileName) async {
     _cargando = true;
     // Una foto nueva reemplaza el resultado anterior: si falla, no debe
@@ -287,11 +292,11 @@ class InventarioProvider extends ChangeNotifier {
   /// lote con origen "ia" y la sesion de camara: el backend asigna la razon
   /// "Deteccion IA" y guarda todo o nada. Como en registrarLote, no se
   /// atrapa ApiException para que el detalle llegue a la pantalla.
-  Future<int> confirmarDeteccion(
+  Future<ResultadoLote> confirmarDeteccion(
     List<({int productoId, int cantidad})> items,
   ) async {
     final filas = items.where((i) => i.cantidad > 0).toList();
-    if (filas.isEmpty) return 0;
+    if (filas.isEmpty) return ResultadoLote(guardados: 0);
     final resultado = await _productService.registrarLote(
       tipo: 'entrada',
       items: filas,
@@ -309,7 +314,7 @@ class InventarioProvider extends ChangeNotifier {
       debugPrint('recargar tras confirmar deteccion: $e');
       notifyListeners();
     }
-    return resultado.guardados;
+    return resultado;
   }
 
   /// Descarta el resultado de la deteccion sin registrar nada.

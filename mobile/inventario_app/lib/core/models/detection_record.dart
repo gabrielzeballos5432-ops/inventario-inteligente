@@ -1,16 +1,49 @@
 import 'json_utils.dart';
 
+/// Recuadro de una unidad detectada, en proporcion de la foto (0 a 1) y con
+/// el origen arriba a la izquierda. Se dibuja sobre la foto multiplicando por
+/// el tamano con que se muestra.
+class Caja {
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
+  final double confianza;
+
+  const Caja({
+    required this.x1,
+    required this.y1,
+    required this.x2,
+    required this.y2,
+    required this.confianza,
+  });
+
+  factory Caja.fromJson(Map<String, dynamic> json) {
+    return Caja(
+      x1: parseDouble(json['x1']),
+      y1: parseDouble(json['y1']),
+      x2: parseDouble(json['x2']),
+      y2: parseDouble(json['y2']),
+      confianza: parseDouble(json['confianza']),
+    );
+  }
+}
+
 class Deteccion {
   final int productoId;
   final String productoNombre;
   final double confianza;
   final int cantidad;
 
+  /// Un recuadro por unidad contada. Vacio si el servidor no los envia.
+  final List<Caja> cajas;
+
   Deteccion({
     required this.productoId,
     required this.productoNombre,
     required this.confianza,
     required this.cantidad,
+    this.cajas = const [],
   });
 
   factory Deteccion.fromJson(Map<String, dynamic> json) {
@@ -19,6 +52,10 @@ class Deteccion {
       productoNombre: json['producto_nombre'] as String? ?? '',
       confianza: parseDouble(json['confianza']),
       cantidad: json['cantidad'] as int? ?? 1,
+      cajas: [
+        for (final c in json['cajas'] as List? ?? const [])
+          Caja.fromJson(c as Map<String, dynamic>),
+      ],
     );
   }
 }

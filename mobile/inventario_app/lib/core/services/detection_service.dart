@@ -36,6 +36,19 @@ class DetectionService {
     return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Recuadros para la camara en vivo: el servidor no guarda nada. Timeout
+  /// corto: un cuadro que tarda mas ya no corresponde a lo que se ve.
+  Future<ResultadoInferencia> vistaPrevia(List<int> bytes) async {
+    final json = await _apiClient.postMultipart(
+      ApiConfig.inferenciaVistaPrevia,
+      fieldName: 'imagen',
+      fileName: 'vista.jpg',
+      bytes: bytes,
+      timeout: const Duration(seconds: 6),
+    );
+    return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<Map<String, dynamic>> salud() async {
     final json = await _apiClient.getJson(ApiConfig.salud);
     return json as Map<String, dynamic>;

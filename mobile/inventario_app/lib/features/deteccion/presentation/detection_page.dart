@@ -9,6 +9,8 @@ import '../../../core/network/api_client.dart';
 import '../../../core/providers/inventario_provider.dart';
 import '../../../shared/widgets/boton_seguro.dart';
 import '../../../shared/widgets/section_card.dart';
+import 'camara_en_vivo_page.dart';
+import 'foto_con_recuadros.dart';
 
 class DetectionPage extends StatefulWidget {
   const DetectionPage({super.key});
@@ -53,22 +55,16 @@ class _DetectionPageState extends State<DetectionPage> {
     });
 
     try {
-      final image = await _picker.pickImage(
-        source: _soportaCamara ? ImageSource.camera : ImageSource.gallery,
-        imageQuality: 85,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
-      if (image == null) {
-        setState(() => _capturando = false);
+      final foto = await _obtenerFoto();
+      if (foto == null) {
+        if (mounted) setState(() => _capturando = false);
         return;
       }
-
-      final bytes = await image.readAsBytes();
+      final (bytes, nombre) = foto;
       setState(() => _imageBytes = bytes);
 
       if (!mounted) return;
-      await context.read<InventarioProvider>().enviarImagen(bytes, image.name);
+      await context.read<InventarioProvider>().enviarImagen(bytes, nombre);
 
       if (!mounted) return;
       setState(() {
@@ -83,6 +79,28 @@ class _DetectionPageState extends State<DetectionPage> {
     }
   }
 
+  /// En el celular abre la camara con recuadros en vivo; en web y escritorio,
+  /// el selector de archivos. Null si el usuario cancela.
+  Future<(Uint8List, String)?> _obtenerFoto() async {
+    if (_soportaCamara) {
+      final inventario = context.read<InventarioProvider>();
+      final bytes = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(
+          builder: (_) => CamaraEnVivoPage(vistaPrevia: inventario.vistaPrevia),
+        ),
+      );
+      return bytes == null ? null : (bytes, 'foto.jpg');
+    }
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1920,
+      maxHeight: 1920,
+    );
+    if (image == null) return null;
+    return (await image.readAsBytes(), image.name);
+  }
+
   int get _unidades => _cantidades.values.fold(0, (a, b) => a + b);
 
   Future<void> _registrar() async {
@@ -91,18 +109,23 @@ class _DetectionPageState extends State<DetectionPage> {
       _registrando = true;
       _errorRegistro = null;
     });
+    // Se lee antes de confirmar: al terminar, la pantalla se limpia y el
+    // total quedaba en 0 ("Entrada registrada: 0 unidad(es)").
+    final unidades = _unidades;
     try {
-      final guardados = await context
-          .read<InventarioProvider>()
-          .confirmarDeteccion([
-            for (final e in _cantidades.entries)
-              (productoId: e.key, cantidad: e.value),
-          ]);
+      final lote = await context.read<InventarioProvider>().confirmarDeteccion([
+        for (final e in _cantidades.entries)
+          (productoId: e.key, cantidad: e.value),
+      ]);
       if (!mounted) return;
+      final reactivados = lote.reactivados.isEmpty
+          ? ''
+          : ' Se reactivo: ${lote.reactivados.join(', ')}.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Entrada registrada: $_unidades unidad(es) en $guardados producto(s).',
+            'Entrada registrada: $unidades unidad(es) en '
+            '${lote.guardados} producto(s).$reactivados',
           ),
         ),
       );
@@ -244,13 +267,11 @@ class _DetectionPageState extends State<DetectionPage> {
         if (_imageBytes != null) ...[
           const SizedBox(height: 16),
           SectionCard(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.memory(
-                _imageBytes!,
-                height: 240,
-                fit: BoxFit.cover,
-              ),
+            // Foto completa con un recuadro por unidad contada: deja ver si
+            // la IA conto dos veces lo mismo o se salto uno.
+            child: FotoConRecuadros(
+              bytes: _imageBytes!,
+              detecciones: resultado?.detecciones ?? const [],
             ),
           ),
         ],
@@ -292,6 +313,16 @@ class _DetectionPageState extends State<DetectionPage> {
               child: SectionCard(
                 child: Row(
                   children: [
+                    // Mismo color que sus recuadros en la foto.
+                    Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: colorDeDeteccion(d.productoId),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

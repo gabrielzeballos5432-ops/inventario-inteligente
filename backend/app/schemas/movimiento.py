@@ -83,6 +83,9 @@ class MovimientoLoteResultado(BaseModel):
     movimiento_id: Optional[int] = None
     correcto: bool
     detalle: Optional[str] = None
+    # El producto estaba dado de baja y esta entrada (confirmada desde la
+    # deteccion IA) lo volvio a activar.
+    reactivado: bool = False
 
 
 class MovimientoLoteOut(BaseModel):
