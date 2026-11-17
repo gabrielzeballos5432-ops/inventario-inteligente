@@ -177,6 +177,45 @@ class InventarioService:
             )
         return razon.id, destino
 
+    async def lote_ya_registrado(
+        self,
+        clave: str,
+        usuario_id: int,
+        tipo: str,
+        items: list[MovimientoLoteItem],
+    ) -> list[MovimientoLoteResultado] | None:
+        """Resultado de un lote que ya se guardo con esta clave, o None.
+
+        La app reenvia un lote cuando no llego la respuesta (cola offline): si
+        ya estaba guardado se devuelve tal cual, sin mover el stock otra vez.
+        Una clave repetida con otro contenido es un error del cliente y se
+        rechaza, en vez de responder con movimientos que no son los pedidos.
+        """
+        previos = await self.movimiento_repo.obtener_por_clave(clave, usuario_id)
+        if not previos:
+            return None
+        pedido = sorted((tipo, i.producto_id, i.cantidad) for i in items)
+        guardado = sorted((m.tipo, m.producto_id, m.cantidad) for m in previos)
+        if pedido != guardado:
+            raise MovimientoValidationError(
+                "La clave de idempotencia ya se usó para otro lote de movimientos."
+            )
+        por_producto = {m.producto_id: m for m in previos}
+        resultados = []
+        for indice, item in enumerate(items, start=1):
+            mov = por_producto[item.producto_id]
+            producto = mov.__dict__.get("producto")
+            resultados.append(
+                MovimientoLoteResultado(
+                    fila=indice,
+                    producto_id=item.producto_id,
+                    producto_nombre=producto.nombre if producto else None,
+                    movimiento_id=mov.id,
+                    correcto=True,
+                )
+            )
+        return resultados
+
     async def registrar_lote(
         self,
         tipo: str,
@@ -187,6 +226,7 @@ class InventarioService:
         sesion_id: int | None = None,
         razon_movimiento_id: int | None = None,
         sucursal_destino_id: int | None = None,
+        clave_idempotencia: str | None = None,
     ) -> tuple[list[MovimientoLoteResultado], list[Movimiento]]:
         """Registra varios movimientos del mismo tipo en una sola operacion.
 
@@ -274,6 +314,7 @@ class InventarioService:
             sesion_id=sesion_id,
             sucursal_relacionada_id=destino.id if destino else None,
             confirmar=destino is None,
+            clave_idempotencia=clave_idempotencia,
         )
         if destino is not None:
             await self.movimiento_repo.crear_lote(

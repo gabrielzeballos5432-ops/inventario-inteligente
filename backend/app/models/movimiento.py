@@ -5,6 +5,7 @@ from sqlalchemy import (
     ForeignKey,
     DateTime,
     CheckConstraint,
+    Index,
     UniqueConstraint,
     func,
 )
@@ -82,6 +83,10 @@ class Movimiento(Base):
     cantidad = Column(Integer, nullable=False)
     stock_resultante = Column(Integer, nullable=False)
     origen = Column(String(10), nullable=False)
+    # Clave que genera la app para un lote de movimientos. Si la conexion se
+    # corta despues de guardar y la app reenvia el mismo lote (cola offline),
+    # no se registra dos veces: se devuelve el que ya existe.
+    clave_idempotencia = Column(String(100))
     creado_en = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     producto = relationship("Producto", back_populates="movimientos")
@@ -98,3 +103,16 @@ class Movimiento(Base):
         "Movimiento", remote_side=[id], back_populates="reversiones"
     )
     reversiones = relationship("Movimiento", back_populates="movimiento_revertido")
+
+
+# Un lote no repite producto, asi que (usuario, clave, producto) identifica
+# cada fila: si dos envios del mismo lote llegaran a la vez, el segundo choca
+# aqui en vez de duplicar el stock.
+Index(
+    "uq_movimiento_clave_idempotencia",
+    Movimiento.usuario_id,
+    Movimiento.clave_idempotencia,
+    Movimiento.producto_id,
+    unique=True,
+    postgresql_where=Movimiento.clave_idempotencia.is_not(None),
+)

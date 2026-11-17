@@ -50,7 +50,7 @@ class ApiClient {
     ).replace(queryParameters: query);
   }
 
-  Map<String, String> _buildHeaders({bool includeJson = true}) {
+  Map<String, String> _buildHeaders({bool includeJson = true, int? sucursalId}) {
     final headers = <String, String>{};
     if (includeJson) {
       headers['Content-Type'] = 'application/json';
@@ -61,9 +61,11 @@ class ApiClient {
     }
     // Sucursal en la que se registra la operacion. El backend solo la
     // respeta para el administrador; al vendedor lo deja en la predeterminada.
-    final sucursalId = SucursalController.instance.activaId;
-    if (sucursalId != null) {
-      headers['X-Sucursal-Id'] = '$sucursalId';
+    // Un movimiento de la cola offline se envia con la sucursal en la que se
+    // hizo, aunque la activa haya cambiado desde entonces.
+    final sucursal = sucursalId ?? SucursalController.instance.activaId;
+    if (sucursal != null) {
+      headers['X-Sucursal-Id'] = '$sucursal';
     }
     return headers;
   }
@@ -115,9 +117,17 @@ class ApiClient {
     return response.bodyBytes;
   }
 
-  Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
+  Future<dynamic> postJson(
+    String path,
+    Map<String, dynamic> body, {
+    int? sucursalId,
+  }) async {
     final response = await _httpClient
-        .post(_buildUri(path), headers: _buildHeaders(), body: jsonEncode(body))
+        .post(
+          _buildUri(path),
+          headers: _buildHeaders(sucursalId: sucursalId),
+          body: jsonEncode(body),
+        )
         .timeout(timeoutPeticion);
     _ensureSuccess(response, path);
     if (response.body.isEmpty) return null;

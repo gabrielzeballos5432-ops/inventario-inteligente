@@ -6,6 +6,7 @@ import 'core/config/api_config.dart';
 import 'core/db/db_bootstrap.dart'
     if (dart.library.io) 'core/db/db_bootstrap_io.dart';
 import 'core/providers/auth_provider.dart';
+import 'core/providers/cola_movimientos_controller.dart';
 import 'core/providers/inventario_provider.dart';
 import 'core/providers/servidor_controller.dart';
 import 'core/providers/sucursal_controller.dart';
@@ -33,11 +34,21 @@ void main() async {
 
   final apiClient = ApiClient();
   final localDb = LocalDbService();
+  final productService = ProductService(apiClient);
   final inventarioProvider = InventarioProvider(
-    ProductService(apiClient),
+    productService,
     DetectionService(apiClient),
     localDb,
   );
+
+  // Movimientos hechos sin conexion: esperan en el telefono y se envian al
+  // volver el servidor.
+  final colaMovimientos = ColaMovimientosController(
+    productService,
+    localDb,
+    alSincronizar: () => inventarioProvider.refrescarTodo(),
+  );
+  await colaMovimientos.cargar();
 
   // Vigila que el backend responda (la laptop puede suspenderse y "desaparecer"
   // aunque el telefono siga con Wi-Fi). Al reconectar, recarga el inventario.
@@ -45,6 +56,11 @@ void main() async {
     apiClient,
     onReconectado: () => inventarioProvider.cargarInventario(),
   );
+  // Cada vez que el servidor responde se intenta vaciar la cola (no hace
+  // nada si esta vacia o si no hay sesion abierta).
+  servidorController.addListener(() {
+    if (servidorController.conectado) colaMovimientos.sincronizar();
+  });
   servidorController.iniciar();
 
   runApp(
@@ -56,6 +72,9 @@ void main() async {
         ChangeNotifierProvider.value(value: inventarioProvider),
         ChangeNotifierProvider.value(value: themeController),
         ChangeNotifierProvider.value(value: servidorController),
+        ChangeNotifierProvider<ColaMovimientosController?>.value(
+          value: colaMovimientos,
+        ),
         ChangeNotifierProvider.value(value: SucursalController.instance),
         Provider<ConfiguracionService>(
           create: (_) => ConfiguracionService(apiClient),

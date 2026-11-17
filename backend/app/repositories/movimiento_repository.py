@@ -92,6 +92,7 @@ class MovimientoRepository:
         sesion_id: Optional[int] = None,
         sucursal_relacionada_id: Optional[int] = None,
         confirmar: bool = True,
+        clave_idempotencia: Optional[str] = None,
     ) -> list[Movimiento]:
         """Crea varios movimientos del mismo tipo y ajusta el inventario.
 
@@ -142,6 +143,7 @@ class MovimientoRepository:
                 cantidad=cantidad,
                 stock_resultante=stock_resultante,
                 origen=origen,
+                clave_idempotencia=clave_idempotencia,
             )
             self.db.add(mov)
             movimientos.append(mov)
@@ -151,6 +153,20 @@ class MovimientoRepository:
         else:
             await self.db.flush()
         return movimientos
+
+    async def obtener_por_clave(self, clave: str, usuario_id: int) -> list[Movimiento]:
+        # Movimientos de un lote ya registrado con esta clave. La entrada del
+        # destino de un traspaso no lleva la clave: solo el lote de origen.
+        result = await self.db.execute(
+            select(Movimiento)
+            .options(joinedload(Movimiento.producto))
+            .where(
+                Movimiento.clave_idempotencia == clave,
+                Movimiento.usuario_id == usuario_id,
+            )
+            .order_by(Movimiento.id)
+        )
+        return list(result.scalars().all())
 
     async def obtener_inventarios(
         self, ids: list[int], sucursal_id: int

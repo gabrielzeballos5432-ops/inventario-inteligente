@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +19,11 @@ class SucursalController extends ChangeNotifier {
   static final SucursalController instance = SucursalController._();
 
   static const _claveActiva = 'sucursal_activa';
+
+  /// Ultimos catalogos recibidos del servidor. Sin ellos, al abrir la app sin
+  /// conexion no habria razones que elegir y el movimiento offline no se
+  /// podria registrar (la razon es obligatoria).
+  static const _claveCatalogos = 'catalogos_sucursal';
 
   List<Sucursal> _sucursales = const [];
   List<RazonMovimiento> _razones = const [];
@@ -62,9 +69,12 @@ class SucursalController extends ChangeNotifier {
       final guardada = esAdmin ? await _leerGuardada() : null;
       _activaId = porId(guardada) != null ? guardada : _predeterminadaId;
       _error = null;
+      await _guardarCatalogos();
     } catch (e) {
       debugPrint('cargar sucursales: $e');
       _error = 'No se pudieron cargar las sucursales.';
+      // Sin servidor: se usa lo ultimo que se recibio, si aun no hay nada.
+      if (_razones.isEmpty) await _leerCatalogos(esAdmin: esAdmin);
     }
     _cargando = false;
     notifyListeners();
@@ -96,6 +106,64 @@ class SucursalController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_claveActiva);
     } catch (_) {}
+  }
+
+  Future<void> _guardarCatalogos() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _claveCatalogos,
+        jsonEncode({
+          'predeterminada_id': _predeterminadaId,
+          'sucursales': [
+            for (final s in _sucursales)
+              {
+                'id': s.id,
+                'nombre': s.nombre,
+                'direccion': s.direccion,
+                'telefono': s.telefono,
+                'activo': s.activo,
+                'predeterminada': s.predeterminada,
+              },
+          ],
+          'razones': [
+            for (final r in _razones)
+              {
+                'id': r.id,
+                'nombre': r.nombre,
+                'tipo_movimiento': r.tipoMovimiento,
+                'sistema': r.sistema,
+                'requiere_sucursal_destino': r.requiereSucursalDestino,
+                'activo': r.activo,
+              },
+          ],
+        }),
+      );
+    } catch (_) {
+      // Sin almacenamiento solo se pierde el uso sin conexion.
+    }
+  }
+
+  Future<void> _leerCatalogos({required bool esAdmin}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final texto = prefs.getString(_claveCatalogos);
+      if (texto == null) return;
+      final json = jsonDecode(texto) as Map<String, dynamic>;
+      _sucursales = [
+        for (final s in json['sucursales'] as List)
+          Sucursal.fromJson(s as Map<String, dynamic>),
+      ];
+      _razones = [
+        for (final r in json['razones'] as List)
+          RazonMovimiento.fromJson(r as Map<String, dynamic>),
+      ];
+      _predeterminadaId = json['predeterminada_id'] as int?;
+      final guardada = esAdmin ? await _leerGuardada() : null;
+      _activaId = porId(guardada) != null ? guardada : _predeterminadaId;
+    } catch (e) {
+      debugPrint('leer catalogos guardados: $e');
+    }
   }
 
   Future<int?> _leerGuardada() async {

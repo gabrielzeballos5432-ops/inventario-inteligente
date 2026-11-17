@@ -275,12 +275,14 @@ class InventarioProvider extends ChangeNotifier {
     required List<({int productoId, int cantidad})> items,
     required int razonId,
     int? sucursalDestinoId,
+    String? clave,
   }) async {
     final resultado = await _productService.registrarLote(
       tipo: tipo,
       items: items,
       razonId: razonId,
       sucursalDestinoId: sucursalDestinoId,
+      claveIdempotencia: clave,
     );
     await cargarInventario();
     await cargarHistorial();

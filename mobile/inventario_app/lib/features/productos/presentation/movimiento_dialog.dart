@@ -6,8 +6,11 @@ import 'package:provider/provider.dart';
 import '../../../app/theme.dart';
 import '../../../core/models/product.dart';
 import '../../../core/models/sucursal.dart';
+import '../../../core/models/movimiento_pendiente.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/providers/cola_movimientos_controller.dart';
 import '../../../core/providers/inventario_provider.dart';
+import '../../../core/providers/servidor_controller.dart';
 import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/utils/validaciones.dart';
 import '../../../shared/widgets/boton_seguro.dart';
@@ -21,6 +24,19 @@ typedef GuardarMovimiento =
       int? sucursalDestinoId,
     });
 
+/// Guarda el lote en la cola offline cuando no se pudo enviar por la red.
+typedef EncolarMovimiento =
+    Future<void> Function({
+      required String tipo,
+      required RazonMovimiento razon,
+      required List<({ProductoConStock producto, int cantidad})> items,
+    });
+
+/// El servidor ya figura como caido: no vale la pena esperar el timeout.
+class SinServidorException implements Exception {
+  const SinServidorException();
+}
+
 Future<bool?> mostrarMovimientoLote(
   BuildContext context, {
   ProductoConStock? producto,
@@ -29,12 +45,54 @@ Future<bool?> mostrarMovimientoLote(
 }) {
   final inventario = context.read<InventarioProvider>();
   final sucursales = context.read<SucursalController>();
+  final cola = context.read<ColaMovimientosController?>();
+  final servidor = context.read<ServidorController?>();
+  // Una clave por intento de envio. Si el intento falla por la red, el lote
+  // se encola con ESA clave: si en realidad llego al servidor y solo se
+  // perdio la respuesta, la sincronizacion no lo registra dos veces.
+  var clave = ColaMovimientosController.nuevaClave();
   return showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (_) => MovimientoDialog(
       productos: inventario.productos.where((p) => p.activo).toList(),
-      enviar: inventario.registrarLote,
+      enviar:
+          ({
+            required tipo,
+            required items,
+            required razonId,
+            sucursalDestinoId,
+          }) {
+            clave = ColaMovimientosController.nuevaClave();
+            if (cola != null &&
+                servidor?.estado == EstadoServidor.desconectado) {
+              throw const SinServidorException();
+            }
+            return inventario.registrarLote(
+              tipo: tipo,
+              items: items,
+              razonId: razonId,
+              sucursalDestinoId: sucursalDestinoId,
+              clave: clave,
+            );
+          },
+      encolar: cola == null
+          ? null
+          : ({required tipo, required razon, required items}) => cola.encolar(
+              clave: clave,
+              tipo: tipo,
+              razonId: razon.id,
+              razonNombre: razon.nombre,
+              sucursalId: sucursales.activaId,
+              items: [
+                for (final i in items)
+                  ItemPendiente(
+                    productoId: i.producto.id,
+                    nombre: i.producto.nombre,
+                    cantidad: i.cantidad,
+                  ),
+              ],
+            ),
       razones: sucursales.razones,
       sucursales: sucursales.sucursales,
       sucursalActualId: sucursales.activaId,
@@ -50,6 +108,7 @@ class MovimientoDialog extends StatefulWidget {
     super.key,
     required this.productos,
     required this.enviar,
+    this.encolar,
     this.productoInicial,
     this.tipoInicial = 'entrada',
     this.cantidadInicial,
@@ -60,6 +119,10 @@ class MovimientoDialog extends StatefulWidget {
 
   final List<ProductoConStock> productos;
   final GuardarMovimiento enviar;
+
+  /// Si esta presente, un envio que falla por la red no se pierde: se guarda
+  /// en la cola offline. Null = sin cola (el error se muestra como antes).
+  final EncolarMovimiento? encolar;
 
   /// Razones activas elegibles a mano (de todos los tipos); se filtran por el
   /// tipo elegido.
@@ -223,6 +286,45 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) => fila.dispose());
   }
 
+  /// Sin conexion: guarda el lote en el telefono para enviarlo despues.
+  /// Devuelve false si no hay cola o si el movimiento no puede esperar (un
+  /// traspaso mueve stock de dos sucursales y necesita al servidor).
+  Future<bool> _encolar() async {
+    final encolar = widget.encolar;
+    final razon = _razon;
+    if (encolar == null || razon == null || razon.requiereSucursalDestino) {
+      return false;
+    }
+    try {
+      await encolar(
+        tipo: _tipo,
+        razon: razon,
+        items: [
+          for (final fila in _filas)
+            (
+              producto: _producto(fila)!,
+              cantidad: int.parse(fila.cantidad.text.trim()),
+            ),
+        ],
+      );
+    } catch (error) {
+      debugPrint('encolar movimiento: $error');
+      return false;
+    }
+    if (!mounted) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Sin conexion: el movimiento quedo guardado en este dispositivo y '
+          'se enviara al volver el servidor.',
+        ),
+      ),
+    );
+    setState(() => _guardando = false);
+    Navigator.of(context).pop(true);
+    return true;
+  }
+
   Future<void> _guardar() async {
     if (_guardando) return;
     setState(() {
@@ -262,6 +364,7 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
         });
       }
     } catch (error, stack) {
+      if (await _encolar()) return;
       debugPrint('registrar movimiento por lote: $error\n$stack');
       if (mounted) {
         setState(() {

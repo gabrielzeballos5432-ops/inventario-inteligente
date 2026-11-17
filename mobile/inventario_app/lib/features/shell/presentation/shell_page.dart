@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../../../app/destino_app.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/cola_movimientos_controller.dart';
 import '../../../core/providers/inventario_provider.dart';
 import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/services/configuracion_service.dart';
 import '../../../core/providers/theme_controller.dart';
 import '../../../shared/widgets/boton_seguro.dart';
 import '../../../shared/widgets/menu_lateral.dart';
+import '../../../shared/widgets/movimientos_pendientes.dart';
 import '../../../shared/widgets/selector_sucursal.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
 import '../../caja/presentation/caja_page.dart';
@@ -53,6 +55,9 @@ class _ShellPageState extends State<ShellPage> {
     );
     if (!mounted) return;
     if (control.activaId != control.predeterminadaId) _alCambiarSucursal();
+    // Con la sesion ya abierta: envia lo que esta cuenta dejo pendiente la
+    // ultima vez que trabajo sin conexion.
+    context.read<ColaMovimientosController?>()?.sincronizar();
   }
 
   void _alCambiarSucursal() {
@@ -173,7 +178,11 @@ class _ShellPageState extends State<ShellPage> {
           ),
           drawer: permanente ? null : menu(fijo: false),
           body: SafeArea(
-            child: Row(
+            child: Column(
+              children: [
+                const AvisoMovimientosPendientes(),
+                Expanded(
+                  child: Row(
               children: [
                 if (permanente) ...[
                   menu(fijo: true),
@@ -209,6 +218,9 @@ class _ShellPageState extends State<ShellPage> {
                         ],
                       ),
                     ),
+                  ),
+                ),
+              ],
                   ),
                 ),
               ],

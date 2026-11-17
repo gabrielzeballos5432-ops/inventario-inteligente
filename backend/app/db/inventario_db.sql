@@ -305,6 +305,8 @@ CREATE TABLE movimiento (
     cantidad INTEGER NOT NULL,
     stock_resultante INTEGER NOT NULL,
     origen VARCHAR(10) NOT NULL CHECK (origen IN ('manual', 'ia')),
+    -- Clave del lote enviada por la app: un reenvio no lo registra dos veces.
+    clave_idempotencia VARCHAR(100),
     creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_movimiento_cantidad_positiva CHECK (cantidad > 0 OR tipo = 'ajuste'),
     CONSTRAINT chk_stock_resultante_no_negativo CHECK (stock_resultante >= 0),
@@ -465,6 +467,9 @@ CREATE INDEX idx_movimiento_sesion ON movimiento(sesion_id);
 CREATE INDEX idx_movimiento_fecha ON movimiento(creado_en);
 CREATE INDEX idx_movimiento_sucursal ON movimiento(sucursal_id);
 CREATE INDEX idx_movimiento_razon ON movimiento(razon_movimiento_id);
+CREATE UNIQUE INDEX uq_movimiento_clave_idempotencia
+    ON movimiento(usuario_id, clave_idempotencia, producto_id)
+    WHERE clave_idempotencia IS NOT NULL;
 CREATE INDEX idx_inventario_sucursal ON inventario(sucursal_id);
 CREATE INDEX idx_venta_sucursal ON venta(sucursal_id);
 CREATE INDEX idx_compra_sucursal ON compra(sucursal_id);

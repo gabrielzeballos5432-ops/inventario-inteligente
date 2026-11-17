@@ -146,10 +146,16 @@ class ProductService {
     int? sucursalDestinoId,
     String origen = 'manual',
     int? sesionId,
+    String? claveIdempotencia,
+    int? sucursalId,
   }) async {
     final json = await _apiClient.postJson(
       ApiConfig.movimientoLote,
+      sucursalId: sucursalId,
       {
+        // Si el envio se repite (cola offline, respuesta perdida), el backend
+        // reconoce la clave y no registra el lote dos veces.
+        if (claveIdempotencia != null) 'clave_idempotencia': claveIdempotencia,
         'tipo': tipo,
         // Obligatoria en lo manual: el backend la rechaza si falta. Con
         // origen "ia" el backend asigna sola la razon "Deteccion IA".

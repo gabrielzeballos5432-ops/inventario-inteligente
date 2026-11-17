@@ -94,8 +94,20 @@ async def registrar_movimientos_lote(
     tambien el nucleo que usara el reconocimiento (RF-10), que registra las
     entradas detectadas en una unica captura.
     """
+    servicio = _servicio(db)
     try:
-        resultados, movimientos = await _servicio(db).registrar_lote(
+        if body.clave_idempotencia:
+            previos = await servicio.lote_ya_registrado(
+                body.clave_idempotencia, usuario_id, body.tipo, body.items
+            )
+            if previos is not None:
+                return MovimientoLoteOut(
+                    tipo=body.tipo,
+                    guardados=len(previos),
+                    resultados=previos,
+                    repetido=True,
+                )
+        resultados, movimientos = await servicio.registrar_lote(
             tipo=body.tipo,
             items=body.items,
             usuario_id=usuario_id,
@@ -104,6 +116,7 @@ async def registrar_movimientos_lote(
             sesion_id=body.sesion_id,
             razon_movimiento_id=body.razon_movimiento_id,
             sucursal_destino_id=body.sucursal_destino_id,
+            clave_idempotencia=body.clave_idempotencia,
         )
     except MovimientoValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

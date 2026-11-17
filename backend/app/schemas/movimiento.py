@@ -74,6 +74,9 @@ class MovimientoLoteCreate(BaseModel):
     # Una razón para todo el lote (mismo tipo, mismo motivo).
     razon_movimiento_id: Optional[int] = None
     sucursal_destino_id: Optional[int] = None
+    # La genera la app (cola offline): reenviar el mismo lote con la misma
+    # clave devuelve el ya registrado en lugar de mover el stock otra vez.
+    clave_idempotencia: Optional[str] = Field(default=None, min_length=8, max_length=100)
 
 
 class MovimientoLoteResultado(BaseModel):
@@ -92,6 +95,9 @@ class MovimientoLoteOut(BaseModel):
     tipo: str
     guardados: int
     resultados: list[MovimientoLoteResultado]
+    # True si el lote ya estaba registrado con esa clave de idempotencia: la
+    # respuesta describe los movimientos de aquel envio, no crea otros.
+    repetido: bool = False
 
 def movimiento_out(m) -> MovimientoOut:
     """Arma la salida desde un Movimiento con sus relaciones ya cargadas

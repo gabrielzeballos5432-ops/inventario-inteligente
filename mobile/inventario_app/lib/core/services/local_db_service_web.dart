@@ -1,8 +1,36 @@
 // Implementacion web de la base de datos local (sin SQLite).
-// El cache de inventario vive solo en memoria: en web la sesion siempre esta
-// en linea con el backend, por lo que no se pierde nada al recargar la pagina.
+// El cache de inventario y la cola de movimientos viven solo en memoria: se
+// pierden al recargar la pagina. La cola persistente es de Android y Windows.
 class LocalDbService {
   final Map<int, Map<String, dynamic>> _cache = {};
+  final Map<String, Map<String, dynamic>> _cola = {};
+
+  Future<void> guardarPendiente(Map<String, dynamic> fila) async {
+    _cola[fila['clave'] as String] = Map.of(fila);
+  }
+
+  Future<List<Map<String, dynamic>>> obtenerPendientes() async {
+    final filas = _cola.values.map(Map<String, dynamic>.of).toList()
+      ..sort(
+        (a, b) => (a['creado_en'] as String).compareTo(b['creado_en'] as String),
+      );
+    return filas;
+  }
+
+  Future<void> actualizarPendiente(
+    String clave, {
+    required String estado,
+    String? detalle,
+  }) async {
+    final fila = _cola[clave];
+    if (fila == null) return;
+    fila['estado'] = estado;
+    fila['detalle'] = detalle;
+  }
+
+  Future<void> eliminarPendiente(String clave) async {
+    _cola.remove(clave);
+  }
 
   Future<void> cachearInventario(List<Map<String, dynamic>> productos) async {
     _cache.clear();
