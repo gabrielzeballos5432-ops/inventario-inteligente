@@ -2574,6 +2574,11 @@ class _BonoDialogState extends State<_BonoDialog> {
   int? _liquidacionId;
   String _tipo = 'otro';
 
+  /// Montos de la tienda por tipo de bono: se proponen al elegir el tipo y
+  /// se pueden cambiar. No hay tabla de bonos fijos: cada bono se registra
+  /// cuando ocurre (un live, el almuerzo de cada sábado).
+  static const _montoSugerido = {'live': '100', 'almuerzo': '20'};
+
   @override
   void initState() {
     super.initState();
@@ -2664,7 +2669,16 @@ class _BonoDialogState extends State<_BonoDialog> {
                   DropdownMenuItem(value: 'otro', child: Text('Otro')),
                 ],
                 onChanged: (value) {
-                  if (value != null) setState(() => _tipo = value);
+                  if (value == null) return;
+                  setState(() {
+                    // Solo pisa el monto si estaba vacío o era la sugerencia
+                    // del tipo anterior: nunca lo que escribió la persona.
+                    final anterior = _montoSugerido[_tipo];
+                    if (_monto.text.isEmpty || _monto.text == anterior) {
+                      _monto.text = _montoSugerido[value] ?? '';
+                    }
+                    _tipo = value;
+                  });
                 },
               ),
               TextFormField(

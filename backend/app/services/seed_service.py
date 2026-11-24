@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -43,17 +43,22 @@ class SeedService:
             if existe.scalar_one_or_none() is None:
                 self.db.add(Rol(nombre=nombre, descripcion=descripcion))
 
+    # La busqueda no distingue mayusculas, igual que el indice unico
+    # lower(nombre): con `==` exacto, renombrar "Peroxidos" a "Peróxidos" en la
+    # base hacia que el arranque siguiente creara otra vez "Peroxidos".
     async def _asegurar_categorias(self) -> None:
-        for nombre in ["General", "Tintes", "Peroxidos"]:
+        for nombre in ["General", "Tintes", "Peróxidos"]:
             existe = await self.db.execute(
-                select(Categoria).where(Categoria.nombre == nombre)
+                select(Categoria).where(func.lower(Categoria.nombre) == nombre.lower())
             )
             if existe.scalar_one_or_none() is None:
                 self.db.add(Categoria(nombre=nombre, activo=True))
 
     async def _asegurar_marcas(self) -> None:
-        for nombre in ["Schwarzkopf", "Loreal"]:
-            existe = await self.db.execute(select(Marca).where(Marca.nombre == nombre))
+        for nombre in ["Schwarzkopf", "L'Oréal"]:
+            existe = await self.db.execute(
+                select(Marca).where(func.lower(Marca.nombre) == nombre.lower())
+            )
             if existe.scalar_one_or_none() is None:
                 self.db.add(Marca(nombre=nombre, activo=True))
 
