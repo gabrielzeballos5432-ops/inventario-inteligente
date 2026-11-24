@@ -1,18 +1,18 @@
 import 'package:flutter/foundation.dart';
 
+import 'sucursal_controller.dart';
+
 import '../models/product.dart';
 import '../models/detection_record.dart';
 import '../network/api_client.dart';
 import '../services/product_service.dart';
 import '../services/detection_service.dart';
 import '../services/local_db_service.dart';
-import '../services/sync_service.dart';
 
 class InventarioProvider extends ChangeNotifier {
   final ProductService _productService;
   final DetectionService _detectionService;
   final LocalDbService _localDb;
-  final SyncService _syncService;
 
   List<ProductoConStock> _productos = [];
   List<Movimiento> _historial = [];
@@ -22,11 +22,15 @@ class InventarioProvider extends ChangeNotifier {
   bool _cargando = false;
   String? _error;
 
+  /// Error de la ultima deteccion, aparte de [_error]: al volver de la
+  /// camara la app recarga el inventario, y esa recarga ponia `_error` en
+  /// null, asi que el rechazo de la deteccion no llegaba a verse.
+  String? _errorDeteccion;
+
   InventarioProvider(
     this._productService,
     this._detectionService,
     this._localDb,
-    this._syncService,
   );
 
   List<ProductoConStock> get productos => _productos;
@@ -36,6 +40,7 @@ class InventarioProvider extends ChangeNotifier {
   bool? get yoloDisponible => _yoloDisponible;
   bool get cargando => _cargando;
   String? get error => _error;
+  String? get errorDeteccion => _errorDeteccion;
   ProductService get productService => _productService;
 
   Future<void> cargarInventario() async {
@@ -65,20 +70,20 @@ class InventarioProvider extends ChangeNotifier {
       debugPrint('cargarInventario: HTTP ${e.statusCode} | ${e.body}');
       _productos = await _leerCache();
       _error = switch (e.statusCode) {
-        401 || 403 => 'Sesion expirada o sin permisos. Vuelve a iniciar sesion.',
+        401 || 403 => 'Sesión expirada o sin permisos. Vuelve a iniciar sesión.',
         404 => 'El servidor no encontro el recurso de inventario.',
         >= 500 => 'El servidor tiene un problema (HTTP ${e.statusCode}). '
-            'Se muestran los datos de la ultima carga.',
+            'Se muestran los datos de la última carga.',
         _ => 'El servidor rechazo la peticion (HTTP ${e.statusCode}). '
-            'Se muestran los datos de la ultima carga.',
+            'Se muestran los datos de la última carga.',
       };
     } catch (e, st) {
       // Solo aqui es un problema de red de verdad: no hay IP valida, el wifi
       // cayo o el servidor esta apagado.
       debugPrint('cargarInventario FALLA: $e | $st');
       _productos = await _leerCache();
-      _error = 'Sin conexion con el servidor. '
-          'Se muestran los datos de la ultima carga.';
+      _error = 'Sin conexión con el servidor. '
+          'Se muestran los datos de la última carga.';
     }
 
     _cargando = false;
@@ -112,29 +117,36 @@ class InventarioProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Recuadros en vivo mientras se apunta con la camara. No cambia el estado
+  /// del provider: la deteccion que cuenta es la de la foto final.
+  Future<ResultadoInferencia> vistaPrevia(List<int> bytes) =>
+      _detectionService.vistaPrevia(bytes);
+
   Future<bool> enviarImagen(List<int> bytes, String fileName) async {
     _cargando = true;
+    // Una foto nueva reemplaza el resultado anterior: si falla, no debe
+    // quedar en pantalla la deteccion de la foto previa para confirmarla.
+    _ultimaInferencia = null;
+    _errorDeteccion = null;
     notifyListeners();
 
     try {
       _ultimaInferencia =
           await _detectionService.detectFromUpload(bytes, fileName);
-      _error = null;
       _cargando = false;
       notifyListeners();
-      await cargarInventario();
       return true;
     } on ApiException catch (e) {
-      _error = e.statusCode == 503
-          ? 'El reconocimiento con IA aun no esta activo: falta el modelo '
+      _errorDeteccion = e.statusCode == 503
+          ? 'El reconocimiento con IA aún no está activo: falta el modelo '
               'entrenado en el servidor. Puedes registrar el producto a mano '
               'desde la pestaña Productos.'
-          : 'El servidor rechazo la peticion (HTTP ${e.statusCode}).';
+          : 'El servidor rechazo la foto: ${e.detalle}';
       _cargando = false;
       notifyListeners();
       return false;
     } catch (e) {
-      _error = 'Sin conexion. No se pudo procesar la deteccion.';
+      _errorDeteccion = 'Sin conexión. No se pudo procesar la detección.';
       _cargando = false;
       notifyListeners();
       return false;
@@ -143,7 +155,9 @@ class InventarioProvider extends ChangeNotifier {
 
   Future<void> cargarValorizacion() async {
     try {
-      _valorizacion = await _productService.valorizacion();
+      _valorizacion = await _productService.valorizacion(
+        sucursalId: SucursalController.instance.activaId,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('cargarValorizacion FALLA: $e');
@@ -172,14 +186,6 @@ class InventarioProvider extends ChangeNotifier {
       cargarValorizacion(),
       consultarEstadoServidor(),
     ]);
-  }
-
-  Future<int> sincronizar() async {
-    final count = await _syncService.sincronizarPendientes();
-    if (count > 0) {
-      await cargarInventario();
-    }
-    return count;
   }
 
   Future<bool> crearProducto(Map<String, dynamic> payload) async {
@@ -225,7 +231,7 @@ class InventarioProvider extends ChangeNotifier {
       await cargarInventario();
       return true;
     } catch (e) {
-      _error = 'No se pudo actualizar el stock minimo';
+      _error = 'No se pudo actualizar el stock mínimo';
       notifyListeners();
       return false;
     }
@@ -235,6 +241,7 @@ class InventarioProvider extends ChangeNotifier {
     required int productoId,
     required String tipo,
     required int cantidad,
+    required int razonId,
     String origen = 'manual',
   }) async {
     try {
@@ -242,6 +249,7 @@ class InventarioProvider extends ChangeNotifier {
         productoId: productoId,
         tipo: tipo,
         cantidad: cantidad,
+        razonId: razonId,
         origen: origen,
       );
       await cargarInventario();
@@ -265,11 +273,57 @@ class InventarioProvider extends ChangeNotifier {
   Future<int> registrarLote({
     required String tipo,
     required List<({int productoId, int cantidad})> items,
+    required int razonId,
+    int? sucursalDestinoId,
+    String? clave,
   }) async {
-    final resultado = await _productService.registrarLote(tipo: tipo, items: items);
+    final resultado = await _productService.registrarLote(
+      tipo: tipo,
+      items: items,
+      razonId: razonId,
+      sucursalDestinoId: sucursalDestinoId,
+      claveIdempotencia: clave,
+    );
     await cargarInventario();
     await cargarHistorial();
     return resultado.guardados;
+  }
+
+  /// Registra la entrada de lo detectado por la IA, ya revisado por el
+  /// usuario (cantidades corregidas; las filas en 0 no se envian). Va por
+  /// lote con origen "ia" y la sesion de camara: el backend asigna la razon
+  /// "Deteccion IA" y guarda todo o nada. Como en registrarLote, no se
+  /// atrapa ApiException para que el detalle llegue a la pantalla.
+  Future<ResultadoLote> confirmarDeteccion(
+    List<({int productoId, int cantidad})> items,
+  ) async {
+    final filas = items.where((i) => i.cantidad > 0).toList();
+    if (filas.isEmpty) return ResultadoLote(guardados: 0);
+    final resultado = await _productService.registrarLote(
+      tipo: 'entrada',
+      items: filas,
+      origen: 'ia',
+      sesionId: _ultimaInferencia?.sesionId,
+    );
+    _ultimaInferencia = null;
+    // La entrada ya quedo guardada: si falla la recarga (por ejemplo, se
+    // corta la red justo despues), no debe parecer que fallo el registro, o
+    // el usuario reintentaria y la duplicaria.
+    try {
+      await cargarInventario();
+      await cargarHistorial();
+    } catch (e) {
+      debugPrint('recargar tras confirmar detección: $e');
+      notifyListeners();
+    }
+    return resultado;
+  }
+
+  /// Descarta el resultado de la deteccion sin registrar nada.
+  void descartarDeteccion() {
+    _ultimaInferencia = null;
+    _errorDeteccion = null;
+    notifyListeners();
   }
 
   Future<void> registrarVenta(Map<String, dynamic> payload) async {

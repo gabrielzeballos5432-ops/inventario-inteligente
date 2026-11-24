@@ -31,7 +31,7 @@ void main() {
       expect(producto.categoria?.nombre, 'General');
     });
 
-    test('parsea precios cuando llegan como numero', () {
+    test('parsea precios cuando llegan como número', () {
       final producto = ProductoConStock.fromJson({
         'id': 1,
         'nombre': 'Shampoo',
@@ -47,7 +47,7 @@ void main() {
       expect(producto.precioVenta, 25.5);
     });
 
-    test('usa valores por defecto si el precio es invalido', () {
+    test('usa valores por defecto si el precio es inválido', () {
       final producto = ProductoConStock.fromJson({
         'id': 1,
         'nombre': 'Condicionador',

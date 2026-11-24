@@ -78,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Inicia sesion para gestionar inventario y detecciones.',
+                              'Inicia sesión para gestionar inventario y detecciones.',
                               style: TextStyle(color: Colors.white70),
                             ),
                             const SizedBox(height: 20),
@@ -112,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               validator: (v) => v != null && v.length >= 4
                                   ? null
-                                  : 'La contrasena debe tener al menos 4 caracteres',
+                                  : 'La contraseña debe tener al menos 4 caracteres',
                             ),
                             const SizedBox(height: 18),
                             SizedBox(
@@ -129,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                                 label: Text(
                                   auth.status == AuthStatus.loading
                                       ? 'Ingresando...'
-                                      : 'Iniciar sesion',
+                                      : 'Iniciar sesión',
                                 ),
                               ),
                             ),

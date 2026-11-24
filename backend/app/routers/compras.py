@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user_id, require_admin
+from app.core.sucursal import get_sucursal_activa
 from app.schemas.compra import (
     CompraCreate,
     CompraOut,
@@ -64,9 +65,12 @@ async def registrar_compra(
     body: CompraCreate,
     current_user: tuple[int, str] = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
     try:
-        return await CompraService(db).registrar(body, current_user[0])
+        return await CompraService(db).registrar(
+            body, current_user[0], sucursal_id=sucursal_id
+        )
     except CompraValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -74,10 +78,12 @@ async def registrar_compra(
 @compras_router.get("/", response_model=list[CompraOut])
 async def listar_compras(
     limite: int = Query(default=50, ge=1, le=200),
+    sucursal_id: int | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _: tuple[int, str] = Depends(require_admin),
 ):
-    return await CompraService(db).listar(limite)
+    """Compras recientes; `sucursal_id` filtra por sucursal (sin él, todas)."""
+    return await CompraService(db).listar(limite, sucursal_id)
 
 
 @compras_router.post("/leer-comprobante", response_model=LecturaCompraOut)

@@ -54,7 +54,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
       if (!mounted) return;
       if (status.isDenied || status.isPermanentlyDenied) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permiso de camara denegado')),
+          const SnackBar(content: Text('Permiso de cámara denegado')),
         );
       }
     } catch (_) {
@@ -93,13 +93,13 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
   Widget build(BuildContext context) {
     if (!_soportaCamara) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Escanear codigo')),
+        appBar: AppBar(title: const Text('Escanear código')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'El escaneo de codigos de barras solo esta disponible en '
-              'dispositivos moviles con camara.',
+              'El escaneo de códigos de barras solo esta disponible en '
+              'dispositivos moviles con cámara.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70),
             ),
@@ -109,7 +109,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Escanear codigo')),
+      appBar: AppBar(title: const Text('Escanear código')),
       body: Stack(
         children: [
           MobileScanner(
@@ -127,7 +127,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Text(
-                'Apunta al codigo de barras o codigo QR del producto.',
+                'Apunta al código de barras o código QR del producto.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontSize: 14),
               ),

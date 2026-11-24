@@ -55,7 +55,7 @@ def test_claves_distintas_rechazan_antes_de_consultar():
     db = create_autospec(AsyncSession, instance=True)
     with pytest.raises(VentaValidationError, match="no coincide"):
         asyncio.run(VentaService(db).registrar(
-            venta(clave_idempotencia="clave-uno"), 1, "clave-dos"
+            venta(clave_idempotencia="clave-uno"), 1, "clave-dos", sucursal_id=1
         ))
     db.execute.assert_not_awaited()
     db.add.assert_not_called()
@@ -67,7 +67,7 @@ def test_reintento_con_misma_huella_devuelve_venta_sin_escribir():
     datos = venta(clave_idempotencia="clave-uno")
     existente = SimpleNamespace(huella_solicitud=servicio._huella(datos))
     servicio._obtener_por_clave = AsyncMock(return_value=existente)
-    assert asyncio.run(servicio.registrar(datos, 1)) is existente
+    assert asyncio.run(servicio.registrar(datos, 1, sucursal_id=1)) is existente
     servicio._obtener_por_clave.assert_awaited_once_with("clave-uno", 1)
     db.add.assert_not_called()
     db.commit.assert_not_awaited()
@@ -80,6 +80,6 @@ def test_clave_reutilizada_con_otros_datos_rechaza():
         return_value=SimpleNamespace(huella_solicitud="otra-huella")
     )
     with pytest.raises(VentaValidationError, match="otros datos"):
-        asyncio.run(servicio.registrar(venta(clave_idempotencia="clave-uno"), 1))
+        asyncio.run(servicio.registrar(venta(clave_idempotencia="clave-uno"), 1, sucursal_id=1))
     db.add.assert_not_called()
     db.commit.assert_not_awaited()

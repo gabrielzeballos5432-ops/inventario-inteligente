@@ -8,13 +8,14 @@ import 'package:inventario_app/app/theme.dart';
 import 'package:inventario_app/core/network/api_client.dart';
 import 'package:inventario_app/core/providers/auth_provider.dart';
 import 'package:inventario_app/core/providers/inventario_provider.dart';
+import 'package:inventario_app/core/providers/sucursal_controller.dart';
 import 'package:inventario_app/core/providers/theme_controller.dart';
 import 'package:inventario_app/core/services/auth_service.dart';
+import 'package:inventario_app/core/services/configuracion_service.dart';
 import 'package:inventario_app/core/services/detection_service.dart';
 import 'package:inventario_app/core/services/local_db_service.dart';
 import 'package:inventario_app/core/services/operaciones_service.dart';
 import 'package:inventario_app/core/services/product_service.dart';
-import 'package:inventario_app/core/services/sync_service.dart';
 import 'package:inventario_app/features/shell/presentation/shell_page.dart';
 import 'package:inventario_app/features/contabilidad/presentation/finanzas_page.dart';
 import 'package:inventario_app/features/productos/presentation/products_page.dart';
@@ -38,7 +39,6 @@ class _InventarioPrueba extends InventarioProvider {
         ProductService(api),
         DetectionService(api),
         LocalDbService(),
-        SyncService(api, LocalDbService()),
       );
 
   @override
@@ -77,9 +77,14 @@ Future<void> _montar(
     httpClient: MockClient((peticion) async {
       peticiones.add(peticion.url.path);
       return http.Response(
-        jsonEncode(
-          peticion.url.path.endsWith('/reporte-financiero') ? _reporte : [],
-        ),
+        jsonEncode(switch (peticion.url.path) {
+          final ruta when ruta.endsWith('/reporte-financiero') => _reporte,
+          '/api/configuracion/' => {'sucursal_predeterminada_id': 1},
+          '/api/sucursales/' => [
+            {'id': 1, 'nombre': 'Principal', 'activo': true, 'predeterminada': true},
+          ],
+          _ => [],
+        }),
         200,
         headers: {'content-type': 'application/json; charset=utf-8'},
       );
@@ -98,6 +103,8 @@ Future<void> _montar(
           create: (_) => ThemeController.inicial(ThemeMode.dark),
         ),
         Provider(create: (_) => OperacionesService(api)),
+        ChangeNotifierProvider.value(value: SucursalController.instance),
+        Provider(create: (_) => ConfiguracionService(api)),
       ],
       child: MaterialApp(theme: buildTemaNoche(), home: const ShellPage()),
     ),
@@ -159,7 +166,14 @@ void main() {
   ) async {
     final peticiones = <String>[];
     await _montar(tester, peticiones, tamano: const Size(1440, 900));
-    expect(peticiones, isEmpty);
+    // Al entrar solo se pide el contexto de la sesión (sucursal activa y
+    // razones de movimiento); ninguna página carga antes de abrirse.
+    expect(peticiones.toSet(), {
+      '/api/sucursales/',
+      '/api/configuracion/',
+      '/api/razones-movimiento/',
+    });
+    peticiones.clear();
     expect(find.byType(MenuLateral), findsOneWidget);
     expect(find.byType(TabBar), findsNothing);
     final menu = find.byType(MenuLateral);

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user_id, require_admin
+from app.core.sucursal import get_sucursal_activa
 from app.schemas.venta import VentaAnular, VentaCreate, VentaOut
 from app.services.venta_service import VentaService, VentaValidationError
 
@@ -16,10 +17,11 @@ async def registrar_venta(
     db: AsyncSession = Depends(get_db),
     usuario_id: int = Depends(get_current_user_id),
     clave_idempotencia: str | None = Header(default=None, alias="Idempotency-Key"),
+    sucursal_id: int = Depends(get_sucursal_activa),
 ):
     try:
         return await VentaService(db).registrar(
-            body, usuario_id, clave_idempotencia
+            body, usuario_id, clave_idempotencia, sucursal_id=sucursal_id
         )
     except VentaValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -28,10 +30,12 @@ async def registrar_venta(
 @router.get("/", response_model=list[VentaOut])
 async def listar_ventas(
     limite: int = Query(default=50, ge=1, le=200),
+    sucursal_id: int | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _: int = Depends(get_current_user_id),
 ):
-    return await VentaService(db).listar(limite)
+    """Ventas recientes; `sucursal_id` filtra por sucursal (sin él, todas)."""
+    return await VentaService(db).listar(limite, sucursal_id)
 
 
 @router.post("/{venta_id}/anular", response_model=VentaOut)

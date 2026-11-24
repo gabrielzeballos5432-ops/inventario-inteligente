@@ -45,7 +45,7 @@ class Producto(Base):
     categoria = relationship("Categoria", back_populates="productos")
     marca = relationship("Marca", back_populates="productos")
     proveedor = relationship("Proveedor", back_populates="productos")
-    inventario = relationship("Inventario", back_populates="producto", uselist=False)
+    inventarios = relationship("Inventario", back_populates="producto")
     movimientos = relationship("Movimiento", back_populates="producto")
     detecciones = relationship("Deteccion", back_populates="producto")
     ventas_detalle = relationship("VentaDetalle", back_populates="producto")

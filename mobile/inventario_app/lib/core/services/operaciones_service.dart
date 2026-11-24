@@ -1,5 +1,6 @@
 import '../network/api_client.dart';
 import '../models/categoria_gasto.dart';
+import '../providers/sucursal_controller.dart';
 
 class OperacionesService {
   final ApiClient _api;
@@ -256,21 +257,32 @@ class OperacionesService {
     return respuesta as Map<String, dynamic>;
   }
 
+  /// Resultado del período de una sucursal; `sucursalId` null = todas.
   Future<Map<String, dynamic>> reporteFinanciero({
     required String fechaInicio,
     required String fechaFin,
+    int? sucursalId,
   }) async {
     final respuesta = await _api.getJson(
       '/api/contabilidad/reporte-financiero',
-      query: {'fecha_inicio': fechaInicio, 'fecha_fin': fechaFin},
+      query: {
+        'fecha_inicio': fechaInicio,
+        'fecha_fin': fechaFin,
+        if (sucursalId != null) 'sucursal_id': '$sucursalId',
+      },
     );
     return respuesta as Map<String, dynamic>;
   }
 
   Future<List<Map<String, dynamic>>> listarVentas() async {
+    // Ventas recientes de la sucursal en la que se está trabajando.
+    final sucursalId = SucursalController.instance.activaId;
     final respuesta = await _api.getJson(
       '/api/ventas/',
-      query: const {'limite': '50'},
+      query: {
+        'limite': '50',
+        if (sucursalId != null) 'sucursal_id': '$sucursalId',
+      },
     );
     return _listaMapas(respuesta);
   }
@@ -376,9 +388,14 @@ class OperacionesService {
   }
 
   Future<List<Map<String, dynamic>>> listarCompras() async {
+    // Compras recibidas en la sucursal en la que se está trabajando.
+    final sucursalId = SucursalController.instance.activaId;
     final respuesta = await _api.getJson(
       '/api/compras/',
-      query: const {'limite': '50'},
+      query: {
+        'limite': '50',
+        if (sucursalId != null) 'sucursal_id': '$sucursalId',
+      },
     );
     return _listaMapas(respuesta);
   }

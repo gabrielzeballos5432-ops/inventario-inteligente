@@ -24,7 +24,7 @@ def test_rechaza_combinaciones_invalidas(pagos):
 def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
     gasto = SimpleNamespace(
         id=1, estado="pendiente", moneda_codigo="BOB", monto=Decimal("100"),
-        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"),
+        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"), sucursal_id=1,
     )
     db = SimpleNamespace(
         execute=AsyncMock(side_effect=[
@@ -36,10 +36,12 @@ def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
         add_all=Mock(), commit=AsyncMock(), refresh=AsyncMock(),
     )
     datos = PagoGastoMixtoCreate(pagos=[
-        {"metodo_pago": "efectivo", "monto": "20"},
+        {"metodo_pago": "efectivo", "monto": "20", "desde_caja": True},
         {"metodo_pago": "qr", "monto": str(Decimal(total) - 20)},
     ])
-    with patch("app.services.contabilidad_service.CajaService.validar_caja_venta", new_callable=AsyncMock):
+    with patch("app.services.contabilidad_service.CajaService.validar_caja_venta", new_callable=AsyncMock), \
+            patch("app.services.contabilidad_service.CajaService.efectivo_en_caja",
+                  new_callable=AsyncMock, return_value=Decimal("500")):
         pagos = asyncio.run(ContabilidadService(db).registrar_pagos_gasto(1, datos.pagos, 1))
     assert [p.sesion_caja_id for p in pagos] == [7, None]
     assert sum(p.monto_bob for p in pagos) == Decimal(total)
@@ -50,7 +52,7 @@ def test_mixto_un_solo_commit_y_caja_solo_efectivo(total, previo, estado):
 def test_sin_caja_no_guarda_ni_la_parte_qr():
     gasto = SimpleNamespace(
         id=1, estado="pendiente", moneda_codigo="BOB", monto=Decimal("100"),
-        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"),
+        tipo_cambio_ext=Decimal("1"), tipo_cambio_bob=Decimal("1"), sucursal_id=1,
     )
     db = SimpleNamespace(
         execute=AsyncMock(side_effect=[
@@ -63,9 +65,9 @@ def test_sin_caja_no_guarda_ni_la_parte_qr():
     )
     datos = PagoGastoMixtoCreate(pagos=[
         {"metodo_pago": "qr", "monto": "30"},
-        {"metodo_pago": "efectivo", "monto": "20"},
+        {"metodo_pago": "efectivo", "monto": "20", "desde_caja": True},
     ])
-    with pytest.raises(ContabilidadValidationError, match="Abre"):
+    with pytest.raises(ContabilidadValidationError, match="No tienes una caja abierta"):
         asyncio.run(ContabilidadService(db).registrar_pagos_gasto(1, datos.pagos, 1))
     db.add_all.assert_not_called()
     db.commit.assert_not_awaited()

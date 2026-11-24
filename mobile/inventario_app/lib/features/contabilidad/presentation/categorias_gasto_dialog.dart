@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/categoria_gasto.dart';
-import '../../../core/network/api_client.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/formato_numero.dart';
 
-String _detalle(Object error) => error is ApiException
-    ? error.detalle
-    : 'No se pudo completar la operación: $error';
+String _detalle(Object error) => mensajeDeError(error);
 
 class CategoriasGastoDialog extends StatefulWidget {
   const CategoriasGastoDialog({super.key});
@@ -283,6 +282,9 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
                   : (valor) => setState(() => _periodicidad = valor!),
             ),
             DropdownButtonFormField<String>(
+              // Ocupa el ancho del campo: un nombre largo se corta con
+              // … en vez de desbordar la fila en el telefono.
+              isExpanded: true,
               initialValue: _tipo,
               decoration: const InputDecoration(labelText: 'Tipo de importe'),
               items: const [
@@ -295,6 +297,7 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
             ),
             if (_tipo == 'fijo')
               TextFormField(
+                inputFormatters: FormatoNumero.decimal(decimales: 2),
                 controller: _monto,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,

@@ -70,6 +70,7 @@ class Compra(Base):
     id = Column(Integer, primary_key=True)
     proveedor_id = Column(Integer, ForeignKey("proveedor.id"), nullable=True)
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False)
+    sucursal_id = Column(Integer, ForeignKey("sucursal.id"), nullable=False)
     moneda_codigo = Column(String(3), ForeignKey("moneda.codigo"), nullable=False)
     tipo_cambio_ext = Column(Numeric(18, 6), nullable=False)
     tipo_cambio_bob = Column(Numeric(18, 6), nullable=False)

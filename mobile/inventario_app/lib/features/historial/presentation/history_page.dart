@@ -40,8 +40,8 @@ class _HistoryPageState extends State<HistoryPage> {
   static const _periodosEtiqueta = {
     'todo': 'Todo',
     'hoy': 'Hoy',
-    'semana': '7 dias',
-    'mes': '30 dias',
+    'semana': '7 días',
+    'mes': '30 días',
   };
 
   bool _pasaTipo(String? tipo) => _tipo == 'todos' || (tipo ?? '') == _tipo;
@@ -176,13 +176,13 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           )
         else if (historial.isEmpty)
-          const SectionCard(child: Text('Aun no hay movimientos registrados.'))
+          const SectionCard(child: Text('Aún no hay movimientos registrados.'))
         else if (filtrados.isEmpty)
           // Lista con datos pero ningun registro con ese filtro: hay que
           // decirlo, porque "lista vacia" parece error o pagina sin cargar.
           SectionCard(
             child: Text(
-              'Ningun movimiento cumple el filtro. Prueba con otro tipo, '
+              'Ningún movimiento cumple el filtro. Prueba con otro tipo, '
               'otro periodo o menos texto.',
               style: TextStyle(color: context.textoSecundario),
             ),
@@ -204,8 +204,13 @@ class _HistoryPageState extends State<HistoryPage> {
             final accion = esAjuste
                 ? 'Ajuste · stock ${m.stockResultante}'
                 : '${esEntrada ? 'Entrada' : 'Salida'} de ${m.cantidad} '
-                    '· stock ${m.stockResultante}'
-                    '${m.origen != null ? ' · ${m.origen}' : ''}';
+                    '· stock ${m.stockResultante}';
+            final relacionada = m.sucursalRelacionadaNombre;
+            final razon = [
+              m.razonNombre ?? 'Sin razón',
+              if (relacionada != null) '${esEntrada ? 'desde' : 'hacia'} $relacionada',
+              if (m.origen == 'ia') 'IA',
+            ].join(' · ');
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -240,6 +245,15 @@ class _HistoryPageState extends State<HistoryPage> {
                           Text(
                             accion,
                             maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.textoSecundario,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            razon,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: context.textoSecundario,

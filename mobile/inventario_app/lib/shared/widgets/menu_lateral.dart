@@ -150,7 +150,7 @@ class MenuLateral extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 leading: Icon(Icons.logout, color: context.paleta.negativo),
                 title: Text(
-                  'Cerrar sesion',
+                  'Cerrar sesión',
                   style: TextStyle(
                     color: context.paleta.negativo,
                     fontWeight: FontWeight.w600,

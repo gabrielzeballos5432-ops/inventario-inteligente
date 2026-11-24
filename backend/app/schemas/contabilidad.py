@@ -91,8 +91,21 @@ class GastoCreate(BaseModel):
 class PagoGastoCreate(BaseModel):
     monto: Decimal = Field(gt=0, max_digits=18, decimal_places=4)
     metodo_pago: Literal["efectivo", "transferencia", "qr", "otro"]
+    # Solo para efectivo: el pago sale del cajón de la caja abierta y se
+    # descuenta en su cierre. Por defecto no: los gastos (alquiler, luz) se
+    # pagan aparte, a cualquier hora y sin caja abierta.
+    desde_caja: bool = False
     sesion_caja_id: Optional[int] = Field(default=None, gt=0)
     referencia: Optional[str] = Field(default=None, max_length=150)
+
+    @model_validator(mode="after")
+    def validar_caja(self):
+        if self.sesion_caja_id is not None:
+            # Indicar la caja equivale a decir que el efectivo salió de ella.
+            self.desde_caja = True
+        if self.desde_caja and self.metodo_pago != "efectivo":
+            raise ValueError("Solo un pago en efectivo puede salir de la caja.")
+        return self
 
 
 class PagoGastoOut(BaseModel):
@@ -128,6 +141,7 @@ class GastoOut(BaseModel):
     concepto: str
     proveedor_id: Optional[int]
     usuario_id: int
+    sucursal_id: Optional[int] = None
     fecha_documento: Optional[date]
     periodo_desde: Optional[date]
     periodo_hasta: Optional[date]
@@ -167,4 +181,6 @@ class ReporteFinancieroOut(BaseModel):
     cargos_adicionales_bob: Decimal
     utilidad_neta_estimada_bob: Optional[Decimal]
     moneda: str = "BOB"
+    # None = todas las sucursales.
+    sucursal_id: Optional[int] = None
     nota: str

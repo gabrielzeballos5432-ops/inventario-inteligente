@@ -30,7 +30,7 @@ def test_compra_sin_proveedor_continua_validando_productos():
     db.execute.return_value = SimpleNamespace(scalars=lambda: [])
 
     with pytest.raises(CompraValidationError, match="producto 1 no existe"):
-        asyncio.run(CompraService(db).registrar(compra(proveedor_id=None), 1))
+        asyncio.run(CompraService(db).registrar(compra(proveedor_id=None), 1, sucursal_id=1))
 
     assert db.get.await_count == 1
     db.execute.assert_awaited_once()
@@ -49,6 +49,8 @@ def test_compra_actualiza_stock_y_costo_con_o_sin_proveedor(proveedor_id):
     db.execute.side_effect = [
         SimpleNamespace(scalars=lambda: [producto]),
         SimpleNamespace(scalars=lambda: [inventario]),
+        # Stock sumado de todas las sucursales: aqui solo hay una.
+        SimpleNamespace(all=lambda: [(1, 5)]),
     ]
     servicio = CompraService(db)
     servicio.obtener = AsyncMock(return_value=None)
@@ -56,13 +58,14 @@ def test_compra_actualiza_stock_y_costo_con_o_sin_proveedor(proveedor_id):
         proveedor_id=proveedor_id,
         detalles=[dict(producto_id=1, cantidad=2, costo_unitario_moneda="20")],
     )
-    asyncio.run(servicio.registrar(datos, 7))
+    asyncio.run(servicio.registrar(datos, 7, sucursal_id=1))
     guardada = next(
         llamada.args[0] for llamada in db.add.call_args_list
         if isinstance(llamada.args[0], Compra)
     )
     assert guardada.proveedor_id == proveedor_id
     assert guardada.usuario_id == 7
+    assert guardada.sucursal_id == 1
     assert guardada.total_bob == Decimal("40")
     assert inventario.cantidad == 7
     assert producto.precio_compra == Decimal("12.86")
@@ -80,7 +83,7 @@ def test_compra_rechaza_producto_repetido_sin_consultas():
     datos = compra()
     datos.detalles.append(datos.detalles[0].model_copy())
     with pytest.raises(CompraValidationError, match="repetir"):
-        asyncio.run(CompraService(db).registrar(datos, 1))
+        asyncio.run(CompraService(db).registrar(datos, 1, sucursal_id=1))
     db.get.assert_not_awaited()
     db.add.assert_not_called()
 
@@ -90,7 +93,7 @@ def test_compra_rechaza_moneda_inexistente_o_inactiva(moneda):
     db = create_autospec(AsyncSession, instance=True)
     db.get.return_value = moneda
     with pytest.raises(CompraValidationError, match="moneda no existe"):
-        asyncio.run(CompraService(db).registrar(compra(), 1))
+        asyncio.run(CompraService(db).registrar(compra(), 1, sucursal_id=1))
     db.add.assert_not_called()
     db.commit.assert_not_awaited()
 
@@ -107,7 +110,7 @@ def test_compra_rechaza_cotizacion_o_precision_invalida(cambios, mensaje):
     db = create_autospec(AsyncSession, instance=True)
     db.get.return_value = SimpleNamespace(activa=True, decimales=2)
     with pytest.raises(CompraValidationError, match=mensaje):
-        asyncio.run(CompraService(db).registrar(compra(**cambios), 1))
+        asyncio.run(CompraService(db).registrar(compra(**cambios), 1, sucursal_id=1))
     db.execute.assert_not_awaited()
     db.add.assert_not_called()
 
@@ -117,6 +120,40 @@ def test_compra_rechaza_proveedor_inexistente_o_inactivo(proveedor):
     db = create_autospec(AsyncSession, instance=True)
     db.get.side_effect = [SimpleNamespace(activa=True, decimales=2), proveedor]
     with pytest.raises(CompraValidationError, match="proveedor no existe"):
-        asyncio.run(CompraService(db).registrar(compra(), 1))
+        asyncio.run(CompraService(db).registrar(compra(), 1, sucursal_id=1))
     db.add.assert_not_called()
     db.commit.assert_not_awaited()
+
+
+def test_costo_promedio_usa_el_stock_de_todas_las_sucursales():
+    # La sucursal que recibe tiene 0 unidades, pero otra tiene 8 a costo 10:
+    # el costo de compra es uno por producto, así que el promedio pondera las
+    # 8 unidades existentes y no toma el costo nuevo como si fuera el único.
+    db = create_autospec(AsyncSession, instance=True)
+    db.get.side_effect = [SimpleNamespace(codigo="BOB", activa=True, decimales=2)]
+    producto = SimpleNamespace(id=1, activo=True, nombre="Producto", precio_compra=Decimal("10"))
+    db.execute.side_effect = [
+        SimpleNamespace(scalars=lambda: [producto]),
+        SimpleNamespace(scalars=lambda: []),
+        SimpleNamespace(all=lambda: [(1, 8)]),
+    ]
+    servicio = CompraService(db)
+    servicio.obtener = AsyncMock(return_value=None)
+    datos = compra(
+        proveedor_id=None,
+        detalles=[dict(producto_id=1, cantidad=2, costo_unitario_moneda="20")],
+    )
+    asyncio.run(servicio.registrar(datos, 7, sucursal_id=2))
+    assert producto.precio_compra == Decimal("12.00")
+    inventario = next(
+        llamada.args[0] for llamada in db.add.call_args_list
+        if type(llamada.args[0]).__name__ == "Inventario"
+    )
+    assert inventario.sucursal_id == 2
+    assert inventario.cantidad == 2
+    movimiento = next(
+        llamada.args[0] for llamada in db.add.call_args_list
+        if isinstance(llamada.args[0], Movimiento)
+    )
+    assert movimiento.sucursal_id == 2
+    assert movimiento.razon_movimiento_id is not None

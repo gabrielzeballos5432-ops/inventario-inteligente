@@ -36,6 +36,12 @@ enum DestinoApp {
     Icons.local_shipping_outlined,
     'Administración',
     soloAdmin: true,
+  ),
+  configuracion(
+    'Configuración',
+    Icons.settings_outlined,
+    'Administración',
+    soloAdmin: true,
   );
 
   const DestinoApp(

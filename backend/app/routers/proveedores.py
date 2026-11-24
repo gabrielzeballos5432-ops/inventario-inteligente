@@ -90,13 +90,21 @@ async def actualizar_proveedor(
     cambios = body.model_dump(exclude_unset=True)
     cambios.pop("activo", None)
     cambios.update(_campos_texto(cambios))
+    # nombre: null no significa "borrar el nombre" (la columna es NOT NULL).
+    if cambios.get("nombre") is None:
+        cambios.pop("nombre", None)
     nombre = cambios.get("nombre")
     if nombre and nombre != proveedor.nombre:
         conflicto = await repo.obtener_por_nombre(nombre)
-        if conflicto is not None and conflicto.activo and conflicto.id != proveedor.id:
+        if conflicto is not None and conflicto.id != proveedor.id:
             raise HTTPException(
                 status_code=400,
-                detail="Ya existe un proveedor activo con ese nombre",
+                detail=(
+                    "Ya existe un proveedor activo con ese nombre"
+                    if conflicto.activo
+                    else "Hay un proveedor desactivado con ese nombre. "
+                    "Registralo de nuevo con ese nombre y se reactivara."
+                ),
             )
     for campo, valor in cambios.items():
         setattr(proveedor, campo, valor)

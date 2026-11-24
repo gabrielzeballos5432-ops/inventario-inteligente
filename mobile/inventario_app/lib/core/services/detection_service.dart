@@ -19,6 +19,9 @@ class DetectionService {
         .toList();
   }
 
+  /// Detecta productos en la foto SIN tocar el stock: el usuario revisa y
+  /// corrige el resultado, y la entrada se registra al confirmar
+  /// (`InventarioProvider.confirmarDeteccion`).
   Future<ResultadoInferencia> detectFromUpload(
     List<int> bytes,
     String fileName,
@@ -28,6 +31,20 @@ class DetectionService {
       fieldName: 'imagen',
       fileName: fileName,
       bytes: bytes,
+      fields: const {'tipo_operacion': 'entrada', 'registrar': 'false'},
+    );
+    return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Recuadros para la camara en vivo: el servidor no guarda nada. Timeout
+  /// corto: un cuadro que tarda mas ya no corresponde a lo que se ve.
+  Future<ResultadoInferencia> vistaPrevia(List<int> bytes) async {
+    final json = await _apiClient.postMultipart(
+      ApiConfig.inferenciaVistaPrevia,
+      fieldName: 'imagen',
+      fileName: 'vista.jpg',
+      bytes: bytes,
+      timeout: const Duration(seconds: 6),
     );
     return ResultadoInferencia.fromJson(json as Map<String, dynamic>);
   }

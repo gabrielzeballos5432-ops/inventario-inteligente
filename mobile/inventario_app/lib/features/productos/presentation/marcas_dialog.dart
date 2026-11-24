@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../core/models/marca.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/catalog_service.dart';
+import '../../../core/utils/mensaje_error.dart';
 import '../../../core/utils/validaciones.dart';
+import '../../../shared/widgets/catalogo_view.dart';
 import '../../../shared/widgets/section_card.dart';
-import '../../../shared/widgets/boton_seguro.dart';
 
 /// Gestion del catalogo de marcas.
 ///
@@ -14,258 +15,213 @@ import '../../../shared/widgets/boton_seguro.dart';
 /// nombre sigue reservado, asi que escribir el nombre de una marca
 /// desactivada la reactiva en lugar de crear otra.
 class MarcasPage extends StatefulWidget {
-  const MarcasPage();
+  const MarcasPage({super.key, this.service});
+
+  /// Inyectable para los tests; por defecto usa el cliente de la app.
+  final CatalogService? service;
 
   @override
   State<MarcasPage> createState() => MarcasPageState();
 }
 
 class MarcasPageState extends State<MarcasPage> {
-  final _service = CatalogService(ApiClient());
-  final _nombreController = TextEditingController();
-  late Future<List<Marca>> _future;
+  late final CatalogService _service =
+      widget.service ?? CatalogService(ApiClient());
+  List<Marca>? _marcas;
+  Object? _error;
+  bool _cargando = false;
 
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchMarcas();
+    _cargar();
   }
 
-  @override
-  void dispose() {
-    _nombreController.dispose();
-    super.dispose();
-  }
-
-  void _reload() {
-    setState(() => _future = _service.fetchMarcas());
-  }
-
-  static String _motivo(Object e) => e is ApiException ? e.detalle : '$e';
-
-  Future<void> _crear() async {
-    final error = Validaciones.nombreSinNumeros(_nombreController.text);
-    if (error != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
-      return;
-    }
-    final nombre = _nombreController.text.trim();
+  /// Consulta la lista sin vaciar la que ya se ve.
+  ///
+  /// Antes era `setState(() => _future = fetch())`: la flecha devuelve el
+  /// Future y Flutter lanza "setState() callback argument returned a Future"
+  /// en modo depuracion. Ese error caia en el catch de crear y la app
+  /// mostraba "No se pudo crear la marca" aunque el API ya la habia guardado,
+  /// y la lista no se refrescaba.
+  Future<void> _cargar() async {
+    if (!mounted) return;
+    setState(() => _cargando = true);
     try {
-      await _service.createMarca(nombre);
-      _nombreController.clear();
-      _reload();
+      final marcas = await _service.fetchMarcas();
+      if (!mounted) return;
+      setState(() {
+        _marcas = marcas;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo crear la marca: ${_motivo(e)}')),
-      );
+      setState(() => _error = e);
+    } finally {
+      if (mounted) setState(() => _cargando = false);
     }
   }
 
-  Future<void> _editar(Marca m) async {
-    final controller = TextEditingController(text: m.nombre);
-    final formKey = GlobalKey<FormState>();
-    final nombre = await showDialog<String>(
+  /// Pone la marca guardada en la lista al instante y luego confirma con el
+  /// servidor, para que aparezca aunque la recarga tarde o falle.
+  void _aplicar(Marca guardada) {
+    final lista = [...?_marcas]..removeWhere((m) => m.id == guardada.id);
+    lista
+      ..add(guardada)
+      ..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+    setState(() => _marcas = lista);
+    _cargar();
+  }
+
+  Future<void> _formulario({Marca? actual}) async {
+    final nombre = TextEditingController(text: actual?.nombre ?? '');
+    final guardada = await mostrarFormularioCatalogo<Marca>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        title: const Text('Renombrar marca'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            validator: Validaciones.nombreSinNumeros,
-            decoration: const InputDecoration(
-              labelText: 'Nombre',
-              errorMaxLines: 2,
-            ),
-            onFieldSubmitted: (v) {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(ctx).pop(v.trim());
-              }
-            },
+      titulo: actual == null ? 'Registrar marca' : 'Renombrar marca',
+      textoGuardar: actual == null ? 'Registrar' : 'Guardar',
+      campos: (enviar) => [
+        TextFormField(
+          controller: nombre,
+          autofocus: true,
+          maxLength: 100,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.done,
+          validator: Validaciones.nombreSinNumeros,
+          onFieldSubmitted: (_) => enviar(),
+          decoration: const InputDecoration(
+            labelText: 'Nombre *',
+            errorMaxLines: 2,
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          BotonSeguro(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.of(ctx).pop(controller.text.trim());
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+      ],
+      guardar: () {
+        final texto = nombre.text.trim();
+        if (actual == null) return _service.createMarca(texto);
+        if (texto == actual.nombre) return Future.value(actual);
+        return _service.renombrarMarca(actual.id, texto);
+      },
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
-    if (nombre == null || nombre.isEmpty || nombre == m.nombre) return;
-    try {
-      await _service.renombrarMarca(m.id, nombre);
-      _reload();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo renombrar: ${_motivo(e)}')),
-      );
-    }
+    // Tras el pop queda un frame de animacion que aun usa el controlador.
+    WidgetsBinding.instance.addPostFrameCallback((_) => nombre.dispose());
+    if (guardada == null || !mounted) return;
+    _aplicar(guardada);
+    avisoCatalogo(
+      context,
+      actual == null
+          ? 'Marca registrada: ${guardada.nombre}'
+          : 'Marca actualizada: ${guardada.nombre}',
+    );
   }
 
   Future<void> _desactivar(Marca m) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        title: const Text('Desactivar marca'),
-        content: Text(
-          'La marca "${m.nombre}" dejara de aparecer al registrar o editar '
+    final ok = await confirmarDesactivar(
+      context,
+      titulo: 'Desactivar marca',
+      mensaje:
+          'La marca "${m.nombre}" dejará de aparecer al registrar o editar '
           'productos. Los productos que ya la usan no se modifican.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          BotonSeguro(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Desactivar'),
-          ),
-        ],
-      ),
     );
-    if (ok != true) return;
+    if (!ok || !mounted) return;
     try {
       await _service.desactivarMarca(m.id);
-      _reload();
+      if (!mounted) return;
+      setState(() => _marcas = [...?_marcas]..removeWhere((x) => x.id == m.id));
+      avisoCatalogo(context, 'Marca desactivada: ${m.nombre}');
+      _cargar();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo desactivar: ${_motivo(e)}')),
-      );
+      avisoCatalogo(context, 'No se pudo desactivar: ${mensajeDeError(e)}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Marca>>(
-      future: _future,
-      builder: (context, snapshot) {
-        final marcas = snapshot.data ?? const <Marca>[];
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Administra las marcas disponibles para clasificar productos.',
-                    style: TextStyle(color: context.textoSecundario),
-                  ),
+    return CatalogoView<Marca>(
+      descripcion: 'Administra las marcas disponibles para clasificar productos.',
+      items: _marcas,
+      error: _error,
+      cargando: _cargando,
+      onRecargar: _cargar,
+      onRegistrar: () => _formulario(),
+      textoBusqueda: (m) => m.nombre,
+      textoVacio: 'No hay marcas registradas.\nUsa "Registrar" para crear la primera.',
+      etiquetaTotal: (n) => n == 1 ? '1 marca' : '$n marcas',
+      icono: Icons.sell_outlined,
+      notaPie:
+          'Desactivar no borra el nombre: si vuelves a registrar una marca '
+          'desactivada, se reactiva.',
+      itemBuilder: (context, m) => SectionCard(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _formulario(actual: m),
+          child: Row(
+            children: [
+              _Inicial(m.nombre),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  m.nombre,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                BotonSeguro(
-                  onPressed: _abrirCrear,
-                  icon: const Icon(Icons.add),
-                  child: const Text('Registrar'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (snapshot.connectionState == ConnectionState.waiting)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (snapshot.hasError)
-              SectionCard(
-                child: Row(
-                  children: [
-                    Icon(Icons.cloud_off, color: context.paleta.stockBajo),
-                    const SizedBox(width: 10),
-                    const Expanded(child: Text('No se pudieron cargar las marcas.')),
-                    TextButton(onPressed: _reload, child: const Text('Reintentar')),
-                  ],
-                ),
-              )
-            else if (marcas.isEmpty)
-              const SectionCard(child: Text('No hay marcas registradas.'))
-            else ...[
-              SectionCard(
-                child: Text('Total de marcas: ${marcas.length}',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
-              const SizedBox(height: 12),
-              ...marcas.map(
-                (m) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: SectionCard(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.sell_outlined),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(m.nombre)),
-                        PopupMenuButton<String>(
-                          tooltip: 'Acciones',
-                          onSelected: (opcion) {
-                            if (opcion == 'editar') _editar(m);
-                            if (opcion == 'desactivar') _desactivar(m);
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'editar', child: Text('Editar')),
-                            PopupMenuItem(value: 'desactivar', child: Text('Desactivar')),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              _MenuAcciones(
+                alEditar: () => _formulario(actual: m),
+                alDesactivar: () => _desactivar(m),
               ),
             ],
-            const SizedBox(height: 8),
-            Text(
-              'Desactivar no borra el nombre: si vuelves a registrar una marca desactivada, se reactiva.',
-              style: TextStyle(color: context.textoTerciario, fontSize: 12),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _abrirCrear() async {
-    final formKey = GlobalKey<FormState>();
-    _nombreController.clear();
-    final crear = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        title: const Text('Registrar marca'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: _nombreController,
-            autofocus: true,
-            validator: Validaciones.nombreSinNumeros,
-            decoration: const InputDecoration(labelText: 'Nombre', errorMaxLines: 2),
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          BotonSeguro(
-            onPressed: () {
-              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
-            },
-            child: const Text('Registrar'),
-          ),
-        ],
       ),
     );
-    if (crear == true) await _crear();
+  }
+}
+
+/// Circulo con la inicial del nombre, compartido por marcas y proveedores.
+class _Inicial extends StatelessWidget {
+  const _Inicial(this.nombre);
+  final String nombre;
+
+  @override
+  Widget build(BuildContext context) {
+    final esquema = Theme.of(context).colorScheme;
+    final letra = nombre.trim().isEmpty ? '?' : nombre.trim()[0].toUpperCase();
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: esquema.primaryContainer,
+      foregroundColor: esquema.onPrimaryContainer,
+      child: Text(letra, style: const TextStyle(fontWeight: FontWeight.w700)),
+    );
+  }
+}
+
+class _MenuAcciones extends StatelessWidget {
+  const _MenuAcciones({required this.alEditar, required this.alDesactivar});
+  final VoidCallback alEditar;
+  final VoidCallback alDesactivar;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Acciones',
+      onSelected: (op) => op == 'editar' ? alEditar() : alDesactivar(),
+      itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: 'editar',
+          child: ListTile(
+            leading: Icon(Icons.edit_outlined),
+            title: Text('Editar'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem(
+          value: 'desactivar',
+          child: ListTile(
+            leading: Icon(Icons.block, color: context.paleta.negativo),
+            title: const Text('Desactivar'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+    );
   }
 }

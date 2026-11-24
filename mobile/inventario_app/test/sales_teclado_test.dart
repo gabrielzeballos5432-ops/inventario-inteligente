@@ -15,7 +15,6 @@ import 'package:inventario_app/core/services/detection_service.dart';
 import 'package:inventario_app/core/services/local_db_service.dart';
 import 'package:inventario_app/core/services/operaciones_service.dart';
 import 'package:inventario_app/core/services/product_service.dart';
-import 'package:inventario_app/core/services/sync_service.dart';
 import 'package:inventario_app/features/ventas/presentation/sales_page.dart';
 import 'package:provider/provider.dart';
 
@@ -25,7 +24,6 @@ class _InventarioPrueba extends InventarioProvider {
         ProductService(api),
         DetectionService(api),
         LocalDbService(),
-        SyncService(api, LocalDbService()),
       );
 
   final ventas = <Map<String, dynamic>>[];
@@ -121,37 +119,92 @@ void main() {
     });
   }
 
-  for (final etiqueta in ['Código', 'Cantidad', 'Monto total (Bs)']) {
-    for (final tecla in [
-      LogicalKeyboardKey.enter,
-      LogicalKeyboardKey.numpadEnter,
-    ]) {
-      testWidgets('$tecla registra desde $etiqueta', (tester) async {
-        final inventario = await _montar(tester, const Size(1440, 900));
-        await tester.enterText(_campo('Código'), 'ZOOM-1');
-        await tester.enterText(_campo('Cantidad'), '2');
-        await tester.enterText(_campo('Monto total (Bs)'), '30');
-        await tester.tap(_campo(etiqueta));
-        await tester.sendKeyEvent(tecla);
-        await tester.pumpAndSettle();
-        expect(inventario.ventas, hasLength(1));
-        expect(inventario.ventas.single['detalles'], [
-          {
-            'producto_id': 1,
-            'cantidad': 2,
-            'precio_unitario_negociado': '15.00',
-            'total_linea': '30.00',
-          },
-        ]);
-        expect(
-          tester.widget<TextField>(_campo('Código')).controller!.text,
-          isEmpty,
-        );
-      });
-    }
+  bool enfocado(WidgetTester tester, String etiqueta) =>
+      tester.widget<TextField>(_campo(etiqueta)).focusNode!.hasFocus;
+
+  Future<void> ctrlEnter(WidgetTester tester) async {
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
   }
 
-  testWidgets('Enter incluye captura pendiente con filas ya agregadas', (
+  for (final tecla in [
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+  ]) {
+    testWidgets('$tecla avanza Código → Cantidad → Monto y agrega la fila', (
+      tester,
+    ) async {
+      final inventario = await _montar(tester, const Size(1440, 900));
+      await tester.enterText(_campo('Código'), 'ZOOM-1');
+      await tester.sendKeyEvent(tecla);
+      await tester.pumpAndSettle();
+      expect(enfocado(tester, 'Cantidad'), isTrue);
+
+      await tester.enterText(_campo('Cantidad'), '2');
+      await tester.sendKeyEvent(tecla);
+      await tester.pumpAndSettle();
+      expect(enfocado(tester, 'Monto total (Bs)'), isTrue);
+
+      await tester.enterText(_campo('Monto total (Bs)'), '30');
+      await tester.sendKeyEvent(tecla);
+      await tester.pumpAndSettle();
+      // La fila quedó agregada y la captura vuelve a Código, sin cobrar.
+      expect(inventario.ventas, isEmpty);
+      expect(enfocado(tester, 'Código'), isTrue);
+      expect(
+        tester.widget<TextField>(_campo('Código')).controller!.text,
+        isEmpty,
+      );
+
+      // Enter con el código vacío registra la venta.
+      await tester.sendKeyEvent(tecla);
+      await tester.pumpAndSettle();
+      expect(inventario.ventas, hasLength(1));
+      expect(inventario.ventas.single['detalles'], [
+        {
+          'producto_id': 1,
+          'cantidad': 2,
+          'precio_unitario_negociado': '15.00',
+          'total_linea': '30.00',
+        },
+      ]);
+    });
+  }
+
+  testWidgets('lector de códigos: código + Enter carga el producto sin cobrar', (
+    tester,
+  ) async {
+    final inventario = await _montar(tester, const Size(1440, 900));
+    await tester.enterText(_campo('Código'), 'ZOOM-1');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(inventario.ventas, isEmpty);
+    expect(enfocado(tester, 'Cantidad'), isTrue);
+    expect(find.text('Producto de prueba'), findsWidgets);
+  });
+
+  for (final etiqueta in ['Código', 'Cantidad', 'Monto total (Bs)']) {
+    testWidgets('Ctrl+Enter registra desde $etiqueta con la captura', (
+      tester,
+    ) async {
+      final inventario = await _montar(tester, const Size(1440, 900));
+      await tester.enterText(_campo('Código'), 'ZOOM-1');
+      await tester.enterText(_campo('Cantidad'), '2');
+      await tester.enterText(_campo('Monto total (Bs)'), '30');
+      await tester.tap(_campo(etiqueta));
+      await ctrlEnter(tester);
+      expect(inventario.ventas, hasLength(1));
+      expect(inventario.ventas.single['detalles'], hasLength(1));
+      expect(
+        tester.widget<TextField>(_campo('Código')).controller!.text,
+        isEmpty,
+      );
+    });
+  }
+
+  testWidgets('Ctrl+Enter incluye captura pendiente con filas ya agregadas', (
     tester,
   ) async {
     final inventario = await _montar(tester, const Size(1440, 900));
@@ -160,37 +213,73 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(_campo('Código'), 'ZOOM-1');
     await tester.enterText(_campo('Cantidad'), '2');
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pumpAndSettle();
+    await ctrlEnter(tester);
     expect(inventario.ventas, hasLength(1));
     expect(inventario.ventas.single['detalles'], hasLength(2));
   });
 
-  testWidgets('Enter repetido no duplica registro pendiente', (tester) async {
+  testWidgets('Ctrl+Enter repetido no duplica registro pendiente', (
+    tester,
+  ) async {
     final inventario = await _montar(tester, const Size(1440, 900));
     inventario.pendiente = Completer<void>();
     await tester.enterText(_campo('Código'), 'ZOOM-1');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
     expect(inventario.ventas, hasLength(1));
     inventario.pendiente!.complete();
     await tester.pumpAndSettle();
   });
 
-  testWidgets('accion del teclado movil registra y codigo invalido no envia', (
+  testWidgets('teclado del celular: avanza campo por campo y código inválido avisa', (
     tester,
   ) async {
-    final inventario = await _montar(tester, const Size(1440, 900));
+    final inventario = await _montar(tester, const Size(600, 844));
     await tester.enterText(_campo('Código'), 'NO-EXISTE');
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
     await tester.pumpAndSettle();
-    expect(inventario.ventas, isEmpty);
+    expect(find.text('No existe un producto con ese código.'), findsOneWidget);
+    expect(enfocado(tester, 'Código'), isTrue);
+
     await tester.enterText(_campo('Código'), 'ZOOM-1');
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    expect(enfocado(tester, 'Cantidad'), isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pumpAndSettle();
+    expect(enfocado(tester, 'Monto total (Bs)'), isTrue);
     await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    // Se agregó la fila (monto de lista), sin registrar todavía.
+    expect(inventario.ventas, isEmpty);
+    expect(enfocado(tester, 'Código'), isTrue);
+
+    await tester.testTextInput.receiveAction(TextInputAction.next);
     await tester.pumpAndSettle();
     expect(inventario.ventas, hasLength(1));
     expect(tester.takeException(), isNull);
   });
+
+  for (final tamano in [
+    const Size(320, 640),
+    const Size(360, 800),
+    const Size(390, 844),
+  ]) {
+    testWidgets('teléfono angosto sin desbordes, vacía y con productos: $tamano', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _montar(tester, tamano);
+      expect(tester.takeException(), isNull);
+      await tester.enterText(_campo('Código'), 'ZOOM-1');
+      await tester.tap(find.text('Agregar'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

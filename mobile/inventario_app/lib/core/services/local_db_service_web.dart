@@ -1,38 +1,35 @@
 // Implementacion web de la base de datos local (sin SQLite).
-// La cola de sincronizacion y el cache viven solo en memoria: en web la
-// sesion siempre esta en linea con el backend, por lo que no se pierde nada
-// relevante al recargar la pagina.
+// El cache de inventario y la cola de movimientos viven solo en memoria: se
+// pierden al recargar la pagina. La cola persistente es de Android y Windows.
 class LocalDbService {
-  final List<Map<String, dynamic>> _cola = [];
   final Map<int, Map<String, dynamic>> _cache = {};
-  int _siguienteId = 1;
+  final Map<String, Map<String, dynamic>> _cola = {};
 
-  Future<void> encolarMovimiento(
-    int productoId,
-    String tipo,
-    int cantidad,
-  ) async {
-    _cola.add({
-      'id': _siguienteId++,
-      'producto_id': productoId,
-      'tipo': tipo,
-      'cantidad': cantidad,
-      'origen': 'offline',
-      'creado_en': DateTime.now().toIso8601String(),
-      'sincronizado': 0,
-    });
+  Future<void> guardarPendiente(Map<String, dynamic> fila) async {
+    _cola[fila['clave'] as String] = Map.of(fila);
   }
 
   Future<List<Map<String, dynamic>>> obtenerPendientes() async {
-    return _cola.where((m) => m['sincronizado'] == 0).toList();
+    final filas = _cola.values.map(Map<String, dynamic>.of).toList()
+      ..sort(
+        (a, b) => (a['creado_en'] as String).compareTo(b['creado_en'] as String),
+      );
+    return filas;
   }
 
-  Future<void> marcarSincronizado(int id) async {
-    for (final item in _cola) {
-      if (item['id'] == id) {
-        item['sincronizado'] = 1;
-      }
-    }
+  Future<void> actualizarPendiente(
+    String clave, {
+    required String estado,
+    String? detalle,
+  }) async {
+    final fila = _cola[clave];
+    if (fila == null) return;
+    fila['estado'] = estado;
+    fila['detalle'] = detalle;
+  }
+
+  Future<void> eliminarPendiente(String clave) async {
+    _cola.remove(clave);
   }
 
   Future<void> cachearInventario(List<Map<String, dynamic>> productos) async {

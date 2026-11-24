@@ -99,6 +99,7 @@ class Gasto(Base):
     concepto = Column(String(200), nullable=False)
     proveedor_id = Column(Integer, ForeignKey("proveedor.id"))
     usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False)
+    sucursal_id = Column(Integer, ForeignKey("sucursal.id"), nullable=False)
     fecha_documento = Column(Date)
     periodo_desde = Column(Date)
     periodo_hasta = Column(Date)

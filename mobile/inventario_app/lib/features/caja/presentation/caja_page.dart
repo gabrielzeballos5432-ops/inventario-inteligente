@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
-import '../../../core/network/api_client.dart';
+import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/validaciones.dart';
+import '../../../core/utils/formato_numero.dart';
 
 class CajaPage extends StatefulWidget {
   final bool esAdmin;
@@ -87,7 +90,7 @@ class _CajaPageState extends State<CajaPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Caja cerrada. Diferencia: Bs ${diferencia.toStringAsFixed(2)}',
+            'Caja cerrada. Diferencia: ${FormatoNumero.bs(diferencia)}',
           ),
         ),
       );
@@ -126,19 +129,15 @@ class _CajaPageState extends State<CajaPage> {
     }
   }
 
-  String _mensajeError(Object error) {
-    if (error is ApiException) return error.detalle;
-    final texto = error.toString();
-    return texto.startsWith('Error HTTP')
-        ? texto.substring(texto.indexOf(':') + 2)
-        : 'No se pudo completar la operación. $texto';
-  }
+  String _mensajeError(Object error) => mensajeDeError(error);
 
   String _dinero(dynamic valor) =>
-      'Bs ${(double.tryParse('$valor') ?? 0).toStringAsFixed(2)}';
+      FormatoNumero.bs(valor is num ? valor : double.tryParse('$valor'));
 
   String _fecha(dynamic fecha) {
-    final valor = DateTime.tryParse(fecha?.toString() ?? '');
+    // El backend manda la hora en UTC ("...Z"): sin toLocal() la caja abierta
+    // a las 16:46 en Bolivia se mostraba como 20:46.
+    final valor = DateTime.tryParse(fecha?.toString() ?? '')?.toLocal();
     if (valor == null) return '—';
     return '${valor.day.toString().padLeft(2, '0')}/'
         '${valor.month.toString().padLeft(2, '0')}/${valor.year} '
@@ -301,28 +300,16 @@ class _DialogoMontoState extends State<_DialogoMonto> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextFormField(
+              inputFormatters: FormatoNumero.decimal(decimales: 2),
               controller: _monto,
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               decoration: InputDecoration(labelText: widget.etiqueta),
-              validator: (texto) {
-                final valor = double.tryParse(texto ?? '');
-                if (valor == null ||
-                    valor < 0 ||
-                    (!widget.permitirCero && valor == 0)) {
-                  return widget.permitirCero
-                      ? 'Ingresa un monto válido'
-                      : 'El monto debe ser mayor a cero';
-                }
-                if (!RegExp(
-                  r'^\d{1,10}([.]\d{1,2})?$',
-                ).hasMatch(texto!.trim())) {
-                  return 'Usa hasta 2 decimales';
-                }
-                return null;
-              },
+              // Acepta coma decimal (teclado del celular en castellano).
+              validator: (texto) =>
+                  Validaciones.monto(texto, permitirCero: widget.permitirCero),
             ),
             if (widget.pedirNota)
               TextFormField(
@@ -344,7 +331,7 @@ class _DialogoMontoState extends State<_DialogoMonto> {
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Navigator.pop(context, (
-                monto: double.parse(_monto.text.trim()),
+                monto: Validaciones.leerNumero(_monto.text)!,
                 nota: widget.pedirNota ? _nota.text.trim() : null,
               ));
             }
@@ -422,6 +409,7 @@ class _CajaAbierta extends StatelessWidget {
             ],
           ),
           Text('Abierta: $fecha'),
+          ..._sucursalDeLaCaja(context, sesion),
           const SizedBox(height: 12),
           _DatoCaja(
             etiqueta: 'Efectivo inicial',
@@ -442,6 +430,31 @@ class _CajaAbierta extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Sucursal de la caja abierta y, si no es la activa, un aviso: las ventas y
+/// pagos en efectivo de esta sucursal no entran en una caja de otro local.
+List<Widget> _sucursalDeLaCaja(
+  BuildContext context,
+  Map<String, dynamic> sesion,
+) {
+  final control = SucursalController.instance;
+  final sucursalCaja = control.porId(sesion['sucursal_id'] as int?);
+  if (sucursalCaja == null) return const [];
+  final esOtra = control.activaId != null && sucursalCaja.id != control.activaId;
+  return [
+    const SizedBox(height: 4),
+    Text('Sucursal: ${sucursalCaja.nombre}'),
+    if (esOtra) ...[
+      const SizedBox(height: 8),
+      Text(
+        'Esta caja es de ${sucursalCaja.nombre}. Las ventas en efectivo de '
+        '${control.activa?.nombre ?? 'esta sucursal'} no se suman a ella: '
+        'ciérrala y abre una aquí si vas a cobrar en este local.',
+        style: TextStyle(color: context.paleta.stockBajo),
+      ),
+    ],
+  ];
 }
 
 class _DatoCaja extends StatelessWidget {

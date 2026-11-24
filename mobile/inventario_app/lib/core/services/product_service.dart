@@ -116,6 +116,7 @@ class ProductService {
     required int productoId,
     required String tipo,
     required int cantidad,
+    required int razonId,
     String origen = 'manual',
   }) async {
     final json = await _apiClient.postJson(
@@ -125,6 +126,7 @@ class ProductService {
         'tipo': tipo,
         'cantidad': cantidad,
         'origen': origen,
+        'razon_movimiento_id': razonId,
       },
     );
     if (json == null) return null;
@@ -140,11 +142,29 @@ class ProductService {
   Future<ResultadoLote> registrarLote({
     required String tipo,
     required List<({int productoId, int cantidad})> items,
+    int? razonId,
+    int? sucursalDestinoId,
+    String origen = 'manual',
+    int? sesionId,
+    String? claveIdempotencia,
+    int? sucursalId,
   }) async {
     final json = await _apiClient.postJson(
       ApiConfig.movimientoLote,
+      sucursalId: sucursalId,
       {
+        // Si el envio se repite (cola offline, respuesta perdida), el backend
+        // reconoce la clave y no registra el lote dos veces.
+        if (claveIdempotencia != null) 'clave_idempotencia': claveIdempotencia,
         'tipo': tipo,
+        // Obligatoria en lo manual: el backend la rechaza si falta. Con
+        // origen "ia" el backend asigna sola la razon "Deteccion IA".
+        if (razonId != null) 'razon_movimiento_id': razonId,
+        'origen': origen,
+        if (sesionId != null) 'sesion_id': sesionId,
+        // Solo en un traspaso ("Salida a sucursal"): el backend registra la
+        // entrada en esta sucursal en la misma transaccion.
+        if (sucursalDestinoId != null) 'sucursal_destino_id': sucursalDestinoId,
         'items': items
             .map((i) => {'producto_id': i.productoId, 'cantidad': i.cantidad})
             .toList(),
@@ -153,9 +173,15 @@ class ProductService {
     return ResultadoLote.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<List<ProductoConStock>> reporteStock() async {
-    final json =
-        await _apiClient.getJson(ApiConfig.reporteStock) as List<dynamic>;
+  /// Filtro de los reportes: `sucursalId` null = todas las sucursales.
+  static Map<String, String> _filtroSucursal(int? sucursalId) =>
+      {if (sucursalId != null) 'sucursal_id': '$sucursalId'};
+
+  Future<List<ProductoConStock>> reporteStock({int? sucursalId}) async {
+    final json = await _apiClient.getJson(
+      ApiConfig.reporteStock,
+      query: _filtroSucursal(sucursalId),
+    ) as List<dynamic>;
     return json
         .map((item) =>
             ProductoConStock.fromJson(item as Map<String, dynamic>))
@@ -165,10 +191,12 @@ class ProductService {
   Future<List<Movimiento>> reporteMovimientos({
     String? fechaDesde,
     String? fechaHasta,
+    int? sucursalId,
   }) async {
     final query = <String, String>{
       if (fechaDesde != null) 'fecha_desde': fechaDesde,
       if (fechaHasta != null) 'fecha_hasta': fechaHasta,
+      ..._filtroSucursal(sucursalId),
     };
     final json = await _apiClient.getJson(
       ApiConfig.reporteMovimientos,
@@ -179,18 +207,24 @@ class ProductService {
         .toList();
   }
 
-  Future<List<int>> exportarStock({String formato = 'csv'}) async {
+  Future<List<int>> exportarStock({String formato = 'csv', int? sucursalId}) async {
     return _apiClient.getBytes(ApiConfig.exportarStock,
-        query: {'formato': formato});
+        query: {'formato': formato, ..._filtroSucursal(sucursalId)});
   }
 
-  Future<List<int>> exportarMovimientos({String formato = 'csv'}) async {
+  Future<List<int>> exportarMovimientos({
+    String formato = 'csv',
+    int? sucursalId,
+  }) async {
     return _apiClient.getBytes(ApiConfig.exportarMovimientos,
-        query: {'formato': formato});
+        query: {'formato': formato, ..._filtroSucursal(sucursalId)});
   }
 
-  Future<ValorizacionInventario> valorizacion() async {
-    final json = await _apiClient.getJson(ApiConfig.valorizacion);
+  Future<ValorizacionInventario> valorizacion({int? sucursalId}) async {
+    final json = await _apiClient.getJson(
+      ApiConfig.valorizacion,
+      query: _filtroSucursal(sucursalId),
+    );
     return ValorizacionInventario.fromJson(json as Map<String, dynamic>);
   }
 }

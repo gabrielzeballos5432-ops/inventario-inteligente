@@ -19,7 +19,7 @@ enum EstadoServidor {
 
 /// Vigila si el backend responde de verdad.
 ///
-/// `ConnectivityService` solo sabe si el telefono tiene red, y cuando la laptop
+/// Saber si el telefono tiene red no basta: cuando la laptop
 /// se suspende el telefono sigue con Wi-Fi: por eso la app no se enteraba de
 /// que el servidor se habia caido y solo quedaba el error al pedir datos.
 ///

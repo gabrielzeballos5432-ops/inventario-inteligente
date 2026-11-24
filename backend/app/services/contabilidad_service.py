@@ -20,7 +20,7 @@ from app.schemas.contabilidad import (
     GastoCreate,
     PagoGastoCreate,
 )
-from app.services.caja_service import CajaService
+from app.services.caja_service import CajaService, CajaValidationError
 
 
 CENTAVO = Decimal("0.01")
@@ -171,7 +171,9 @@ class ContabilidadService:
         categoria.activo = False
         await self.db.commit()
 
-    async def registrar_gasto(self, data: GastoCreate, usuario_id: int) -> dict:
+    async def registrar_gasto(
+        self, data: GastoCreate, usuario_id: int, sucursal_id: int
+    ) -> dict:
         valores = data.model_dump()
         if data.categoria_gasto_id is not None:
             resultado = await self.db.execute(
@@ -214,6 +216,7 @@ class ContabilidadService:
         gasto = Gasto(
             **valores,
             usuario_id=usuario_id,
+            sucursal_id=sucursal_id,
             monto_bob=monto_bob,
             estado="pendiente",
         )
@@ -262,30 +265,49 @@ class ContabilidadService:
                 "El pago supera el saldo pendiente del gasto."
             )
         pagos = []
+        # Efectivo que este registro saca de cada caja: no puede superar lo
+        # que hay. Antes se aceptaba cualquier monto y la caja quedaba con un
+        # esperado negativo que ya no se podía cerrar nunca.
+        efectivo_por_caja: dict[int, Decimal] = {}
+        cajas: dict[int, SesionCaja] = {}
         for data in datos:
-            sesion_caja_id = data.sesion_caja_id
-            if data.metodo_pago == "efectivo" and sesion_caja_id is None:
+            # Solo el efectivo marcado "desde la caja" se liga a una sesión:
+            # el resto (QR, transferencia, efectivo pagado aparte) no toca el
+            # cajón y no necesita caja abierta.
+            sesion_caja_id = data.sesion_caja_id if data.desde_caja else None
+            if data.desde_caja and sesion_caja_id is None:
+                # El efectivo sale de la caja del local del gasto.
                 abierta = await self.db.execute(
                     select(SesionCaja.id).where(
                         SesionCaja.usuario_apertura_id == usuario_id,
                         SesionCaja.estado == "abierta",
+                        SesionCaja.sucursal_id == gasto.sucursal_id,
                     )
                 )
                 sesion_caja_id = abierta.scalar_one_or_none()
                 if sesion_caja_id is None:
                     raise ContabilidadValidationError(
-                        "Abre una sesión de caja para registrar un pago en efectivo."
+                        "No tienes una caja abierta en la sucursal del gasto. "
+                        "Desmarca \"Se pagó con dinero de la caja\" si el "
+                        "efectivo salió de otro lado."
                     )
             if sesion_caja_id is not None:
-                await CajaService(self.db).validar_caja_venta(
-                    usuario_id, sesion_caja_id
-                )
+                try:
+                    cajas[sesion_caja_id] = await CajaService(self.db).validar_caja_venta(
+                        usuario_id, sesion_caja_id, gasto.sucursal_id
+                    )
+                except CajaValidationError as exc:
+                    raise ContabilidadValidationError(str(exc)) from exc
             monto_bob = (
                 data.monto / gasto.tipo_cambio_ext * gasto.tipo_cambio_bob
             ).quantize(CENTAVO, rounding=ROUND_HALF_UP)
             if monto_bob <= 0:
                 raise ContabilidadValidationError(
                     "El importe convertido del pago debe ser mayor que cero."
+                )
+            if data.metodo_pago == "efectivo" and sesion_caja_id is not None:
+                efectivo_por_caja[sesion_caja_id] = (
+                    efectivo_por_caja.get(sesion_caja_id, Decimal("0")) + monto_bob
                 )
             pagos.append(PagoGasto(
                 gasto_id=gasto.id,
@@ -295,6 +317,16 @@ class ContabilidadService:
                 metodo_pago=data.metodo_pago,
                 referencia=data.referencia,
             ))
+        for sesion_caja_id, salida in efectivo_por_caja.items():
+            disponible = await CajaService(self.db).efectivo_en_caja(
+                cajas[sesion_caja_id]
+            )
+            if salida > disponible:
+                raise ContabilidadValidationError(
+                    f"No hay efectivo suficiente en la caja: disponible "
+                    f"Bs {max(disponible, Decimal('0')):.2f}, se quieren pagar "
+                    f"Bs {salida:.2f}. Paga el resto por transferencia o QR."
+                )
         self.db.add_all(pagos)
         if pagado + total == gasto.monto:
             gasto.estado = "pagado"
@@ -353,6 +385,7 @@ class ContabilidadService:
             "concepto": gasto.concepto,
             "proveedor_id": gasto.proveedor_id,
             "usuario_id": gasto.usuario_id,
+            "sucursal_id": gasto.sucursal_id,
             "fecha_documento": gasto.fecha_documento,
             "periodo_desde": gasto.periodo_desde,
             "periodo_hasta": gasto.periodo_hasta,
@@ -378,6 +411,7 @@ class ContabilidadService:
         fecha_fin: date | None = None,
         categoria: str | None = None,
         limite: int = 100,
+        sucursal_id: int | None = None,
     ) -> list[dict]:
         query = select(Gasto).options(selectinload(Gasto.pagos)).order_by(
             Gasto.fecha_creacion.desc(), Gasto.id.desc()
@@ -402,12 +436,20 @@ class ContabilidadService:
             )
         if categoria:
             query = query.where(Gasto.categoria == categoria)
+        if sucursal_id is not None:
+            query = query.where(Gasto.sucursal_id == sucursal_id)
         result = await self.db.execute(query.limit(limite))
         return [await self.obtener_gasto(gasto.id) for gasto in result.scalars().all()]
 
     async def reporte_financiero(
-        self, fecha_inicio: date, fecha_fin: date
+        self, fecha_inicio: date, fecha_fin: date, sucursal_id: int | None = None
     ) -> dict:
+        """Resultado del período, de una sucursal o de todas (None).
+
+        Ventas, costo y gastos se filtran por sucursal. Los sueldos y bonos son
+        del personal, no de un local: solo entran en el reporte de todas las
+        sucursales, y la nota lo dice para no inflar la utilidad de un local.
+        """
         if fecha_fin < fecha_inicio:
             raise ContabilidadValidationError(
                 "La fecha de fin no puede ser anterior a la fecha de inicio."
@@ -416,12 +458,15 @@ class ContabilidadService:
         fin_exclusivo = datetime.combine(
             fecha_fin + timedelta(days=1), time.min, ZONA_NEGOCIO
         )
+        filtro_venta = [
+            Venta.estado == "completada",
+            Venta.fecha_creacion >= inicio_local,
+            Venta.fecha_creacion < fin_exclusivo,
+        ]
+        if sucursal_id is not None:
+            filtro_venta.append(Venta.sucursal_id == sucursal_id)
         ventas_result = await self.db.execute(
-            select(func.coalesce(func.sum(Venta.total), 0)).where(
-                Venta.estado == "completada",
-                Venta.fecha_creacion >= inicio_local,
-                Venta.fecha_creacion < fin_exclusivo,
-            )
+            select(func.coalesce(func.sum(Venta.total), 0)).where(*filtro_venta)
         )
         ventas_netas = Decimal(ventas_result.scalar_one()).quantize(CENTAVO)
         resultado_costos = await self.db.execute(
@@ -431,11 +476,7 @@ class ContabilidadService:
                 func.count(VentaDetalle.costo_total_bob_aplicado),
             )
             .join(Venta, VentaDetalle.venta_id == Venta.id)
-            .where(
-                Venta.estado == "completada",
-                Venta.fecha_creacion >= inicio_local,
-                Venta.fecha_creacion < fin_exclusivo,
-            )
+            .where(*filtro_venta)
         )
         costos_suma, total_detalles, detalles_con_costo = resultado_costos.one()
         sin_costo = total_detalles - detalles_con_costo
@@ -457,6 +498,7 @@ class ContabilidadService:
                 Gasto.estado != "anulado",
                 fecha_gasto >= fecha_inicio,
                 fecha_gasto <= fecha_fin,
+                *([Gasto.sucursal_id == sucursal_id] if sucursal_id is not None else []),
             )
         )
         gastos = Decimal(gastos_result.scalar_one()).quantize(CENTAVO)
@@ -468,7 +510,8 @@ class ContabilidadService:
             )
         )
         salarios = Decimal("0")
-        for liquidacion in liquidaciones_result.scalars():
+        liquidaciones = list(liquidaciones_result.scalars()) if sucursal_id is None else []
+        for liquidacion in liquidaciones:
             dias_periodo = (liquidacion.fecha_fin - liquidacion.fecha_inicio).days + 1
             dias_solapados = (
                 min(liquidacion.fecha_fin, fecha_fin)
@@ -497,9 +540,16 @@ class ContabilidadService:
             "cargos_adicionales_bob": Decimal("0.00"),
             "utilidad_neta_estimada_bob": utilidad_operativa,
             "moneda": "BOB",
+            "sucursal_id": sucursal_id,
             "nota": (
                 "Estimación operativa antes de impuestos y cargos no registrados. "
                 "La ganancia bruta solo se informa si todas las ventas del período "
                 "tienen costo histórico capturado."
+                + (
+                    " Los sueldos y bonos son del negocio completo: solo se "
+                    "incluyen en el reporte de todas las sucursales."
+                    if sucursal_id is not None
+                    else ""
+                )
             ),
         }

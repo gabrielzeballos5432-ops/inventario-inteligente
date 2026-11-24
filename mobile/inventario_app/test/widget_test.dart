@@ -13,22 +13,19 @@ import 'package:inventario_app/core/services/auth_service.dart';
 import 'package:inventario_app/core/services/detection_service.dart';
 import 'package:inventario_app/core/services/local_db_service.dart';
 import 'package:inventario_app/core/services/product_service.dart';
-import 'package:inventario_app/core/services/sync_service.dart';
 
 void main() {
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
-  testWidgets('muestra la pantalla de login sin sesion', (tester) async {
+  testWidgets('muestra la pantalla de login sin sesión', (tester) async {
     final apiClient = ApiClient();
     final localDb = LocalDbService();
-    final syncService = SyncService(apiClient, localDb);
     final inventarioProvider = InventarioProvider(
       ProductService(apiClient),
       DetectionService(apiClient),
       localDb,
-      syncService,
     );
 
     await tester.pumpWidget(
@@ -48,6 +45,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesion'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
   });
 }

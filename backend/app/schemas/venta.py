@@ -9,7 +9,7 @@ ClaveIdempotencia = Annotated[str, Field(min_length=8, max_length=100)]
 
 class VentaDetalleCreate(BaseModel):
     producto_id: int = Field(gt=0)
-    cantidad: int = Field(gt=0)
+    cantidad: int = Field(gt=0, le=2_147_483_647)
     precio_unitario_negociado: Decimal = Field(
         ge=0, max_digits=10, decimal_places=2
     )
@@ -75,6 +75,7 @@ class VentaOut(BaseModel):
     id: int
     fecha_creacion: datetime
     usuario_id: int
+    sucursal_id: int
     cliente_id: Optional[int] = None
     sesion_caja_id: Optional[int] = None
     tipo_venta: str

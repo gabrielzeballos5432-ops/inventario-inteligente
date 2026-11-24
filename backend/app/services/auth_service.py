@@ -33,6 +33,35 @@ class AuthService:
             rol=usuario.rol.nombre,
         )
 
+    async def renovar(self, usuario_id: int) -> TokenResponse:
+        """Entrega un token nuevo a una sesión que sigue vigente.
+
+        La app lo pide sola mientras se usa, para que un turno largo no termine
+        en el login a mitad de una venta. Se vuelve a leer al usuario: si lo
+        desactivaron no se renueva, y si le cambiaron el rol el token nuevo
+        trae el rol actual (no el que tenía al iniciar sesión).
+        """
+        usuario = await self.repo.obtener_por_id(usuario_id)
+        if usuario is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="La sesión ya no es válida",
+            )
+        if not usuario.activo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario desactivado",
+            )
+        token = create_access_token(
+            data={"sub": str(usuario.id), "rol": usuario.rol.nombre}
+        )
+        return TokenResponse(
+            access_token=token,
+            usuario_id=usuario.id,
+            nombre=usuario.nombre,
+            rol=usuario.rol.nombre,
+        )
+
     async def registrar(self, data: UsuarioCreate) -> Usuario:
         existe = await self.repo.obtener_por_email(data.email)
         if existe:

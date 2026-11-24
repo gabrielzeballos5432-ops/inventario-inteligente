@@ -74,7 +74,16 @@ void main() {
             );
             await tester.tap(confirmarBoton.last);
             await tester.pump(const Duration(milliseconds: 800));
-            expect(find.text('Ingresa un monto válido'), findsOneWidget);
+            // El campo no deja escribir el signo menos: queda vacio y la
+            // validacion pide el monto en vez de aceptar un negativo.
+            expect(
+              tester
+                  .widget<EditableText>(find.byType(EditableText).first)
+                  .controller
+                  .text,
+              isNot(contains('-')),
+            );
+            expect(find.text('Escribe el monto'), findsOneWidget);
             expect(peticiones, isEmpty);
             await tester.enterText(find.byType(TextFormField).first, '20');
             if (cerrar) {

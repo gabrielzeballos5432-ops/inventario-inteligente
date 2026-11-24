@@ -24,6 +24,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Java fijado a 17, igual que en local. El runner de GitHub trae Java 25
+      # por defecto y Gradle 8.14 no lo reconoce: el build fallaba con
+      # "What went wrong: 25.0.5".
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

@@ -1,6 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -9,6 +9,7 @@ from app.models.inventario import Inventario
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.models.proveedor import Proveedor
+from app.models.razon_movimiento import razon_sistema
 from app.schemas.compra import CompraCreate, MonedaCreate
 
 
@@ -58,7 +59,9 @@ class CompraService:
         await self.db.refresh(moneda)
         return moneda
 
-    async def registrar(self, data: CompraCreate, usuario_id: int) -> Compra:
+    async def registrar(
+        self, data: CompraCreate, usuario_id: int, *, sucursal_id: int
+    ) -> Compra:
         if len({detalle.producto_id for detalle in data.detalles}) != len(data.detalles):
             raise CompraValidationError(
                 "No se puede repetir un producto en la misma compra."
@@ -142,6 +145,7 @@ class CompraService:
         compra = Compra(
             proveedor_id=data.proveedor_id,
             usuario_id=usuario_id,
+            sucursal_id=sucursal_id,
             moneda_codigo=moneda.codigo,
             tipo_cambio_ext=data.tipo_cambio_ext,
             tipo_cambio_bob=data.tipo_cambio_bob,
@@ -162,13 +166,27 @@ class CompraService:
 
         result_inventario = await self.db.execute(
             select(Inventario)
-            .where(Inventario.producto_id.in_(producto_ids))
+            .where(
+                Inventario.producto_id.in_(producto_ids),
+                Inventario.sucursal_id == sucursal_id,
+            )
             .order_by(Inventario.producto_id)
             .with_for_update()
         )
         inventarios = {
             inventario.producto_id: inventario
             for inventario in result_inventario.scalars()
+        }
+        # El costo de compra es uno por producto, así que el promedio
+        # ponderado usa el stock de todas las sucursales, no solo la que recibe.
+        result_totales = await self.db.execute(
+            select(Inventario.producto_id, func.sum(Inventario.cantidad))
+            .where(Inventario.producto_id.in_(producto_ids))
+            .group_by(Inventario.producto_id)
+        )
+        stock_total = {
+            producto_id: int(cantidad or 0)
+            for producto_id, cantidad in result_totales.all()
         }
 
         detalles_creados: list[CompraDetalle] = []
@@ -207,7 +225,11 @@ class CompraService:
         for detalle in detalles_creados:
             inventario = inventarios.get(detalle.producto_id)
             if inventario is None:
-                inventario = Inventario(producto_id=detalle.producto_id, cantidad=0)
+                inventario = Inventario(
+                    producto_id=detalle.producto_id,
+                    sucursal_id=sucursal_id,
+                    cantidad=0,
+                )
                 self.db.add(inventario)
                 inventarios[detalle.producto_id] = inventario
             cantidad_anterior = inventario.cantidad
@@ -219,7 +241,7 @@ class CompraService:
                 )
             inventario.cantidad = stock_resultante
             producto = productos[detalle.producto_id]
-            stock_previo = cantidad_anterior
+            stock_previo = stock_total.get(detalle.producto_id, 0)
             total_unidades = stock_previo + detalle.cantidad
             if stock_previo == 0:
                 costo_promedio = detalle.costo_unitario_final_bob
@@ -234,6 +256,8 @@ class CompraService:
             self.db.add(
                 Movimiento(
                     producto_id=detalle.producto_id,
+                    sucursal_id=sucursal_id,
+                    razon_movimiento_id=razon_sistema("compra"),
                     usuario_id=usuario_id,
                     tipo="entrada",
                     cantidad_anterior=cantidad_anterior,
@@ -258,11 +282,13 @@ class CompraService:
             raise CompraValidationError("Compra no encontrada.")
         return compra
 
-    async def listar(self, limite: int = 50) -> list[Compra]:
+    async def listar(
+        self, limite: int = 50, sucursal_id: int | None = None
+    ) -> list[Compra]:
+        query = select(Compra).options(selectinload(Compra.detalles))
+        if sucursal_id is not None:
+            query = query.where(Compra.sucursal_id == sucursal_id)
         result = await self.db.execute(
-            select(Compra)
-            .options(selectinload(Compra.detalles))
-            .order_by(Compra.fecha_creacion.desc(), Compra.id.desc())
-            .limit(limite)
+            query.order_by(Compra.fecha_creacion.desc(), Compra.id.desc()).limit(limite)
         )
         return list(result.scalars().all())

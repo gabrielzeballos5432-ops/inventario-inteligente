@@ -41,6 +41,13 @@ class AuthService {
     return LoginResult.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Token nuevo para la sesión actual (el backend vuelve a leer al usuario:
+  /// si lo desactivaron responde 403, si el token ya venció 401).
+  Future<LoginResult> renovar() async {
+    final json = await _apiClient.postJson('/api/auth/renovar', const {});
+    return LoginResult.fromJson(json as Map<String, dynamic>);
+  }
+
   Future<AuthUser> me() async {
     final json = await _apiClient.getJson('/api/auth/me');
     return AuthUser.fromJson(json as Map<String, dynamic>);
