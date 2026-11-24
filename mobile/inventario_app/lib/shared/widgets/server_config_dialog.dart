@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
+import '../../core/utils/validaciones.dart';
 import 'boton_seguro.dart';
 
 /// Abre el dialogo para ver o cambiar la URL del backend sin recompilar.
@@ -40,14 +41,15 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
   }
 
   Future<void> _probar() async {
-    final url = ApiConfig.normalizar(_controller.text);
-    if (url.isEmpty) {
+    final error = Validaciones.urlServidor(_controller.text);
+    if (error != null) {
       setState(() {
-        _mensaje = 'Escribe la direccion del servidor';
+        _mensaje = error;
         _esError = true;
       });
       return;
     }
+    final url = ApiConfig.normalizar(_controller.text);
     setState(() {
       _ocupado = true;
       _mensaje = null;
@@ -58,7 +60,7 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
       setState(() {
         _esError = respuesta.statusCode != 200;
         _mensaje = respuesta.statusCode == 200
-            ? 'Conexion exitosa con el backend'
+            ? 'Conexión exitosa con el backend'
             : 'El servidor respondio con error HTTP ${respuesta.statusCode}';
       });
     } catch (_) {
@@ -73,8 +75,15 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
   }
 
   Future<void> _guardar() async {
+    final error = Validaciones.urlServidor(_controller.text);
+    if (error != null) {
+      setState(() {
+        _esError = true;
+        _mensaje = error;
+      });
+      return;
+    }
     final url = ApiConfig.normalizar(_controller.text);
-    if (url.isEmpty) return;
     await ApiConfig.setBaseUrl(url);
     if (mounted) Navigator.of(context).pop(true);
   }
@@ -93,7 +102,7 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Direccion del backend (PC) que usa la app. Se guarda en el '
+              'Dirección del backend (PC) que usa la app. Se guarda en el '
               'dispositivo y no requiere reinstalar.',
               style: TextStyle(fontSize: 13, color: context.textoSecundario),
             ),

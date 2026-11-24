@@ -40,8 +40,8 @@ class _HistoryPageState extends State<HistoryPage> {
   static const _periodosEtiqueta = {
     'todo': 'Todo',
     'hoy': 'Hoy',
-    'semana': '7 dias',
-    'mes': '30 dias',
+    'semana': '7 días',
+    'mes': '30 días',
   };
 
   bool _pasaTipo(String? tipo) => _tipo == 'todos' || (tipo ?? '') == _tipo;
@@ -176,13 +176,13 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           )
         else if (historial.isEmpty)
-          const SectionCard(child: Text('Aun no hay movimientos registrados.'))
+          const SectionCard(child: Text('Aún no hay movimientos registrados.'))
         else if (filtrados.isEmpty)
           // Lista con datos pero ningun registro con ese filtro: hay que
           // decirlo, porque "lista vacia" parece error o pagina sin cargar.
           SectionCard(
             child: Text(
-              'Ningun movimiento cumple el filtro. Prueba con otro tipo, '
+              'Ningún movimiento cumple el filtro. Prueba con otro tipo, '
               'otro periodo o menos texto.',
               style: TextStyle(color: context.textoSecundario),
             ),

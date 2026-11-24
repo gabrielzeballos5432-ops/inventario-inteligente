@@ -20,6 +20,8 @@ import '../../../shared/widgets/section_card.dart';
 import 'barcode_scanner_page.dart';
 import 'movimiento_dialog.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/formato_numero.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
@@ -171,7 +173,7 @@ return ListView(
                           size: 16, color: context.paleta.stockBajo),
                       const SizedBox(width: 8),
                       Text(
-                        'No se pudieron cargar las categorias.',
+                        'No se pudieron cargar las categorías.',
                         style: TextStyle(color: context.paleta.stockBajo, fontSize: 12),
                       ),
                     ],
@@ -285,12 +287,12 @@ return ListView(
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'Bs. ${p.precioVenta.toStringAsFixed(2)}',
+                      FormatoNumero.bs(p.precioVenta),
                       style: TextStyle(color: context.textoSecundario),
                     ),
                     if (p.categoria != null)
                       Text(
-                        'Categoria: ${p.categoria!.nombre}',
+                        'Categoría: ${p.categoria!.nombre}',
                         style: TextStyle(
                           color: context.textoSecundario,
                           fontSize: 12,
@@ -298,7 +300,7 @@ return ListView(
                       ),
                     if (p.stockBajo)
                       Text(
-                        'Stock minimo: ${p.stockMinimo}',
+                        'Stock mínimo: ${p.stockMinimo}',
                         style: TextStyle(
                           color: context.paleta.stockBajo,
                           fontSize: 12,
@@ -351,7 +353,7 @@ return ListView(
       context: context,
       builder: (context) => AlertDialog(
         scrollable: true,
-        title: const Text('Configurar stock minimo'),
+        title: const Text('Configurar stock mínimo'),
         content: Form(
           key: formKey,
           child: TextFormField(
@@ -360,7 +362,7 @@ return ListView(
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             validator: Validaciones.stockMinimo,
             decoration: const InputDecoration(
-              labelText: 'Stock minimo',
+              labelText: 'Stock mínimo',
               helperText: '0 desactiva la alerta para este producto',
               helperMaxLines: 2,
               errorMaxLines: 2,
@@ -441,7 +443,7 @@ return ListView(
       builder: (ctx) => AlertDialog(
         scrollable: true,
         icon: Icon(Icons.warning_amber, color: context.paleta.stockBajo, size: 32),
-        title: Text(eraBajo ? 'Sigue bajo el minimo' : 'Stock bajo el minimo'),
+        title: Text(eraBajo ? 'Sigue bajo el mínimo' : 'Stock bajo el mínimo'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,16 +451,16 @@ return ListView(
             Text(
               eraBajo
                   ? '"${actual.nombre}" continua con ${actual.stockActual} '
-                      'unidades, por debajo del minimo de '
+                      'unidades, por debajo del mínimo de '
                       '${actual.stockMinimo}.'
                   : '"${actual.nombre}" quedo en ${actual.stockActual} '
-                      'unidades y su minimo es ${actual.stockMinimo}.',
+                      'unidades y su mínimo es ${actual.stockMinimo}.',
               style: const TextStyle(height: 1.4),
             ),
             if (faltante > 0) ...[
               SizedBox(height: 12),
               Text(
-                'Faltan $faltante unidades para alcanzar el minimo.',
+                'Faltan $faltante unidades para alcanzar el mínimo.',
                 style: TextStyle(
                   color: context.paleta.stockBajo,
                   fontWeight: FontWeight.w600,
@@ -574,7 +576,7 @@ return ListView(
           dense: true,
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.notifications_outlined, size: 20),
-          title: Text('Configurar stock minimo'),
+          title: Text('Configurar stock mínimo'),
         ),
       ),
       const PopupMenuDivider(),
@@ -703,7 +705,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               labelText: 'Marca (opcional)',
               errorText: 'No se pudieron cargar las marcas',
             ),
-            child: Text('Sin conexion'),
+            child: Text('Sin conexión'),
           );
         }
         final marcas = snapshot.data ?? const <Marca>[];
@@ -742,7 +744,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               labelText: 'Proveedor (opcional)',
               errorText: 'No se pudieron cargar los proveedores',
             ),
-            child: Text('Sin conexion'),
+            child: Text('Sin conexión'),
           );
         }
         final proveedores = snapshot.data ?? const <Proveedor>[];
@@ -879,15 +881,24 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 TextFormField(
                   controller: _codigoController,
                   textCapitalization: TextCapitalization.characters,
+                  // Mismos topes que las columnas: por encima la base
+                  // rechazaba el guardado con un error del servidor.
+                  maxLength: 50,
+                  validator: (v) => (v ?? '').trim().contains(' ')
+                      ? 'El código no puede tener espacios'
+                      : null,
                   decoration: const InputDecoration(
-                    labelText: 'Codigo (opcional)',
-                    helperText: 'Codigo propio de la tienda, se usa en ventas.',
+                    errorMaxLines: 2,
+                    labelText: 'Código (opcional)',
+                    helperText: 'Código propio de la tienda, se usa en ventas.',
                     helperMaxLines: 2,
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _nombreController,
+                  maxLength: 200,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Nombre',
                     errorMaxLines: 2,
@@ -897,18 +908,25 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _descripcionController,
+                  maxLength: 500,
+                  minLines: 1,
+                  maxLines: 3,
                   decoration: const InputDecoration(labelText: 'Descripcion'),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _codigoBarrasController,
                   keyboardType: TextInputType.number,
+                  maxLength: 50,
+                  validator: (v) => (v ?? '').trim().contains(' ')
+                      ? 'El código de barras no puede tener espacios'
+                      : null,
                   decoration: InputDecoration(
-                    labelText: 'Codigo de barras',
+                    labelText: 'Código de barras',
                     helperText: 'Opcional. Escanea la etiqueta para no escribirlo.',
                     helperMaxLines: 2,
                     suffixIcon: IconButton(
-                      tooltip: 'Escanear codigo de barras',
+                      tooltip: 'Escanear código de barras',
                       icon: const Icon(Icons.qr_code_scanner),
                       onPressed: _saving ? null : _escanearEnElFormulario,
                     ),
@@ -916,6 +934,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 2),
                   controller: _precioCompraController,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
@@ -928,6 +947,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 2),
                   controller: _precioVentaController,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
@@ -940,6 +960,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 2),
                   controller: _precioMayorController,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
@@ -957,7 +978,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: const InputDecoration(
-                    labelText: 'Stock minimo',
+                    labelText: 'Stock mínimo',
                     helperText: 'Se avisa cuando el stock cae por debajo de este valor',
                     errorMaxLines: 2,
                   ),
@@ -988,9 +1009,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       return const InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'Categoria',
-                          errorText: 'No se pudieron cargar las categorias',
+                          errorText: 'No se pudieron cargar las categorías',
                         ),
-                        child: Text('Sin conexion con el servidor'),
+                        child: Text('Sin conexión con el servidor'),
                       );
                     }
                     final categorias =
@@ -1009,11 +1030,14 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         : null;
 
                     return DropdownButtonFormField<int?>(
+                      // Ocupa el ancho del campo: un nombre largo se corta con
+                      // … en vez de desbordar la fila en el telefono.
+                      isExpanded: true,
                       value: valorValido,
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('Sin categoria'),
+                          child: Text('Sin categoría'),
                         ),
                         ...categorias.map(
                           (c) => DropdownMenuItem<int?>(
@@ -1254,14 +1278,14 @@ class _CategoriasPageState extends State<CategoriasPage> {
       // Sin esto, un fallo de red al crear deja la excepcion sin manejar.
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo crear la categoria: ${_motivo(e)}')),
+        SnackBar(content: Text('No se pudo crear la categoría: ${_motivo(e)}')),
       );
     }
   }
 
   /// Traduce la excepcion a la frase del backend. Mostrar el JSON crudo
   /// deja al usuario leyendo {"detail":"..."} en vez de la causa.
-  static String _motivo(Object e) => e is ApiException ? e.detalle : '$e';
+  static String _motivo(Object e) => mensajeDeError(e);
 
   /// Renombra una categoria. Es la unica correccion posible sobre una
   /// categoria: el borrado es logico, asi que un nombre mal tecleado se
@@ -1273,12 +1297,13 @@ class _CategoriasPageState extends State<CategoriasPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: const Text('Renombrar categoria'),
+        title: const Text('Renombrar categoría'),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: controller,
             autofocus: true,
+            maxLength: 100,
             validator: Validaciones.nombreSinNumeros,
             decoration: const InputDecoration(
               labelText: 'Nombre',
@@ -1329,9 +1354,9 @@ class _CategoriasPageState extends State<CategoriasPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: const Text('Desactivar categoria'),
+        title: const Text('Desactivar categoría'),
         content: Text(
-          'La categoria "${c.nombre}" dejara de aparecer al registrar o editar '
+          'La categoría "${c.nombre}" dejará de aparecer al registrar o editar '
           'productos. Los productos que ya la usan no se modifican.',
         ),
         actions: [
@@ -1369,7 +1394,7 @@ class _CategoriasPageState extends State<CategoriasPage> {
           padding: const EdgeInsets.all(20),
           children: [
             Row(children: [
-              Expanded(child: Text('Administra las categorias del inventario.', style: TextStyle(color: context.textoSecundario))),
+              Expanded(child: Text('Administra las categorías del inventario.', style: TextStyle(color: context.textoSecundario))),
               BotonSeguro(onPressed: _abrirCrear, icon: const Icon(Icons.add), child: const Text('Registrar')),
             ]),
             const SizedBox(height: 20),
@@ -1379,13 +1404,13 @@ class _CategoriasPageState extends State<CategoriasPage> {
               SectionCard(child: Row(children: [
                 Icon(Icons.cloud_off, color: context.paleta.stockBajo),
                 const SizedBox(width: 10),
-                const Expanded(child: Text('No se pudieron cargar las categorias.')),
+                const Expanded(child: Text('No se pudieron cargar las categorías.')),
                 TextButton(onPressed: _reload, child: const Text('Reintentar')),
               ]))
             else if (categorias.isEmpty)
-              const SectionCard(child: Text('No hay categorias registradas.'))
+              const SectionCard(child: Text('No hay categorías registradas.'))
             else ...[
-              SectionCard(child: Text('Total de categorias: ${categorias.length}', style: const TextStyle(fontWeight: FontWeight.w600))),
+              SectionCard(child: Text('Total de categorías: ${categorias.length}', style: const TextStyle(fontWeight: FontWeight.w600))),
               const SizedBox(height: 12),
               ...categorias.map((c) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -1405,7 +1430,7 @@ class _CategoriasPageState extends State<CategoriasPage> {
               )),
             ],
             const SizedBox(height: 8),
-            Text('Desactivar no borra el nombre: al registrar nuevamente una categoria desactivada, se reactiva.', style: TextStyle(color: context.textoTerciario, fontSize: 12)),
+            Text('Desactivar no borra el nombre: al registrar nuevamente una categoría desactivada, se reactiva.', style: TextStyle(color: context.textoTerciario, fontSize: 12)),
           ],
         );
       },
@@ -1419,10 +1444,11 @@ class _CategoriasPageState extends State<CategoriasPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: const Text('Registrar categoria'),
+        title: const Text('Registrar categoría'),
         content: Form(key: formKey, child: TextFormField(
           controller: _nombreController,
           autofocus: true,
+          maxLength: 100,
           validator: Validaciones.nombreSinNumeros,
           decoration: const InputDecoration(labelText: 'Nombre', errorMaxLines: 2),
         )),

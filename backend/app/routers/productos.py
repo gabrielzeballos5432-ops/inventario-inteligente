@@ -97,8 +97,15 @@ async def actualizar_producto(
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     for campo, valor in body.model_dump(exclude_unset=True).items():
+        # null en una columna NOT NULL no es "borrar": se ignora. Antes llegaba
+        # a PostgreSQL y respondia un 409 de "valor ya en uso".
+        if valor is None and campo in _NO_NULOS:
+            continue
         setattr(producto, campo, valor)
     return await repo.guardar(producto)
+
+
+_NO_NULOS = {"nombre", "precio_compra", "precio_venta", "stock_minimo", "activo"}
 
 
 @router.delete("/{producto_id}", response_model=ProductoOut)

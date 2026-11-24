@@ -102,7 +102,7 @@ void main() {
 
   setUp(() => db = _DbFalsa());
 
-  test('el movimiento hecho sin conexion queda guardado y se cuenta', () async {
+  test('el movimiento hecho sin conexión queda guardado y se cuenta', () async {
     final c = cola(ok);
     await encolar(c, 'clave-uno-0001');
     expect(c.pendientes, 1);
@@ -185,7 +185,7 @@ void main() {
     expect(db.cola, isEmpty);
   });
 
-  test('con la sesion vencida el movimiento sigue pendiente, no rechazado', () async {
+  test('con la sesión vencida el movimiento sigue pendiente, no rechazado', () async {
     final c = cola((_) => http.Response('{"detail":"Token vencido"}', 401));
     await encolar(c, 'clave-uno-0001');
     await c.sincronizar();
@@ -193,7 +193,7 @@ void main() {
     expect(c.rechazados, 0);
   });
 
-  test('solo se envian los movimientos de la cuenta que tiene la sesion', () async {
+  test('solo se envian los movimientos de la cuenta que tiene la sesión', () async {
     final deOtro = cola(ok, usuario: 9);
     await encolar(deOtro, 'clave-otro-0009');
 
@@ -205,14 +205,14 @@ void main() {
     expect(db.cola.keys, ['clave-otro-0009']);
   });
 
-  test('cada lote lleva una clave distinta y valida para el servidor', () {
+  test('cada lote lleva una clave distinta y válida para el servidor', () {
     final a = ColaMovimientosController.nuevaClave();
     final b = ColaMovimientosController.nuevaClave();
     expect(a, isNot(b));
     expect(a.length, inInclusiveRange(8, 100));
   });
 
-  group('dialogo de movimiento sin conexion', () {
+  group('dialogo de movimiento sin conexión', () {
     final producto = ProductoConStock(
       id: 7,
       sku: 'ZOOM-7',

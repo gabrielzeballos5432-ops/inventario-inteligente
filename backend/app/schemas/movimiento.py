@@ -35,7 +35,7 @@ class MovimientoCreate(BaseModel):
     tipo: str = Field(pattern="^(entrada|salida|ajuste)$")
     # El ajuste fija el stock exacto, por eso admite 0. Entrada y salida no:
     # lo impide el validador de abajo.
-    cantidad: int = Field(ge=0)
+    cantidad: int = Field(ge=0, le=2_147_483_647)
     origen: str = Field(default="manual", pattern="^(manual|ia)$")
     sesion_id: Optional[int] = None
     # Obligatoria en los movimientos manuales; la valida el servicio para
@@ -59,7 +59,7 @@ class MovimientoLoteItem(BaseModel):
     # cero). Entrada y salida exigen > 0, pero la validacion se hace en el
     # servicio linea a linea para poder devolver numero de fila y nombre del
     # producto, en vez de un 422 generico que no dice que corregir.
-    cantidad: int = Field(ge=0)
+    cantidad: int = Field(ge=0, le=2_147_483_647)
 
 
 class MovimientoLoteCreate(BaseModel):

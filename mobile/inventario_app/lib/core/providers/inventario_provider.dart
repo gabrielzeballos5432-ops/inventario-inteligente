@@ -70,20 +70,20 @@ class InventarioProvider extends ChangeNotifier {
       debugPrint('cargarInventario: HTTP ${e.statusCode} | ${e.body}');
       _productos = await _leerCache();
       _error = switch (e.statusCode) {
-        401 || 403 => 'Sesion expirada o sin permisos. Vuelve a iniciar sesion.',
+        401 || 403 => 'Sesión expirada o sin permisos. Vuelve a iniciar sesión.',
         404 => 'El servidor no encontro el recurso de inventario.',
         >= 500 => 'El servidor tiene un problema (HTTP ${e.statusCode}). '
-            'Se muestran los datos de la ultima carga.',
+            'Se muestran los datos de la última carga.',
         _ => 'El servidor rechazo la peticion (HTTP ${e.statusCode}). '
-            'Se muestran los datos de la ultima carga.',
+            'Se muestran los datos de la última carga.',
       };
     } catch (e, st) {
       // Solo aqui es un problema de red de verdad: no hay IP valida, el wifi
       // cayo o el servidor esta apagado.
       debugPrint('cargarInventario FALLA: $e | $st');
       _productos = await _leerCache();
-      _error = 'Sin conexion con el servidor. '
-          'Se muestran los datos de la ultima carga.';
+      _error = 'Sin conexión con el servidor. '
+          'Se muestran los datos de la última carga.';
     }
 
     _cargando = false;
@@ -138,7 +138,7 @@ class InventarioProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _errorDeteccion = e.statusCode == 503
-          ? 'El reconocimiento con IA aun no esta activo: falta el modelo '
+          ? 'El reconocimiento con IA aún no está activo: falta el modelo '
               'entrenado en el servidor. Puedes registrar el producto a mano '
               'desde la pestaña Productos.'
           : 'El servidor rechazo la foto: ${e.detalle}';
@@ -146,7 +146,7 @@ class InventarioProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorDeteccion = 'Sin conexion. No se pudo procesar la deteccion.';
+      _errorDeteccion = 'Sin conexión. No se pudo procesar la detección.';
       _cargando = false;
       notifyListeners();
       return false;
@@ -231,7 +231,7 @@ class InventarioProvider extends ChangeNotifier {
       await cargarInventario();
       return true;
     } catch (e) {
-      _error = 'No se pudo actualizar el stock minimo';
+      _error = 'No se pudo actualizar el stock mínimo';
       notifyListeners();
       return false;
     }
@@ -313,7 +313,7 @@ class InventarioProvider extends ChangeNotifier {
       await cargarInventario();
       await cargarHistorial();
     } catch (e) {
-      debugPrint('recargar tras confirmar deteccion: $e');
+      debugPrint('recargar tras confirmar detección: $e');
       notifyListeners();
     }
     return resultado;

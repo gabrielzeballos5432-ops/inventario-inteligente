@@ -111,9 +111,9 @@ void main() {
       expect(find.text('Total del mes'), findsOneWidget);
       expect(find.text('Pagado'), findsAtLeastNWidgets(1));
       expect(find.text('Pendiente'), findsAtLeastNWidgets(1));
-      expect(find.text('Bs 150.00'), findsOneWidget);
-      expect(find.text('Bs 70.00'), findsOneWidget);
-      expect(find.text('Bs 80.00'), findsOneWidget);
+      expect(find.text('Bs 150,00'), findsOneWidget);
+      expect(find.text('Bs 70,00'), findsOneWidget);
+      expect(find.text('Bs 80,00'), findsOneWidget);
       final consultaGastos = peticiones.firstWhere(
         (uri) => uri.path.endsWith('/gastos'),
       );

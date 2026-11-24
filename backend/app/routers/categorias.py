@@ -73,6 +73,9 @@ async def actualizar_categoria(
     if categoria is None:
         raise HTTPException(status_code=404, detail="Categoria no encontrada")
     cambios = body.model_dump(exclude_unset=True)
+    # nombre: null no significa "borrar el nombre" (la columna es NOT NULL).
+    if cambios.get("nombre") is None:
+        cambios.pop("nombre", None)
     if "nombre" in cambios and cambios["nombre"] != categoria.nombre:
         # Igual que al crear: solo estorba otra categoria activa. Chocar con
         # una inactiva daria un rechazo sobre un nombre que el usuario no ve
@@ -82,10 +85,15 @@ async def actualizar_categoria(
         # "uñas" por "Uñas" se encuentra a si misma y sin esta excepcion el
         # renombrado por capitalizacion quedaria bloqueado.
         conflicto = await repo.obtener_por_nombre(cambios["nombre"])
-        if conflicto is not None and conflicto.activo and conflicto.id != categoria.id:
+        if conflicto is not None and conflicto.id != categoria.id:
             raise HTTPException(
                 status_code=400,
-                detail="Ya existe una categoria activa con ese nombre",
+                detail=(
+                    "Ya existe una categoria activa con ese nombre"
+                    if conflicto.activo
+                    else "Hay una categoria desactivada con ese nombre. "
+                    "Registrala de nuevo con ese nombre y se reactivara."
+                ),
             )
     if cambios.get("padre_id") == categoria.id:
         raise HTTPException(status_code=400, detail="Una categoria no puede ser su propio padre")

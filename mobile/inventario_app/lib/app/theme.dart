@@ -217,8 +217,10 @@ ThemeData buildTemaClaro() => _buildTema(
         seedColor: AppColors.morado,
         brightness: Brightness.light,
       ).copyWith(
-        // Sin forzar: en claro el morado de marca ya se usa como color
-        // principal y el texto encima sale blanco, con ~8:1 de contraste.
+        // Forzado como en noche: fromSeed lo bajaba a un morado grisaceo
+        // (#65558F) y en claro la app perdia el color de marca. Con texto
+        // blanco encima da ~8:1 de contraste.
+        primary: AppColors.morado,
         secondary: const Color(0xFF7E57C2),
       ),
       AppPaleta.claro,

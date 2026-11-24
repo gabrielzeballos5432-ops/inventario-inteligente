@@ -114,7 +114,7 @@ class _FotoConRecuadrosState extends State<FotoConRecuadros> {
         child: AspectRatio(
           aspectRatio: tamano.width / tamano.height,
           child: Semantics(
-            label: 'Foto con $unidades recuadro(s) de deteccion',
+            label: 'Foto con $unidades recuadro(s) de detección',
             child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
               child: Stack(

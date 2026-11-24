@@ -19,7 +19,7 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
-  testWidgets('muestra la pantalla de login sin sesion', (tester) async {
+  testWidgets('muestra la pantalla de login sin sesión', (tester) async {
     final apiClient = ApiClient();
     final localDb = LocalDbService();
     final inventarioProvider = InventarioProvider(
@@ -45,6 +45,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Iniciar sesion'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
   });
 }

@@ -123,13 +123,13 @@ class MovimientosPendientesDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Se registraron sin conexion y estan guardados en este '
+                'Se registraron sin conexión y están guardados en este '
                 'dispositivo. Se envian solos cuando vuelve el servidor.',
                 style: TextStyle(color: context.textoSecundario),
               ),
               const SizedBox(height: 12),
               if (movimientos.isEmpty)
-                const Text('No queda ningun movimiento pendiente.'),
+                const Text('No queda ningún movimiento pendiente.'),
               for (final m in movimientos) _fila(context, cola, m),
               const SizedBox(height: 8),
               Row(
@@ -199,7 +199,7 @@ class MovimientosPendientesDialog extends StatelessWidget {
           ),
           if (m.rechazado)
             IconButton(
-              tooltip: 'Reintentar el envio',
+              tooltip: 'Reintentar el envío',
               onPressed: cola.sincronizando
                   ? null
                   : () => cola.reintentar(m.clave),

@@ -68,18 +68,26 @@ async def actualizar_marca(
     if marca is None:
         raise HTTPException(status_code=404, detail="Marca no encontrada")
     cambios = body.model_dump(exclude_unset=True)
-    if "nombre" in cambios and cambios["nombre"] is not None:
-        nombre = cambios["nombre"].strip()
-        cambios["nombre"] = nombre
-        if nombre != marca.nombre:
-            # El id propio se excluye para que renombrar solo por caja
-            # (Loreal -> loreal) no se rechace a si mismo.
-            conflicto = await repo.obtener_por_nombre(nombre)
-            if conflicto is not None and conflicto.activo and conflicto.id != marca.id:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Ya existe una marca activa con ese nombre",
-                )
+    # nombre: null no significa "borrar el nombre" (la columna es NOT NULL).
+    if cambios.get("nombre") is None:
+        cambios.pop("nombre", None)
+    nombre = cambios.get("nombre")
+    if nombre is not None and nombre != marca.nombre:
+        # El id propio se excluye para que renombrar solo por caja
+        # (Loreal -> loreal) no se rechace a si mismo.
+        conflicto = await repo.obtener_por_nombre(nombre)
+        if conflicto is not None and conflicto.id != marca.id:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Ya existe una marca activa con ese nombre"
+                    if conflicto.activo
+                    # Sin este caso chocaba con el indice unico y respondia un
+                    # 409 generico sobre un nombre que no se ve en la lista.
+                    else "Hay una marca desactivada con ese nombre. Registrala "
+                    "de nuevo con ese nombre y se reactivara."
+                ),
+            )
     for campo, valor in cambios.items():
         setattr(marca, campo, valor)
     return await repo.guardar(marca)

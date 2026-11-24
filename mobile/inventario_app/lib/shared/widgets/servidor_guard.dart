@@ -76,7 +76,7 @@ class _AvisoSinServidor extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Sin conexion con el servidor. Se reintenta solo.',
+                  'Sin conexión con el servidor. Se reintenta solo.',
                   style: TextStyle(
                     fontSize: 12,
                     color: context.paleta.negativo,

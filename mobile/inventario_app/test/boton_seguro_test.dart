@@ -8,7 +8,7 @@ Widget _envolver(Widget hijo) =>
     MaterialApp(home: Scaffold(body: Center(child: hijo)));
 
 void main() {
-  testWidgets('doble toque con accion asincrona ejecuta una sola vez', (
+  testWidgets('doble toque con acción asincrona ejecuta una sola vez', (
     tester,
   ) async {
     var llamadas = 0;
@@ -48,7 +48,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navegador,
-        home: const Scaffold(body: Text('Pagina base')),
+        home: const Scaffold(body: Text('Página base')),
       ),
     );
     unawaited(
@@ -70,7 +70,7 @@ void main() {
     await tester.tap(find.text('Aceptar'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(find.text('Pagina base'), findsOneWidget);
+    expect(find.text('Página base'), findsOneWidget);
     expect(navegador.currentState!.canPop(), isFalse);
   });
 

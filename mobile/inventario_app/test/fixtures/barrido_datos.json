@@ -1,0 +1,1080 @@
+{
+ "/api/auth/me": {
+  "id": 1,
+  "nombre": "Persona 1",
+  "email": "cuenta578@ejemplo.com",
+  "rol": "administrador",
+  "activo": true
+ },
+ "/api/caja/sesiones": [],
+ "/api/caja/sesiones/actual": null,
+ "/api/categorias/": [
+  {
+   "id": 1,
+   "nombre": "General",
+   "padre_id": null,
+   "activo": true
+  },
+  {
+   "id": 10,
+   "nombre": "Maquillaje",
+   "padre_id": null,
+   "activo": true
+  },
+  {
+   "id": 2,
+   "nombre": "Tintes",
+   "padre_id": null,
+   "activo": true
+  }
+ ],
+ "/api/compras/": [
+  {
+   "id": 6,
+   "proveedor_id": null,
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "moneda_codigo": "CLP",
+   "tipo_cambio_ext": "900.000000",
+   "tipo_cambio_bob": "11.900000",
+   "numero_factura": null,
+   "fecha_factura": null,
+   "subtotal_moneda": "18000.0000",
+   "descuento_moneda": "1800.0000",
+   "base_costo_adicional_moneda": "16200.0000",
+   "porcentaje_manipulacion_envio": "10.00",
+   "costo_manipulacion_envio_moneda": "1620.0000",
+   "total_moneda": "17820.0000",
+   "total_bob": "235.62",
+   "imagen_factura_url": null,
+   "estado": "registrada",
+   "fecha_creacion": "2026-11-19T19:09:03.664967Z",
+   "detalles": [
+    {
+     "id": 25,
+     "producto_id": 24,
+     "descripcion_factura": null,
+     "cantidad": 10,
+     "costo_unitario_moneda": "1800.000000",
+     "subtotal_linea_moneda": "18000.0000",
+     "costo_unitario_final_bob": "23.5620"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "proveedor_id": null,
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "moneda_codigo": "USD",
+   "tipo_cambio_ext": "1.000000",
+   "tipo_cambio_bob": "11.900000",
+   "numero_factura": null,
+   "fecha_factura": null,
+   "subtotal_moneda": "20.0000",
+   "descuento_moneda": "2.0000",
+   "base_costo_adicional_moneda": "18.0000",
+   "porcentaje_manipulacion_envio": "10.00",
+   "costo_manipulacion_envio_moneda": "1.8000",
+   "total_moneda": "19.8000",
+   "total_bob": "235.62",
+   "imagen_factura_url": null,
+   "estado": "registrada",
+   "fecha_creacion": "2026-11-19T18:59:39.726493Z",
+   "detalles": [
+    {
+     "id": 24,
+     "producto_id": 24,
+     "descripcion_factura": null,
+     "cantidad": 10,
+     "costo_unitario_moneda": "2.000000",
+     "subtotal_linea_moneda": "20.0000",
+     "costo_unitario_final_bob": "23.5620"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "proveedor_id": null,
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "moneda_codigo": "BOB",
+   "tipo_cambio_ext": "11.900000",
+   "tipo_cambio_bob": "11.900000",
+   "numero_factura": null,
+   "fecha_factura": null,
+   "subtotal_moneda": "750.0000",
+   "descuento_moneda": "0.0000",
+   "base_costo_adicional_moneda": "750.0000",
+   "porcentaje_manipulacion_envio": "5.00",
+   "costo_manipulacion_envio_moneda": "37.5000",
+   "total_moneda": "787.5000",
+   "total_bob": "787.50",
+   "imagen_factura_url": null,
+   "estado": "registrada",
+   "fecha_creacion": "2026-11-19T18:48:40.572463Z",
+   "detalles": [
+    {
+     "id": 22,
+     "producto_id": 24,
+     "descripcion_factura": null,
+     "cantidad": 15,
+     "costo_unitario_moneda": "30.000000",
+     "subtotal_linea_moneda": "450.0000",
+     "costo_unitario_final_bob": "31.5000"
+    },
+    {
+     "id": 23,
+     "producto_id": 25,
+     "descripcion_factura": null,
+     "cantidad": 10,
+     "costo_unitario_moneda": "30.000000",
+     "subtotal_linea_moneda": "300.0000",
+     "costo_unitario_final_bob": "31.5000"
+    }
+   ]
+  }
+ ],
+ "/api/contabilidad/bonos": [],
+ "/api/contabilidad/categorias-gasto": [
+  {
+   "nombre": "Agua",
+   "periodicidad": "mensual",
+   "tipo_importe": "fijo",
+   "monto_habitual": "20.00",
+   "activo": true,
+   "id": 2
+  },
+  {
+   "nombre": "Alquiler",
+   "periodicidad": "mensual",
+   "tipo_importe": "fijo",
+   "monto_habitual": "2000.00",
+   "activo": true,
+   "id": 4
+  },
+  {
+   "nombre": "Etiquetas",
+   "periodicidad": "sin_periodicidad",
+   "tipo_importe": "variable",
+   "monto_habitual": null,
+   "activo": true,
+   "id": 7
+  },
+  {
+   "nombre": "Luz",
+   "periodicidad": "mensual",
+   "tipo_importe": "variable",
+   "monto_habitual": null,
+   "activo": true,
+   "id": 1
+  },
+  {
+   "nombre": "Papel para tickets",
+   "periodicidad": "sin_periodicidad",
+   "tipo_importe": "variable",
+   "monto_habitual": null,
+   "activo": true,
+   "id": 6
+  },
+  {
+   "nombre": "Scotch",
+   "periodicidad": "sin_periodicidad",
+   "tipo_importe": "fijo",
+   "monto_habitual": "10.00",
+   "activo": true,
+   "id": 5
+  },
+  {
+   "nombre": "Wifi",
+   "periodicidad": "mensual",
+   "tipo_importe": "fijo",
+   "monto_habitual": "168.00",
+   "activo": true,
+   "id": 3
+  }
+ ],
+ "/api/contabilidad/gastos": [
+  {
+   "id": 16,
+   "categoria": "Wifi",
+   "categoria_gasto_id": 3,
+   "concepto": "Wifi",
+   "proveedor_id": null,
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "fecha_documento": null,
+   "periodo_desde": "2026-11-01",
+   "periodo_hasta": "2026-11-30",
+   "numero_documento": null,
+   "moneda_codigo": "BOB",
+   "monto": "168.0000",
+   "tipo_cambio_ext": "1.000000",
+   "tipo_cambio_bob": "1.000000",
+   "monto_bob": "168.00",
+   "saldo_pendiente_bob": "0.00",
+   "soporte_url": null,
+   "anulado_en": null,
+   "anulada_por_usuario_id": null,
+   "motivo_anulacion": null,
+   "estado": "pagado",
+   "fecha_creacion": "2026-11-19T19:32:21.365744Z",
+   "pagos": [
+    {
+     "id": 12,
+     "gasto_id": 16,
+     "sesion_caja_id": null,
+     "fecha_pago": "2026-11-19T19:32:24.571969Z",
+     "monto": "168.0000",
+     "monto_bob": "168.00",
+     "metodo_pago": "efectivo",
+     "referencia": null
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "categoria": "Luz",
+   "categoria_gasto_id": 1,
+   "concepto": "Luz",
+   "proveedor_id": null,
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "fecha_documento": null,
+   "periodo_desde": "2026-11-01",
+   "periodo_hasta": "2026-11-30",
+   "numero_documento": null,
+   "moneda_codigo": "BOB",
+   "monto": "1000.0000",
+   "tipo_cambio_ext": "1.000000",
+   "tipo_cambio_bob": "1.000000",
+   "monto_bob": "1000.00",
+   "saldo_pendiente_bob": "1000.00",
+   "soporte_url": null,
+   "anulado_en": null,
+   "anulada_por_usuario_id": null,
+   "motivo_anulacion": null,
+   "estado": "pendiente",
+   "fecha_creacion": "2026-11-19T19:32:09.556712Z",
+   "pagos": []
+  },
+  {
+   "id": 14,
+   "categoria": "Alquiler",
+   "categoria_gasto_id": 4,
+   "concepto": "Alquiler",
+   "proveedor_id": null,
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "fecha_documento": null,
+   "periodo_desde": "2026-11-01",
+   "periodo_hasta": "2026-11-30",
+   "numero_documento": null,
+   "moneda_codigo": "BOB",
+   "monto": "2000.0000",
+   "tipo_cambio_ext": "1.000000",
+   "tipo_cambio_bob": "1.000000",
+   "monto_bob": "2000.00",
+   "saldo_pendiente_bob": "2000.00",
+   "soporte_url": null,
+   "anulado_en": "2026-11-19T19:32:37.045505Z",
+   "anulada_por_usuario_id": 1,
+   "motivo_anulacion": "equivocado",
+   "estado": "anulado",
+   "fecha_creacion": "2026-11-19T19:31:51.108051Z",
+   "pagos": []
+  }
+ ],
+ "/api/inventario/": [
+  {
+   "id": 24,
+   "sku": "0001040",
+   "codigo_barras": null,
+   "nombre": "Iluminador líquido",
+   "descripcion": null,
+   "categoria_id": 10,
+   "categoria": {
+    "id": 10,
+    "nombre": "Maquillaje",
+    "padre_id": null
+   },
+   "marca_id": 6,
+   "proveedor_id": null,
+   "precio_compra": "28.71",
+   "precio_venta": "40.00",
+   "precio_mayor": "35.00",
+   "stock_minimo": 5,
+   "activo": true,
+   "stock_actual": 81,
+   "stock_bajo": false
+  },
+  {
+   "id": 25,
+   "sku": "0002040",
+   "codigo_barras": "123456",
+   "nombre": "Sombra de ojos líquida",
+   "descripcion": null,
+   "categoria_id": 10,
+   "categoria": {
+    "id": 10,
+    "nombre": "Maquillaje",
+    "padre_id": null
+   },
+   "marca_id": 6,
+   "proveedor_id": null,
+   "precio_compra": "30.25",
+   "precio_venta": "40.00",
+   "precio_mayor": "35.00",
+   "stock_minimo": 5,
+   "activo": true,
+   "stock_actual": 60,
+   "stock_bajo": false
+  }
+ ],
+ "/api/inventario/historial": [
+  {
+   "id": 131,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 11,
+   "razon_nombre": "Venta",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": 96,
+   "compra_detalle_id": null,
+   "tipo": "salida",
+   "cantidad_anterior": 82,
+   "cantidad": 1,
+   "stock_resultante": 81,
+   "origen": "manual",
+   "creado_en": "2026-11-19T19:43:04.549362Z"
+  },
+  {
+   "id": 130,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 13,
+   "razon_nombre": "Compra",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": null,
+   "compra_detalle_id": 25,
+   "tipo": "entrada",
+   "cantidad_anterior": 72,
+   "cantidad": 10,
+   "stock_resultante": 82,
+   "origen": "manual",
+   "creado_en": "2026-11-19T19:09:03.664967Z"
+  },
+  {
+   "id": 129,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 11,
+   "razon_nombre": "Venta",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": 95,
+   "compra_detalle_id": null,
+   "tipo": "salida",
+   "cantidad_anterior": 73,
+   "cantidad": 1,
+   "stock_resultante": 72,
+   "origen": "manual",
+   "creado_en": "2026-11-19T19:02:23.346433Z"
+  },
+  {
+   "id": 128,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 13,
+   "razon_nombre": "Compra",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": null,
+   "compra_detalle_id": 24,
+   "tipo": "entrada",
+   "cantidad_anterior": 63,
+   "cantidad": 10,
+   "stock_resultante": 73,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:59:39.726493Z"
+  },
+  {
+   "id": 127,
+   "producto_id": 25,
+   "producto_nombre": "Sombra de ojos líquida",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 13,
+   "razon_nombre": "Compra",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": null,
+   "compra_detalle_id": 23,
+   "tipo": "entrada",
+   "cantidad_anterior": 50,
+   "cantidad": 10,
+   "stock_resultante": 60,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:48:40.572463Z"
+  },
+  {
+   "id": 126,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 13,
+   "razon_nombre": "Compra",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": null,
+   "compra_detalle_id": 22,
+   "tipo": "entrada",
+   "cantidad_anterior": 48,
+   "cantidad": 15,
+   "stock_resultante": 63,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:48:40.572463Z"
+  },
+  {
+   "id": 125,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 11,
+   "razon_nombre": "Venta",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": 94,
+   "compra_detalle_id": null,
+   "tipo": "salida",
+   "cantidad_anterior": 49,
+   "cantidad": 1,
+   "stock_resultante": 48,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:46:30.043227Z"
+  },
+  {
+   "id": 124,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 11,
+   "razon_nombre": "Venta",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": 93,
+   "compra_detalle_id": null,
+   "tipo": "salida",
+   "cantidad_anterior": 50,
+   "cantidad": 1,
+   "stock_resultante": 49,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:46:02.530935Z"
+  },
+  {
+   "id": 123,
+   "producto_id": 25,
+   "producto_nombre": "Sombra de ojos líquida",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 14,
+   "razon_nombre": "Stock inicial",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": null,
+   "compra_detalle_id": null,
+   "tipo": "entrada",
+   "cantidad_anterior": 0,
+   "cantidad": 50,
+   "stock_resultante": 50,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:32:59.573826Z"
+  },
+  {
+   "id": 122,
+   "producto_id": 24,
+   "producto_nombre": "Iluminador líquido",
+   "sucursal_id": 1,
+   "sucursal_nombre": "Sucursal principal",
+   "razon_movimiento_id": 14,
+   "razon_nombre": "Stock inicial",
+   "sucursal_relacionada_id": null,
+   "sucursal_relacionada_nombre": null,
+   "usuario_id": 1,
+   "usuario_nombre": "Persona 1",
+   "sesion_id": null,
+   "venta_detalle_id": null,
+   "compra_detalle_id": null,
+   "tipo": "entrada",
+   "cantidad_anterior": 0,
+   "cantidad": 50,
+   "stock_resultante": 50,
+   "origen": "manual",
+   "creado_en": "2026-11-19T18:32:59.573826Z"
+  }
+ ],
+ "/api/inventario/stock-bajo": [],
+ "/api/marcas/": [
+  {
+   "id": 7,
+   "nombre": "Cherrymoya",
+   "activo": true
+  },
+  {
+   "id": 2,
+   "nombre": "Loreal",
+   "activo": true
+  },
+  {
+   "id": 1,
+   "nombre": "Schwarzkopf",
+   "activo": true
+  },
+  {
+   "id": 6,
+   "nombre": "Proveedor 3",
+   "activo": true
+  }
+ ],
+ "/api/productos/": [
+  {
+   "id": 24,
+   "sku": "0001040",
+   "codigo_barras": null,
+   "nombre": "Iluminador líquido",
+   "descripcion": null,
+   "categoria_id": 10,
+   "categoria": {
+    "id": 10,
+    "nombre": "Maquillaje",
+    "padre_id": null
+   },
+   "marca_id": 6,
+   "proveedor_id": null,
+   "precio_compra": "28.71",
+   "precio_venta": "40.00",
+   "precio_mayor": "35.00",
+   "stock_minimo": 5,
+   "activo": true
+  },
+  {
+   "id": 25,
+   "sku": "0002040",
+   "codigo_barras": "123456",
+   "nombre": "Sombra de ojos líquida",
+   "descripcion": null,
+   "categoria_id": 10,
+   "categoria": {
+    "id": 10,
+    "nombre": "Maquillaje",
+    "padre_id": null
+   },
+   "marca_id": 6,
+   "proveedor_id": null,
+   "precio_compra": "30.25",
+   "precio_venta": "40.00",
+   "precio_mayor": "35.00",
+   "stock_minimo": 5,
+   "activo": true
+  }
+ ],
+ "/api/proveedores/": [
+  {
+   "id": 4,
+   "nombre": "Proveedor 1",
+   "contacto": "Contacto",
+   "telefono": "70000000",
+   "email": "cuenta443@ejemplo.com",
+   "activo": true
+  },
+  {
+   "id": 7,
+   "nombre": "Proveedor 2",
+   "contacto": "Contacto",
+   "telefono": "70000000",
+   "email": "cuenta867@ejemplo.com",
+   "activo": true
+  },
+  {
+   "id": 5,
+   "nombre": "Proveedor 3",
+   "contacto": "Contacto",
+   "telefono": "70000000",
+   "email": "cuenta443@ejemplo.com",
+   "activo": true
+  }
+ ],
+ "/api/reportes/valorizacion": {
+  "productos_activos": 2,
+  "unidades_totales": 141,
+  "productos_stock_bajo": 0,
+  "valorizado_costo": "4140.51",
+  "valorizado_venta": "5640.00"
+ },
+ "/api/sucursales/": [
+  {
+   "id": 1,
+   "nombre": "Sucursal principal",
+   "direccion": null,
+   "telefono": null,
+   "activo": true,
+   "predeterminada": true
+  }
+ ],
+ "/api/sueldos/asistencias": [],
+ "/api/sueldos/liquidaciones": [],
+ "/api/usuarios/": [
+  {
+   "id": 1,
+   "nombre": "Persona 1",
+   "email": "cuenta578@ejemplo.com",
+   "rol_id": 1,
+   "rol_nombre": "administrador",
+   "activo": true,
+   "created_at": "2026-09-22T19:59:05.087284Z",
+   "pago_por_hora": null,
+   "porcentaje_comision": null
+  },
+  {
+   "id": 26,
+   "nombre": "Persona 2",
+   "email": "cuenta299@ejemplo.com",
+   "rol_id": 2,
+   "rol_nombre": "vendedor",
+   "activo": true,
+   "created_at": "2026-11-19T19:33:42.026213Z",
+   "pago_por_hora": "20.00",
+   "porcentaje_comision": "5.00"
+  }
+ ],
+ "/api/usuarios/roles": [
+  {
+   "id": 1,
+   "nombre": "administrador",
+   "descripcion": null
+  },
+  {
+   "id": 2,
+   "nombre": "vendedor",
+   "descripcion": null
+  }
+ ],
+ "/api/ventas/": [
+  {
+   "id": 52,
+   "fecha_creacion": "2026-11-19T19:43:04.549362Z",
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "cliente_id": null,
+   "sesion_caja_id": null,
+   "tipo_venta": "minorista",
+   "total": "40.00",
+   "estado": "completada",
+   "anulada_en": null,
+   "anulada_por_usuario_id": null,
+   "motivo_anulacion": null,
+   "detalles": [
+    {
+     "id": 96,
+     "producto_id": 24,
+     "producto_nombre": "Iluminador líquido",
+     "producto_sku": "0001040",
+     "cantidad": 1,
+     "precio_lista_unitario": "40.00",
+     "precio_unitario_negociado": "40.00",
+     "total_linea": "40.00",
+     "costo_unitario_bob_aplicado": "28.7100",
+     "costo_total_bob_aplicado": "28.71",
+     "tipo_promocion": null,
+     "observacion_promocion": null
+    }
+   ],
+   "pagos": [
+    {
+     "id": 68,
+     "fecha_creacion": "2026-11-19T19:43:04.549362Z",
+     "metodo_pago": "efectivo",
+     "monto": "40.00",
+     "estado": "confirmado",
+     "referencia": null
+    }
+   ]
+  },
+  {
+   "id": 51,
+   "fecha_creacion": "2026-11-19T19:02:23.346433Z",
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "cliente_id": null,
+   "sesion_caja_id": null,
+   "tipo_venta": "minorista",
+   "total": "40.00",
+   "estado": "completada",
+   "anulada_en": null,
+   "anulada_por_usuario_id": null,
+   "motivo_anulacion": null,
+   "detalles": [
+    {
+     "id": 95,
+     "producto_id": 24,
+     "producto_nombre": "Iluminador líquido",
+     "producto_sku": "0001040",
+     "cantidad": 1,
+     "precio_lista_unitario": "40.00",
+     "precio_unitario_negociado": "40.00",
+     "total_linea": "40.00",
+     "costo_unitario_bob_aplicado": "29.4300",
+     "costo_total_bob_aplicado": "29.43",
+     "tipo_promocion": null,
+     "observacion_promocion": null
+    }
+   ],
+   "pagos": [
+    {
+     "id": 67,
+     "fecha_creacion": "2026-11-19T19:02:23.346433Z",
+     "metodo_pago": "efectivo",
+     "monto": "40.00",
+     "estado": "confirmado",
+     "referencia": null
+    }
+   ]
+  },
+  {
+   "id": 50,
+   "fecha_creacion": "2026-11-19T18:46:30.043227Z",
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "cliente_id": null,
+   "sesion_caja_id": null,
+   "tipo_venta": "minorista",
+   "total": "40.00",
+   "estado": "completada",
+   "anulada_en": null,
+   "anulada_por_usuario_id": null,
+   "motivo_anulacion": null,
+   "detalles": [
+    {
+     "id": 94,
+     "producto_id": 24,
+     "producto_nombre": "Iluminador líquido",
+     "producto_sku": "0001040",
+     "cantidad": 1,
+     "precio_lista_unitario": "40.00",
+     "precio_unitario_negociado": "40.00",
+     "total_linea": "40.00",
+     "costo_unitario_bob_aplicado": "30.0000",
+     "costo_total_bob_aplicado": "30.00",
+     "tipo_promocion": null,
+     "observacion_promocion": null
+    }
+   ],
+   "pagos": [
+    {
+     "id": 66,
+     "fecha_creacion": "2026-11-19T18:46:30.043227Z",
+     "metodo_pago": "efectivo",
+     "monto": "40.00",
+     "estado": "confirmado",
+     "referencia": null
+    }
+   ]
+  },
+  {
+   "id": 49,
+   "fecha_creacion": "2026-11-19T18:46:02.530935Z",
+   "usuario_id": 1,
+   "sucursal_id": 1,
+   "cliente_id": null,
+   "sesion_caja_id": null,
+   "tipo_venta": "minorista",
+   "total": "40.00",
+   "estado": "completada",
+   "anulada_en": null,
+   "anulada_por_usuario_id": null,
+   "motivo_anulacion": null,
+   "detalles": [
+    {
+     "id": 93,
+     "producto_id": 24,
+     "producto_nombre": "Iluminador líquido",
+     "producto_sku": "0001040",
+     "cantidad": 1,
+     "precio_lista_unitario": "40.00",
+     "precio_unitario_negociado": "40.00",
+     "total_linea": "40.00",
+     "costo_unitario_bob_aplicado": "30.0000",
+     "costo_total_bob_aplicado": "30.00",
+     "tipo_promocion": null,
+     "observacion_promocion": null
+    }
+   ],
+   "pagos": [
+    {
+     "id": 65,
+     "fecha_creacion": "2026-11-19T18:46:02.530935Z",
+     "metodo_pago": "qr",
+     "monto": "40.00",
+     "estado": "confirmado",
+     "referencia": null
+    }
+   ]
+  }
+ ],
+ "/api/monedas/": [
+  {
+   "codigo": "ARS",
+   "nombre": "Peso argentino",
+   "simbolo": "AR$",
+   "pais": "Argentina",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "BOB",
+   "nombre": "Boliviano",
+   "simbolo": "Bs",
+   "pais": "Bolivia",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "BRL",
+   "nombre": "Real brasileno",
+   "simbolo": "R$",
+   "pais": "Brasil",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "CLP",
+   "nombre": "Peso chileno",
+   "simbolo": "CLP$",
+   "pais": "Chile",
+   "decimales": 0,
+   "activa": true
+  },
+  {
+   "codigo": "CNY",
+   "nombre": "Yuan renminbi",
+   "simbolo": "CNY",
+   "pais": "China",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "COP",
+   "nombre": "Peso colombiano",
+   "simbolo": "COL$",
+   "pais": "Colombia",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "EUR",
+   "nombre": "Euro",
+   "simbolo": "EUR",
+   "pais": "Union Europea",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "JPY",
+   "nombre": "Yen",
+   "simbolo": "JPY",
+   "pais": "Japon",
+   "decimales": 0,
+   "activa": true
+  },
+  {
+   "codigo": "PEN",
+   "nombre": "Sol",
+   "simbolo": "S/",
+   "pais": "Peru",
+   "decimales": 2,
+   "activa": true
+  },
+  {
+   "codigo": "USD",
+   "nombre": "Dólar estadounidense",
+   "simbolo": "$",
+   "pais": "Estados Unidos",
+   "decimales": 2,
+   "activa": true
+  }
+ ],
+ "/api/clientes/": [
+  {
+   "nombre": "Persona 3",
+   "telefono": null,
+   "email": null,
+   "id": 4,
+   "activo": true,
+   "creado_en": "2026-11-19T20:16:06.813997Z"
+  }
+ ],
+ "/api/configuracion/": {
+  "sucursal_predeterminada_id": 1,
+  "sucursal_predeterminada": {
+   "id": 1,
+   "nombre": "Sucursal principal",
+   "direccion": null,
+   "telefono": null,
+   "activo": true,
+   "predeterminada": true
+  },
+  "actualizado_en": "2026-11-11T12:45:09.858763Z"
+ },
+ "/api/razones-movimiento/": [
+  {
+   "id": 10,
+   "codigo": "ajuste_desglose",
+   "nombre": "Ajuste por desglose",
+   "tipo_movimiento": "ajuste",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 1,
+   "codigo": "ingreso_proveedor",
+   "nombre": "Ingreso desde proveedor",
+   "tipo_movimiento": "entrada",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 2,
+   "codigo": "devolucion_sucursal",
+   "nombre": "Devolución de sucursal",
+   "tipo_movimiento": "entrada",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 3,
+   "codigo": "devolucion_cliente",
+   "nombre": "Devolución de cliente",
+   "tipo_movimiento": "entrada",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 4,
+   "codigo": "reposicion_falla",
+   "nombre": "Reposición por falla",
+   "tipo_movimiento": "entrada",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 5,
+   "codigo": "salida_sucursal",
+   "nombre": "Salida a sucursal",
+   "tipo_movimiento": "salida",
+   "sistema": false,
+   "requiere_sucursal_destino": true,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 6,
+   "codigo": "salida_falla",
+   "nombre": "Salida por falla",
+   "tipo_movimiento": "salida",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 7,
+   "codigo": "salida_cambio_cliente",
+   "nombre": "Salida por cambio a cliente",
+   "tipo_movimiento": "salida",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 8,
+   "codigo": "salida_tester",
+   "nombre": "Salida para tester",
+   "tipo_movimiento": "salida",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  },
+  {
+   "id": 9,
+   "codigo": "salida_extravio",
+   "nombre": "Salida por extravío",
+   "tipo_movimiento": "salida",
+   "sistema": false,
+   "requiere_sucursal_destino": false,
+   "activo": true,
+   "creado_en": "2026-11-11T12:45:09.858763Z",
+   "actualizado_en": "2026-11-11T12:45:09.858763Z"
+  }
+ ]
+}

@@ -3,10 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/models/sucursal.dart';
-import '../../../core/network/api_client.dart';
 import '../../../core/services/configuracion_service.dart';
 import '../../../shared/widgets/boton_seguro.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/validaciones.dart';
 
 const _tiposMovimiento = {
   'entrada': 'Entrada',
@@ -14,7 +15,7 @@ const _tiposMovimiento = {
   'ajuste': 'Ajuste',
 };
 
-String _motivo(Object e) => e is ApiException ? e.detalle : '$e';
+String _motivo(Object e) => mensajeDeError(e);
 
 String? _nombreObligatorio(String? valor) =>
     (valor == null || valor.trim().isEmpty) ? 'Escribe un nombre.' : null;
@@ -251,9 +252,15 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
             ),
           ),
           const SizedBox(height: 20),
-          Row(
+          // Wrap y no Row: con letra grande del sistema el boton no cabia al
+          // lado del titulo y la fila se desbordaba; ahora baja a otra linea.
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(child: _titulo(context, 'Sucursales')),
+              _titulo(context, 'Sucursales'),
               BotonSeguro(
                 onPressed: () => _editarSucursal(),
                 icon: const Icon(Icons.add),
@@ -342,9 +349,15 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
               ),
             ),
           const SizedBox(height: 20),
-          Row(
+          // Wrap y no Row: con letra grande del sistema el boton no cabia al
+          // lado del titulo y la fila se desbordaba; ahora baja a otra linea.
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(child: _titulo(context, 'Razones de movimiento')),
+              _titulo(context, 'Razones de movimiento'),
               BotonSeguro(
                 onPressed: () => _editarRazon(),
                 icon: const Icon(Icons.add),
@@ -516,7 +529,11 @@ class _SucursalDialogState extends State<_SucursalDialog> {
                   controller: _telefono,
                   maxLength: 30,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Teléfono (opcional)'),
+                  validator: Validaciones.telefono,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono (opcional)',
+                    errorMaxLines: 2,
+                  ),
                   onFieldSubmitted: (_) => _guardar(),
                 ),
                 const SizedBox(height: 16),

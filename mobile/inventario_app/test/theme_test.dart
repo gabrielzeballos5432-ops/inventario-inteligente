@@ -57,10 +57,10 @@ void main() {
   });
 
   // ------------------------------------------------------------- el login
-  testWidgets('la pantalla de login tambien funciona en modo claro',
+  testWidgets('la pantalla de login también funciona en modo claro',
       (tester) async {
     await _montarApp(tester, ThemeMode.light);
-    expect(find.text('Iniciar sesion'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(find.text('Acceso al sistema'), findsOneWidget);
   });
 

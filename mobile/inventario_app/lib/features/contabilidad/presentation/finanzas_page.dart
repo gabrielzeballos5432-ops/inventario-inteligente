@@ -9,10 +9,12 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/models/categoria_gasto.dart';
 import 'categorias_gasto_dialog.dart';
-import '../../../core/network/api_client.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/boton_seguro.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/validaciones.dart';
+import '../../../core/utils/formato_numero.dart';
 
 class FinanzasPage extends StatelessWidget {
   const FinanzasPage({super.key, required this.seccion});
@@ -228,7 +230,9 @@ class _ClienteDialogState extends State<_ClienteDialog> {
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: 'Teléfono (opcional)',
+                  errorMaxLines: 2,
                 ),
+                validator: Validaciones.telefono,
               ),
               TextFormField(
                 controller: _email,
@@ -236,7 +240,9 @@ class _ClienteDialogState extends State<_ClienteDialog> {
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Correo (opcional)',
+                  errorMaxLines: 2,
                 ),
+                validator: (v) => Validaciones.correo(v, obligatorio: false),
               ),
             ],
           ),
@@ -402,6 +408,10 @@ class _ComprasTabState extends State<_ComprasTab> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: SectionCard(
                   child: ExpansionTile(
+                    // Sin clave propia la fila leia del PageStorage el
+                    // desplazamiento de la lista (un double) como su estado
+                    // abierto/cerrado (bool) y fallaba al reconstruirse.
+                    key: PageStorageKey('compra-${compra['id']}'),
                     tilePadding: EdgeInsets.zero,
                     childrenPadding: EdgeInsets.zero,
                     title: Text(
@@ -547,21 +557,26 @@ class _CompraDialogState extends State<_CompraDialog> {
   Map<String, dynamic> _payload() => {
     'proveedor_id': _proveedorId,
     'moneda_codigo': _moneda,
-    'tipo_cambio_ext': _moneda == 'BOB'
-        ? _tcBob.text.trim()
-        : _tcExt.text.trim(),
-    'tipo_cambio_bob': _tcBob.text.trim(),
+    // aDecimal: los campos aceptan coma decimal y el API espera punto.
+    'tipo_cambio_ext': Validaciones.aDecimal(
+      _moneda == 'BOB' ? _tcBob.text : _tcExt.text,
+    ),
+    'tipo_cambio_bob': Validaciones.aDecimal(_tcBob.text),
     'numero_factura': _factura.text.trim().isEmpty
         ? null
         : _factura.text.trim(),
-    'descuento_moneda': _descuento.text.trim(),
-    'porcentaje_manipulacion_envio': _porcentajeEnvio.text.trim(),
+    'descuento_moneda': Validaciones.aDecimal(
+      _descuento.text.trim().isEmpty ? '0' : _descuento.text,
+    ),
+    'porcentaje_manipulacion_envio': Validaciones.aDecimal(
+      _porcentajeEnvio.text.trim().isEmpty ? '0' : _porcentajeEnvio.text,
+    ),
     'detalles': _detalles
         .map(
           (fila) => {
             'producto_id': fila.productoId,
-            'cantidad': int.parse(fila.cantidad.text),
-            'costo_unitario_moneda': fila.costo.text.trim(),
+            'cantidad': int.parse(fila.cantidad.text.trim()),
+            'costo_unitario_moneda': Validaciones.aDecimal(fila.costo.text),
             if (fila.descripcion.text.trim().isNotEmpty)
               'descripcion_factura': fila.descripcion.text.trim(),
           },
@@ -699,6 +714,7 @@ class _CompraDialogState extends State<_CompraDialog> {
           'Descuento y envío se completan manualmente.',
         ),
         ExpansionTile(
+          key: const PageStorageKey('ocr-texto-detectado'),
           title: const Text('Ver texto detectado'),
           children: [SelectableText(lectura['texto_detectado'] as String)],
         ),
@@ -736,7 +752,7 @@ class _CompraDialogState extends State<_CompraDialog> {
       setState(() => _error = 'Revisa los campos marcados en rojo.');
       return;
     }
-    if (_moneda == 'USD' && (double.tryParse(_tcExt.text) ?? 0) != 1) {
+    if (_moneda == 'USD' && (Validaciones.leerNumero(_tcExt.text) ?? 0) != 1) {
       setState(
         () => _error = 'Para USD, el tipo de cambio externo debe ser 1.',
       );
@@ -941,6 +957,7 @@ class _CompraDialogState extends State<_CompraDialog> {
               ocupa(
                 1,
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 6),
                   controller: _tcExt,
                   keyboardType: decimal,
                   textInputAction: TextInputAction.next,
@@ -950,12 +967,13 @@ class _CompraDialogState extends State<_CompraDialog> {
                         : '$_moneda por USD',
                     errorMaxLines: 2,
                   ),
-                  validator: _positivo,
+                  validator: Validaciones.tipoCambio,
                 ),
               ),
             ocupa(
               1,
               TextFormField(
+                inputFormatters: FormatoNumero.decimal(decimales: 6),
                 controller: _tcBob,
                 keyboardType: decimal,
                 textInputAction: TextInputAction.next,
@@ -963,12 +981,13 @@ class _CompraDialogState extends State<_CompraDialog> {
                   labelText: 'Bs por USD',
                   errorMaxLines: 2,
                 ),
-                validator: _positivo,
+                validator: Validaciones.tipoCambio,
               ),
             ),
             ocupa(
               1,
               TextFormField(
+                inputFormatters: FormatoNumero.decimal(decimales: 4),
                 controller: _descuento,
                 keyboardType: decimal,
                 textInputAction: TextInputAction.next,
@@ -976,12 +995,19 @@ class _CompraDialogState extends State<_CompraDialog> {
                   labelText: 'Descuento ($_moneda)',
                   errorMaxLines: 2,
                 ),
-                validator: _noNegativo,
+                validator: (v) => Validaciones.monto(
+                  v,
+                  etiqueta: 'descuento',
+                  obligatorio: false,
+                  permitirCero: true,
+                  decimales: 4,
+                ),
               ),
             ),
             ocupa(
               1,
               TextFormField(
+                inputFormatters: FormatoNumero.decimal(decimales: 2),
                 controller: _porcentajeEnvio,
                 keyboardType: decimal,
                 textInputAction: TextInputAction.next,
@@ -989,10 +1015,8 @@ class _CompraDialogState extends State<_CompraDialog> {
                   labelText: 'Envío (%)',
                   errorMaxLines: 2,
                 ),
-                validator: (value) {
-                  final n = double.tryParse(value ?? '');
-                  return n == null || n < 0 || n > 100 ? 'De 0 a 100' : null;
-                },
+                validator: (v) =>
+                    Validaciones.porcentaje(v, obligatorio: false),
               ),
             ),
           ],
@@ -1177,6 +1201,7 @@ class _CompraDialogState extends State<_CompraDialog> {
 
   Widget _campoCantidad(_DetalleCompraEditor fila, bool conEtiqueta) {
     return TextFormField(
+      inputFormatters: FormatoNumero.entero,
       controller: fila.cantidad,
       focusNode: fila.focoCantidad,
       enabled: !_guardando,
@@ -1187,13 +1212,13 @@ class _CompraDialogState extends State<_CompraDialog> {
         labelText: conEtiqueta ? 'Cant.' : null,
         errorMaxLines: 2,
       ),
-      validator: (value) =>
-          (int.tryParse(value ?? '') ?? 0) <= 0 ? 'Mín. 1' : null,
+      validator: (v) => Validaciones.entero(v),
     );
   }
 
   Widget _campoCosto(_DetalleCompraEditor fila, bool conEtiqueta) {
     return TextFormField(
+      inputFormatters: FormatoNumero.decimal(decimales: 6),
       controller: fila.costo,
       enabled: !_guardando,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1203,8 +1228,12 @@ class _CompraDialogState extends State<_CompraDialog> {
         labelText: conEtiqueta ? 'Costo u. ($_moneda)' : null,
         errorMaxLines: 2,
       ),
-      validator: (value) =>
-          (double.tryParse(value ?? '') ?? -1) < 0 ? 'Costo ≥ 0' : null,
+      validator: (v) => Validaciones.monto(
+        v,
+        etiqueta: 'costo',
+        permitirCero: true,
+        decimales: 6,
+      ),
       onFieldSubmitted: (_) {
         if (fila == _detalles.last) _agregarFila();
       },
@@ -1455,8 +1484,9 @@ class _MonedasDialogState extends State<_MonedasDialog> {
                   style: TextStyle(color: context.paleta.negativo),
                 ),
               ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 360),
+            // Flexible y no un alto fijo de 360: con el telefono acostado
+            // (390 px de alto) titulo + lista + botones no cabian.
+            Flexible(
               child: ListView(
                 shrinkWrap: true,
                 children: [
@@ -1584,6 +1614,9 @@ class _MonedaDialogState extends State<_MonedaDialog> {
                 decoration: const InputDecoration(labelText: 'País (opcional)'),
               ),
               DropdownButtonFormField<int>(
+                // Ocupa el ancho del campo: un nombre largo se corta con
+                // … en vez de desbordar la fila en el telefono.
+                isExpanded: true,
                 initialValue: _decimales,
                 decoration: const InputDecoration(
                   labelText: 'Decimales de la moneda',
@@ -2113,22 +2146,15 @@ class _TarifasVendedorDialogState extends State<_TarifasVendedorDialog> {
     super.dispose();
   }
 
-  String? _validarNumero(String? valor, {required bool permitirCero}) {
-    final texto = (valor ?? '').trim().replaceAll(',', '.');
-    final numero = double.tryParse(texto);
-    if (numero == null || (permitirCero ? numero < 0 : numero <= 0)) {
-      return permitirCero
-          ? 'Ingresa un porcentaje entre 0 y 100'
-          : 'Ingresa un pago por hora mayor que cero';
-    }
-    if (texto.contains('.') && texto.split('.').last.length > 2) {
-      return 'Admite hasta 2 decimales';
-    }
-    if (permitirCero && numero > 100) {
-      return 'Ingresa un porcentaje entre 0 y 100';
-    }
-    return null;
-  }
+  /// Pago por hora: NUMERIC(10,2) en la base. Comision: 0 a 100.
+  String? _validarNumero(String? valor, {required bool permitirCero}) =>
+      permitirCero
+      ? Validaciones.porcentaje(valor)
+      : Validaciones.monto(
+          valor,
+          etiqueta: 'pago por hora',
+          maximo: Validaciones.precioMaximo,
+        );
 
   void _guardar() {
     if (!_formKey.currentState!.validate()) return;
@@ -2155,6 +2181,7 @@ class _TarifasVendedorDialogState extends State<_TarifasVendedorDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 2),
                   controller: _pagoPorHoraController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -2168,6 +2195,7 @@ class _TarifasVendedorDialogState extends State<_TarifasVendedorDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 2),
                   controller: _porcentajeComisionController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -2262,6 +2290,9 @@ class _LiquidacionDialogState extends State<_LiquidacionDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<int>(
+            // Ocupa el ancho del campo: un nombre largo se corta con
+            // … en vez de desbordar la fila en el telefono.
+            isExpanded: true,
             initialValue: _usuarioId,
             decoration: const InputDecoration(labelText: 'Vendedor'),
             items: widget.usuarios
@@ -2317,12 +2348,6 @@ class _LiquidacionDialogState extends State<_LiquidacionDialog> {
   }
 }
 
-String? _positivo(String? value) =>
-    (double.tryParse(value ?? '') ?? 0) <= 0 ? 'Debe ser mayor a cero' : null;
-
-String? _noNegativo(String? value) => (double.tryParse(value ?? '') ?? -1) < 0
-    ? 'Ingresa un importe válido'
-    : null;
 
 class _BonosTab extends StatefulWidget {
   const _BonosTab({super.key});
@@ -2573,6 +2598,9 @@ class _BonoDialogState extends State<_BonoDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
+                // Ocupa el ancho del campo: un nombre largo se corta con
+                // … en vez de desbordar la fila en el telefono.
+                isExpanded: true,
                 initialValue: _usuarioId,
                 decoration: const InputDecoration(labelText: 'Vendedor'),
                 items: widget.vendedores
@@ -2589,6 +2617,9 @@ class _BonoDialogState extends State<_BonoDialog> {
                 }),
               ),
               DropdownButtonFormField<int?>(
+                // Ocupa el ancho del campo: un nombre largo se corta con
+                // … en vez de desbordar la fila en el telefono.
+                isExpanded: true,
                 initialValue: _liquidacionId,
                 decoration: const InputDecoration(
                   labelText: 'Liquidación pendiente (opcional)',
@@ -2609,6 +2640,8 @@ class _BonoDialogState extends State<_BonoDialog> {
                           value: liquidacion['id'] as int,
                           child: Text(
                             '#${liquidacion['id']} · ${liquidacion['fecha_inicio']} a ${liquidacion['fecha_fin']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -2616,6 +2649,9 @@ class _BonoDialogState extends State<_BonoDialog> {
                 onChanged: (value) => setState(() => _liquidacionId = value),
               ),
               DropdownButtonFormField<String>(
+                // Ocupa el ancho del campo: un nombre largo se corta con
+                // … en vez de desbordar la fila en el telefono.
+                isExpanded: true,
                 initialValue: _tipo,
                 decoration: const InputDecoration(labelText: 'Tipo de bono'),
                 items: const [
@@ -2632,14 +2668,16 @@ class _BonoDialogState extends State<_BonoDialog> {
                 },
               ),
               TextFormField(
+                inputFormatters: FormatoNumero.decimal(decimales: 2),
                 controller: _monto,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(labelText: 'Monto (Bs)'),
-                validator: (value) => (double.tryParse(value ?? '') ?? 0) <= 0
-                    ? 'Monto inválido'
-                    : null,
+                decoration: const InputDecoration(
+                  labelText: 'Monto (Bs)',
+                  errorMaxLines: 2,
+                ),
+                validator: (v) => Validaciones.monto(v, maximo: 999999999999.99),
               ),
               TextFormField(
                 controller: _descripcion,
@@ -2669,7 +2707,7 @@ class _BonoDialogState extends State<_BonoDialog> {
                 liquidacionId: _liquidacionId,
                 tipo: _tipo,
                 descripcion: _descripcion.text,
-                monto: double.parse(_monto.text),
+                monto: Validaciones.leerNumero(_monto.text)!,
               ),
             );
           },
@@ -2974,7 +3012,7 @@ class _GastosTabState extends State<_GastosTab> {
                   : (constraints.maxWidth - 8 * (columnas - 1)) / columnas,
               child: _ResumenGasto(
                 titulo: titulo,
-                valor: 'Bs ${monto.toStringAsFixed(2)}',
+                valor: FormatoNumero.bs(monto),
                 icono: icono,
               ),
             ),
@@ -3205,7 +3243,7 @@ class _GastosTabState extends State<_GastosTab> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Pagado: Bs ${pagado.toStringAsFixed(2)} · '
+              'Pagado: ${FormatoNumero.bs(pagado)} · '
               'Pendiente: Bs ${_numero(gasto['saldo_pendiente_bob'])}',
               style: TextStyle(color: Theme.of(context).hintColor),
             ),
@@ -3375,18 +3413,16 @@ class _GastoDialogState extends State<_GastoDialog> {
                       : null,
                 ),
                 TextFormField(
+                  inputFormatters: FormatoNumero.decimal(decimales: 2),
                   controller: _monto,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(labelText: 'Importe (Bs)'),
-                  validator: (value) {
-                    final monto = double.tryParse(value ?? '');
-                    if (monto == null || monto <= 0) return 'Importe inválido';
-                    final decimales =
-                        value!.split('.').elementAtOrNull(1)?.length ?? 0;
-                    return decimales > 2 ? 'Usa hasta 2 decimales' : null;
-                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Importe (Bs)',
+                    errorMaxLines: 2,
+                  ),
+                  validator: (v) => Validaciones.monto(v, etiqueta: 'importe'),
                 ),
                 TextFormField(
                   controller: _documento,
@@ -3409,13 +3445,19 @@ class _GastoDialogState extends State<_GastoDialog> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: TextField(
+                      child: TextFormField(
                         controller: _hasta,
                         readOnly: true,
                         onTap: () => _elegirFecha(_hasta),
                         decoration: const InputDecoration(
                           labelText: 'Período hasta',
+                          errorMaxLines: 2,
                         ),
+                        validator: (_) => _desde.text.isNotEmpty &&
+                                _hasta.text.isNotEmpty &&
+                                _hasta.text.compareTo(_desde.text) < 0
+                            ? 'No puede ser anterior al inicio'
+                            : null,
                       ),
                     ),
                   ],
@@ -3433,21 +3475,12 @@ class _GastoDialogState extends State<_GastoDialog> {
         BotonSeguro(
           onPressed: () {
             if (!_formKey.currentState!.validate()) return;
-            if (_desde.text.isNotEmpty &&
-                _hasta.text.isNotEmpty &&
-                _hasta.text.compareTo(_desde.text) < 0) {
-              _mensaje(
-                context,
-                'El fin del período no puede ser anterior al inicio.',
-              );
-              return;
-            }
             Navigator.pop(
               context,
               _GastoFormulario(
                 categoriaId: _categoria!.id,
                 concepto: _concepto.text.trim(),
-                monto: double.parse(_monto.text),
+                monto: Validaciones.leerNumero(_monto.text)!,
                 numeroDocumento: _documento.text,
                 periodoDesde: _desde.text.isEmpty ? null : _desde.text,
                 periodoHasta: _hasta.text.isEmpty ? null : _hasta.text,
@@ -3531,8 +3564,9 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Saldo pendiente: $moneda ${restante.toStringAsFixed(2)}'),
+            Text('Saldo pendiente: $moneda ${FormatoNumero.monto(restante)}'),
             TextFormField(
+              inputFormatters: FormatoNumero.decimal(decimales: 2),
               controller: _monto,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -3588,6 +3622,7 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
             ),
             if (mixto) ...[
               TextFormField(
+                inputFormatters: FormatoNumero.decimal(decimales: 2),
                 controller: _efectivo,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -3613,7 +3648,7 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
                 },
               ),
               Text(
-                'Parte por QR: $moneda ${(total > efectivo ? total - efectivo : 0).toStringAsFixed(2)}',
+                'Parte por QR: $moneda ${FormatoNumero.monto(total > efectivo ? total - efectivo : 0)}',
               ),
             ],
             if (_pagoQr)
@@ -3935,11 +3970,20 @@ class _ResultadoCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              valor,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: destacado ? 16 : 14,
+            // El monto se achica si no cabe (montos grandes con letra grande
+            // del sistema) en vez de desbordar la tarjeta.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  valor,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: destacado ? 16 : 14,
+                  ),
+                ),
               ),
             ),
           ],
@@ -4048,18 +4092,28 @@ class _ErrorPanel extends StatelessWidget {
 
 Future<String?> _pedirMotivo(BuildContext context, String titulo) async {
   final controller = TextEditingController();
+  final formKey = GlobalKey<FormState>();
   final motivo = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
       scrollable: true,
       title: Text(titulo),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        minLines: 2,
-        maxLines: 4,
-        maxLength: 250,
-        decoration: const InputDecoration(labelText: 'Motivo'),
+      // Antes el "minimo 3 caracteres" salia en un SnackBar detras del
+      // dialogo; ahora va en el propio campo.
+      content: Form(
+        key: formKey,
+        child: TextFormField(
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 250,
+          validator: Validaciones.motivo,
+          decoration: const InputDecoration(
+            labelText: 'Motivo',
+            errorMaxLines: 2,
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -4068,10 +4122,7 @@ Future<String?> _pedirMotivo(BuildContext context, String titulo) async {
         ),
         BotonSeguro(
           onPressed: () {
-            if (controller.text.trim().length < 3) {
-              _mensaje(context, 'Escribe un motivo de al menos 3 caracteres.');
-              return;
-            }
+            if (!formKey.currentState!.validate()) return;
             Navigator.pop(context, controller.text.trim());
           },
           child: const Text('Confirmar'),
@@ -4079,7 +4130,8 @@ Future<String?> _pedirMotivo(BuildContext context, String titulo) async {
       ],
     ),
   );
-  controller.dispose();
+  // En el siguiente frame: la animacion de cierre aun usa el controlador.
+  WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
   return motivo;
 }
 
@@ -4089,20 +4141,13 @@ void _mensaje(BuildContext context, String texto) {
     ..showSnackBar(SnackBar(content: Text(texto)));
 }
 
-String _detalleError(Object error) {
-  if (error is ApiException) return error.detalle;
-  final texto = error.toString();
-  final marcador = 'Error HTTP ';
-  if (texto.startsWith(marcador) && texto.contains(':')) {
-    return texto.substring(texto.indexOf(':') + 2);
-  }
-  return texto;
-}
+String _detalleError(Object error) => mensajeDeError(error);
 
 double _aNumero(dynamic valor) =>
     valor is num ? valor.toDouble() : double.tryParse('$valor') ?? 0;
 
-String _numero(dynamic valor) => _aNumero(valor).toStringAsFixed(2);
+/// Monto para mostrar (`18.450,00`); al API va con toStringAsFixed.
+String _numero(dynamic valor) => FormatoNumero.monto(_aNumero(valor));
 
 String _bs(dynamic valor) => 'Bs ${_numero(valor)}';
 

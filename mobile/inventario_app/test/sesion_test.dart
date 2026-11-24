@@ -64,7 +64,7 @@ void main() {
       var avisos = 0;
       ApiClient.alSesionVencida = () => avisos++;
       final api = ApiClient(
-        httpClient: MockClient((_) async => _json({'detail': 'Token invalido'}, 401)),
+        httpClient: MockClient((_) async => _json({'detail': 'Token inválido'}, 401)),
       );
       await expectLater(api.getJson('/api/inventario/'), throwsA(isA<ApiException>()));
       expect(avisos, 1);
@@ -130,7 +130,7 @@ void main() {
 
       // Varias peticiones fallan juntas al vencer la sesión.
       final api = ApiClient(
-        httpClient: MockClient((_) async => _json({'detail': 'Token invalido'}, 401)),
+        httpClient: MockClient((_) async => _json({'detail': 'Token inválido'}, 401)),
       );
       await Future.wait([
         for (final ruta in ['/api/inventario/', '/api/sucursales/', '/api/razones-movimiento/'])

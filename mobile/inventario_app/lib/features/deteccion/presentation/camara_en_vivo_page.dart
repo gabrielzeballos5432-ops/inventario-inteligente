@@ -81,7 +81,7 @@ class _CamaraEnVivoPageState extends State<CamaraEnVivoPage>
     try {
       final camaras = await availableCameras();
       if (camaras.isEmpty) {
-        setState(() => _error = 'Este dispositivo no tiene camara.');
+        setState(() => _error = 'Este dispositivo no tiene cámara.');
         return;
       }
       final trasera = camaras.firstWhere(
@@ -112,9 +112,9 @@ class _CamaraEnVivoPageState extends State<CamaraEnVivoPage>
       if (!mounted) return;
       setState(() {
         _error = e.code.contains('AccessDenied')
-            ? 'La app no tiene permiso para usar la camara. Activalo en los '
-                'ajustes del telefono.'
-            : 'No se pudo abrir la camara (${e.code}).';
+            ? 'La app no tiene permiso para usar la cámara. Activalo en los '
+                'ajustes del teléfono.'
+            : 'No se pudo abrir la cámara (${e.code}).';
       });
     }
   }

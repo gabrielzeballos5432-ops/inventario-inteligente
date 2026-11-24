@@ -6,6 +6,7 @@ import '../../../app/destino_app.dart';
 import '../../../core/models/product.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/inventario_provider.dart';
+import '../../../core/utils/formato_numero.dart';
 import '../../../shared/widgets/section_card.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -30,7 +31,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   String _bs(double? valor) =>
-      valor == null ? '—' : 'Bs ${valor.toStringAsFixed(2)}';
+      valor == null ? '—' : FormatoNumero.bs(valor);
 
   String _saludo() {
     final hora = TimeOfDay.now().hour;
@@ -205,13 +206,21 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ],
                 ];
+                // Alto fijo segun el contenido, no proporcional al ancho: con
+                // childAspectRatio cada tarjeta media ~160 px en escritorio y
+                // el numero quedaba perdido abajo de un hueco vacio. El texto
+                // (etiqueta de 2 lineas + valor) crece con la letra del sistema.
+                final texto = MediaQuery.textScalerOf(context).scale(58);
                 return GridView.count(
                   crossAxisCount: columnas,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: constraints.maxWidth < 380 ? 1.05 : 1.45,
+                  childAspectRatio:
+                      (constraints.maxWidth - 10 * (columnas - 1)) /
+                          columnas /
+                          (78 + texto),
                   children: metricas,
                 );
               },

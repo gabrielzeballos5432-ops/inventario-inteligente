@@ -146,7 +146,7 @@ class _DetectionPageState extends State<DetectionPage> {
         setState(() {
           _registrando = false;
           _errorRegistro =
-              'No se pudo registrar. Revisa la conexion y el historial antes de reintentar.';
+              'No se pudo registrar. Revisa la conexión y el historial antes de reintentar.';
         });
       }
     }
@@ -186,7 +186,7 @@ class _DetectionPageState extends State<DetectionPage> {
                   'el resultado antes de registrar la entrada.'
               : 'Selecciona una imagen de los productos: la IA los cuenta y tu '
                   'revisas el resultado antes de registrar la entrada. La captura '
-                  'con camara esta disponible en la aplicacion movil.',
+                  'con cámara esta disponible en la aplicacion movil.',
           style: TextStyle(color: context.textoSecundario),
         ),
         const SizedBox(height: 20),
@@ -235,7 +235,7 @@ class _DetectionPageState extends State<DetectionPage> {
                       ),
                       SizedBox(height: 6),
                       Text(
-                        'El servidor todavia no tiene el modelo entrenado '
+                        'El servidor todavía no tiene el modelo entrenado '
                         '(best.pt). Mientras tanto puedes registrar entradas '
                         'y salidas a mano desde la pestaña Productos.',
                         style: TextStyle(
@@ -258,7 +258,7 @@ class _DetectionPageState extends State<DetectionPage> {
                 // Expanded: sin el, el texto no se ajusta al ancho del
                 // telefono y la fila se desbordaba (franja amarilla).
                 const Expanded(
-                  child: Text('Modelo de IA cargado. Deteccion activa.'),
+                  child: Text('Modelo de IA cargado. Detección activa.'),
                 ),
               ],
             ),
@@ -289,7 +289,7 @@ class _DetectionPageState extends State<DetectionPage> {
           SectionCard(
             child: Text(
               'No se reconocieron productos en la imagen. '
-              'Prueba con mejor iluminacion y acercando mas.',
+              'Prueba con mejor iluminación y acercando más.',
               style: TextStyle(color: context.paleta.stockBajo),
             ),
           ),

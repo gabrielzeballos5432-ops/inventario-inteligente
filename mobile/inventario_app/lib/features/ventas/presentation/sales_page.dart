@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/utils/formato_numero.dart';
 import '../../../core/models/product.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/providers/auth_provider.dart';
@@ -13,6 +14,8 @@ import '../../../core/providers/inventario_provider.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/validaciones.dart';
 
 /// Registro rapido de ventas pensado para teclado.
 ///
@@ -111,6 +114,10 @@ class _SalesPageState extends State<SalesPage> {
 
   static String _bs(int centavos) =>
       '${centavos ~/ 100}.${(centavos % 100).toString().padLeft(2, '0')}';
+
+  /// Para mostrar (`18.450,00`); [_bs] es el formato que va al API.
+  static String _montoTexto(int centavos) => FormatoNumero.monto(centavos / 100);
+  static String _bsTexto(int centavos) => FormatoNumero.bs(centavos / 100);
 
   static int _deDouble(double valor) => (valor * 100).round();
 
@@ -293,7 +300,7 @@ class _SalesPageState extends State<SalesPage> {
         return (
           const [],
           'En un pago mixto, el efectivo debe ser mayor a 0 y menor al total '
-              '(Bs ${_bs(total)}).',
+              '(${_bsTexto(total)}).',
         );
       }
       return (
@@ -355,7 +362,7 @@ class _SalesPageState extends State<SalesPage> {
         'pagos': pagos,
       });
       if (!mounted) return;
-      _mostrarMensaje('Venta registrada por Bs ${_bs(total)}.');
+      _mostrarMensaje('Venta registrada por ${_bsTexto(total)}.');
       _limpiarTodo();
       unawaited(_cargarVentas());
     } on ApiException catch (error) {
@@ -430,19 +437,27 @@ class _SalesPageState extends State<SalesPage> {
 
   Future<void> _anularVenta(Map<String, dynamic> venta) async {
     final motivo = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     final texto = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         scrollable: true,
         title: Text('Anular venta #${venta['id']}'),
-        content: TextField(
-          controller: motivo,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          maxLength: 250,
-          decoration: const InputDecoration(
-            labelText: 'Motivo (mínimo 3 caracteres)',
+        // El error va en el campo: el SnackBar de antes quedaba detras del
+        // dialogo y el usuario no veia por que no se anulaba.
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: motivo,
+            autofocus: true,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: 250,
+            validator: Validaciones.motivo,
+            decoration: const InputDecoration(
+              labelText: 'Motivo (mínimo 3 caracteres)',
+              errorMaxLines: 2,
+            ),
           ),
         ),
         actions: [
@@ -452,10 +467,7 @@ class _SalesPageState extends State<SalesPage> {
           ),
           BotonSeguro(
             onPressed: () {
-              if (motivo.text.trim().length < 3) {
-                _mostrarMensaje('Escribe un motivo de al menos 3 caracteres.');
-                return;
-              }
+              if (!formKey.currentState!.validate()) return;
               Navigator.pop(context, motivo.text.trim());
             },
             child: const Text('Confirmar anulación'),
@@ -463,7 +475,8 @@ class _SalesPageState extends State<SalesPage> {
         ],
       ),
     );
-    motivo.dispose();
+    // En el siguiente frame: la animacion de cierre aun usa el controlador.
+    WidgetsBinding.instance.addPostFrameCallback((_) => motivo.dispose());
     if (texto == null || !mounted) return;
     try {
       await context.read<OperacionesService>().anularVenta(
@@ -478,10 +491,7 @@ class _SalesPageState extends State<SalesPage> {
     }
   }
 
-  String _detalleError(Object error) {
-    if (error is ApiException) return error.detalle;
-    return error.toString();
-  }
+  String _detalleError(Object error) => mensajeDeError(error);
 
   String _fechaVenta(dynamic valor) {
     final fecha = DateTime.tryParse(valor?.toString() ?? '')?.toLocal();
@@ -491,10 +501,6 @@ class _SalesPageState extends State<SalesPage> {
         '${fecha.hour.toString().padLeft(2, '0')}:'
         '${fecha.minute.toString().padLeft(2, '0')}';
   }
-
-  String _dineroVenta(dynamic valor) =>
-      (valor is num ? valor.toDouble() : double.tryParse('$valor') ?? 0)
-          .toStringAsFixed(2);
 
   void _mostrarMensaje(String mensaje) {
     ScaffoldMessenger.of(context)
@@ -701,14 +707,14 @@ class _SalesPageState extends State<SalesPage> {
     );
     final publico = _lectura(
       'P. público',
-      producto == null ? '' : 'Bs ${producto.precioVenta.toStringAsFixed(2)}',
+      producto == null ? '' : FormatoNumero.bs(producto.precioVenta),
       ajustar: true,
     );
     final mayor = _lectura(
       'P. mayor',
       producto?.precioMayor == null
           ? ''
-          : 'Bs ${producto!.precioMayor!.toStringAsFixed(2)}',
+          : FormatoNumero.bs(producto!.precioMayor),
       ajustar: true,
     );
     final saldo = _lectura(
@@ -776,7 +782,7 @@ class _SalesPageState extends State<SalesPage> {
     final cantidad = int.tryParse(_cantidadController.text) ?? 0;
     final monto = _aCentavos(_montoController.text);
     final unitario = cantidad > 0 && monto != null
-        ? 'P. unitario: Bs ${_bs((monto / cantidad).round())}'
+        ? 'P. unitario: ${_bsTexto((monto / cantidad).round())}'
         : null;
 
     final campoCantidad = TextField(
@@ -895,7 +901,7 @@ class _SalesPageState extends State<SalesPage> {
             const SizedBox(height: 8),
             Text(
               '$unidades ${unidades == 1 ? 'unidad' : 'unidades'} · '
-              'Subtotal Bs ${_bs(_totalCentavos)}',
+              'Subtotal ${_bsTexto(_totalCentavos)}',
               textAlign: TextAlign.end,
               style: TextStyle(
                 color: context.textoSecundario,
@@ -1033,7 +1039,7 @@ class _SalesPageState extends State<SalesPage> {
                     ),
                     Text(
                       '${item.producto.sku ?? 'Sin código'} · '
-                      'P.u. ${_bs(item.precioUnitarioCentavos)}',
+                      'P.u. ${_montoTexto(item.precioUnitarioCentavos)}',
                       style: TextStyle(
                         color: context.textoSecundario,
                         fontSize: 12,
@@ -1044,7 +1050,7 @@ class _SalesPageState extends State<SalesPage> {
                 ),
               ),
               numero('${item.cantidad}'),
-              numero(_bs(item.totalCentavos), fuerte: true),
+              numero(_montoTexto(item.totalCentavos), fuerte: true),
               celda(checkboxPromo(item)),
               celda(quitar(item)),
             ],
@@ -1064,8 +1070,8 @@ class _SalesPageState extends State<SalesPage> {
                 ),
               ),
               numero('${item.cantidad}'),
-              numero(_bs(item.precioUnitarioCentavos)),
-              numero(_bs(item.totalCentavos), fuerte: true),
+              numero(_montoTexto(item.precioUnitarioCentavos)),
+              numero(_montoTexto(item.totalCentavos), fuerte: true),
               celda(
                 Row(
                   children: [
@@ -1242,7 +1248,7 @@ class _SalesPageState extends State<SalesPage> {
         campoEfectivo,
         _lectura(
           'Monto por QR',
-          total - efectivo > 0 ? 'Bs ${_bs(total - efectivo)}' : '',
+          total - efectivo > 0 ? _bsTexto(total - efectivo) : '',
         ),
       ],
       if (_pagoQr) campoReferencia,
@@ -1291,7 +1297,7 @@ class _SalesPageState extends State<SalesPage> {
 
   Widget _barraRegistro(bool ancho) {
     final total = Text(
-      'Total: Bs ${_bs(_totalCentavos)}',
+      'Total: ${_bsTexto(_totalCentavos)}',
       style: Theme.of(
         context,
       ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1420,7 +1426,7 @@ class _SalesPageState extends State<SalesPage> {
                         ),
                       ),
                       Text(
-                        'Bs ${_dineroVenta(venta['total'])}',
+                        FormatoNumero.bs(double.tryParse('${venta['total']}')),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ],

@@ -182,7 +182,7 @@ void main() {
     expect(find.text('Revisa antes de registrar'), findsNothing);
   });
 
-  testWidgets('la vista previa en vivo usa su endpoint y no reemplaza la deteccion', (
+  testWidgets('la vista previa en vivo usa su endpoint y no reemplaza la detección', (
     tester,
   ) async {
     final inventario = await montar(tester);

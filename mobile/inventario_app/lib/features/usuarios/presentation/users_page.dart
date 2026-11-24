@@ -38,7 +38,7 @@ RolesEstado _estadoDe(AsyncSnapshot<List<RoleOption>> snapshot) {
     return const RolesEstado(
       puedeEditar: false,
       mensaje:
-          'El servidor no devolvio ningun rol, asi que no se puede '
+          'El servidor no devolvio ningún rol, asi que no se puede '
           'asignar uno a un usuario.',
     );
   }
@@ -120,7 +120,7 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
     if (user != null && user.id == sessionUserId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No puedes editar tu propia cuenta desde aqui.'),
+          content: Text('No puedes editar tu propia cuenta desde aquí.'),
         ),
       );
       return;
@@ -143,7 +143,7 @@ class _UsersPageState extends State<UsersPage> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No es posible desactivar tu propia cuenta desde esta sesion.',
+            'No es posible desactivar tu propia cuenta desde esta sesión.',
           ),
         ),
       );
@@ -480,7 +480,7 @@ class _UserCard extends StatelessWidget {
                     if (isCurrentUser) ...[
                       SizedBox(width: 6),
                       Text(
-                        '(tu sesion)',
+                        '(tu sesión)',
                         style: TextStyle(
                           fontSize: 11,
                           color: context.textoTerciario,
@@ -678,13 +678,15 @@ class _UserFormDialogState extends State<_UserFormDialog> {
               children: [
                 Text(
                   _isEditing
-                      ? 'Actualiza los datos del usuario y, si hace falta, renueva su contrasena.'
+                      ? 'Actualiza los datos del usuario y, si hace falta, renueva su contraseña.'
                       : 'Crea una nueva cuenta y asignale su rol.',
                   style: TextStyle(color: context.textoSecundario),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _nombreController,
+                  maxLength: 100,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Nombre',
                     errorMaxLines: 2,
@@ -694,6 +696,9 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _emailController,
+                  maxLength: 100,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     errorMaxLines: 2,
@@ -706,8 +711,9 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   obscureText: !_showPassword,
                   decoration: InputDecoration(
                     labelText: _isEditing
-                        ? 'Nueva contrasena (opcional)'
+                        ? 'Nueva contraseña (opcional)'
                         : 'Contrasena',
+                    errorMaxLines: 2,
                     suffixIcon: IconButton(
                       onPressed: () =>
                           setState(() => _showPassword = !_showPassword),
@@ -718,15 +724,17 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                       ),
                     ),
                   ),
-                  validator: (value) {
-                    if (!_isEditing && (value == null || value.length < 6)) {
-                      return 'La contrasena debe tener al menos 6 caracteres';
-                    }
-                    return null;
-                  },
+                  // Al editar puede quedar vacia, pero si se escribe se valida.
+                  validator: (value) => Validaciones.contrasena(
+                    value,
+                    obligatoria: !_isEditing,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
+                  // Ocupa el ancho del campo: un nombre largo se corta con
+                  // … en vez de desbordar la fila en el telefono.
+                  isExpanded: true,
                   value: _selectedRoleId,
                   items: widget.roles
                       .map(

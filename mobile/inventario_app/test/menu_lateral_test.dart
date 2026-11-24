@@ -57,8 +57,8 @@ void main() {
     await tester.scrollUntilVisible(find.text('Gastos'), 150);
     await tester.tap(find.text('Gastos'));
     expect(seleccionado, DestinoApp.gastos);
-    await tester.scrollUntilVisible(find.text('Cerrar sesion'), 150);
-    await tester.tap(find.text('Cerrar sesion'));
+    await tester.scrollUntilVisible(find.text('Cerrar sesión'), 150);
+    await tester.tap(find.text('Cerrar sesión'));
     expect(cerroSesion, isTrue);
     expect(find.byType(MenuLateral), findsOneWidget);
     expect(tester.takeException(), isNull);

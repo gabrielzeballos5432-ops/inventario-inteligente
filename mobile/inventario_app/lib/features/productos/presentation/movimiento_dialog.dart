@@ -315,7 +315,7 @@ class _MovimientoDialogState extends State<MovimientoDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'Sin conexion: el movimiento quedo guardado en este dispositivo y '
+          'Sin conexión: el movimiento quedo guardado en este dispositivo y '
           'se enviara al volver el servidor.',
         ),
       ),

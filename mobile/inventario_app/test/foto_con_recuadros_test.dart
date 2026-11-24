@@ -78,7 +78,7 @@ void main() {
         .whereType<PintorRecuadros>()
         .single;
     expect(pintor.detecciones.single.cajas, hasLength(2));
-    expect(find.bySemanticsLabel('Foto con 2 recuadro(s) de deteccion'), findsOneWidget);
+    expect(find.bySemanticsLabel('Foto con 2 recuadro(s) de detección'), findsOneWidget);
 
     // Foto 2:1 a lo ancho de 400 px -> 200 px de alto, sin recortar.
     final tamano = tester.getSize(find.byType(AspectRatio));

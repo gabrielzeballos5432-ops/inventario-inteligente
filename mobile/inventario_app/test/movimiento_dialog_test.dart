@@ -259,7 +259,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('editar el buscador invalida una selección anterior', (
+  testWidgets('editar el buscador inválida una selección anterior', (
     tester,
   ) async {
     var llamadas = 0;

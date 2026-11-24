@@ -117,7 +117,7 @@ class ColaMovimientosController extends ChangeNotifier {
   }) async {
     final usuario = _usuarioActual();
     if (usuario == null) {
-      throw StateError('No hay sesion para guardar el movimiento pendiente.');
+      throw StateError('No hay sesión para guardar el movimiento pendiente.');
     }
     final pendiente = MovimientoPendiente(
       clave: clave,

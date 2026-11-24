@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/theme.dart';
-import '../../../core/network/api_client.dart';
 import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../core/utils/mensaje_error.dart';
+import '../../../core/utils/validaciones.dart';
+import '../../../core/utils/formato_numero.dart';
 
 class CajaPage extends StatefulWidget {
   final bool esAdmin;
@@ -88,7 +90,7 @@ class _CajaPageState extends State<CajaPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Caja cerrada. Diferencia: Bs ${diferencia.toStringAsFixed(2)}',
+            'Caja cerrada. Diferencia: ${FormatoNumero.bs(diferencia)}',
           ),
         ),
       );
@@ -127,16 +129,10 @@ class _CajaPageState extends State<CajaPage> {
     }
   }
 
-  String _mensajeError(Object error) {
-    if (error is ApiException) return error.detalle;
-    final texto = error.toString();
-    return texto.startsWith('Error HTTP')
-        ? texto.substring(texto.indexOf(':') + 2)
-        : 'No se pudo completar la operación. $texto';
-  }
+  String _mensajeError(Object error) => mensajeDeError(error);
 
   String _dinero(dynamic valor) =>
-      'Bs ${(double.tryParse('$valor') ?? 0).toStringAsFixed(2)}';
+      FormatoNumero.bs(valor is num ? valor : double.tryParse('$valor'));
 
   String _fecha(dynamic fecha) {
     // El backend manda la hora en UTC ("...Z"): sin toLocal() la caja abierta
@@ -304,28 +300,16 @@ class _DialogoMontoState extends State<_DialogoMonto> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextFormField(
+              inputFormatters: FormatoNumero.decimal(decimales: 2),
               controller: _monto,
               autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               decoration: InputDecoration(labelText: widget.etiqueta),
-              validator: (texto) {
-                final valor = double.tryParse(texto ?? '');
-                if (valor == null ||
-                    valor < 0 ||
-                    (!widget.permitirCero && valor == 0)) {
-                  return widget.permitirCero
-                      ? 'Ingresa un monto válido'
-                      : 'El monto debe ser mayor a cero';
-                }
-                if (!RegExp(
-                  r'^\d{1,10}([.]\d{1,2})?$',
-                ).hasMatch(texto!.trim())) {
-                  return 'Usa hasta 2 decimales';
-                }
-                return null;
-              },
+              // Acepta coma decimal (teclado del celular en castellano).
+              validator: (texto) =>
+                  Validaciones.monto(texto, permitirCero: widget.permitirCero),
             ),
             if (widget.pedirNota)
               TextFormField(
@@ -347,7 +331,7 @@ class _DialogoMontoState extends State<_DialogoMonto> {
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Navigator.pop(context, (
-                monto: double.parse(_monto.text.trim()),
+                monto: Validaciones.leerNumero(_monto.text)!,
                 nota: widget.pedirNota ? _nota.text.trim() : null,
               ));
             }

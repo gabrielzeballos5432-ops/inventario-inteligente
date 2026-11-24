@@ -79,7 +79,20 @@ class ApiClient {
     if (response.statusCode == 401 && conSesion) {
       alSesionVencida?.call();
     }
-    throw ApiException(response.statusCode, response.body);
+    // bodyBytes y no body: FastAPI responde application/json sin charset y
+    // package:http decodifica entonces como latin-1, asi que "categoría"
+    // llegaba al usuario como "categorÃ­a".
+    throw ApiException(response.statusCode, _textoRespuesta(response));
+  }
+
+  /// UTF-8 si los bytes lo son (lo normal con FastAPI); si no, lo que
+  /// decodifique package:http segun el charset de la respuesta.
+  static String _textoRespuesta(http.Response response) {
+    try {
+      return utf8.decode(response.bodyBytes);
+    } on FormatException {
+      return response.body;
+    }
   }
 
   void _quizasRenovar() {
@@ -109,10 +122,9 @@ class ApiClient {
   }
 
   Future<List<int>> getBytes(String path, {Map<String, String>? query}) async {
-    final response = await _httpClient.get(
-      _buildUri(path, query),
-      headers: _buildHeaders(includeJson: false),
-    );
+    final response = await _httpClient
+        .get(_buildUri(path, query), headers: _buildHeaders(includeJson: false))
+        .timeout(timeoutSubida);
     _ensureSuccess(response, path);
     return response.bodyBytes;
   }
@@ -204,14 +216,48 @@ class ApiException implements Exception {
       final json = jsonDecode(body);
       if (json is Map) {
         final d = json['detail'];
-        if (d is String) return d;
-        if (d is List && d.isNotEmpty) return d.first.toString();
+        if (d is String && d.trim().isNotEmpty) return d;
+        // 422 de Pydantic: una lista de {loc, msg, type}. Sin esto se veia el
+        // mapa crudo ("{type: string_too_short, loc: [body, nombre], ...}").
+        if (d is List && d.isNotEmpty) {
+          return d.map(_errorDeValidacion).join('\n');
+        }
       }
     } catch (_) {
-      // El cuerpo no es JSON (por ejemplo un HTML de proxy): se devuelve tal cual.
+      // El cuerpo no es JSON (por ejemplo un HTML de proxy): se resuelve abajo.
     }
-    return body;
+    final texto = body.trim();
+    if (texto.isEmpty || texto.startsWith('<')) return _porCodigo();
+    return texto;
   }
+
+  static String _errorDeValidacion(dynamic error) {
+    if (error is! Map) return '$error';
+    final msg = '${error['msg'] ?? 'dato no valido'}'
+        .replaceFirst(RegExp(r'^Value error, '), '');
+    final loc = error['loc'];
+    final campo = loc is List && loc.isNotEmpty ? '${loc.last}' : null;
+    if (campo == null || campo == 'body' || int.tryParse(campo) != null) {
+      return msg;
+    }
+    return '${_campoLegible(campo)}: $msg';
+  }
+
+  /// "precio_compra" -> "Precio compra": el nombre tecnico del campo no le
+  /// dice nada al usuario.
+  static String _campoLegible(String campo) {
+    final texto = campo.replaceAll('_', ' ').trim();
+    if (texto.isEmpty) return campo;
+    return '${texto[0].toUpperCase()}${texto.substring(1)}';
+  }
+
+  String _porCodigo() => switch (statusCode) {
+    401 => 'Tu sesión expiró. Vuelve a iniciar sesión.',
+    403 => 'No tienes permiso para realizar esta acción.',
+    404 => 'No se encontró lo que buscabas.',
+    >= 500 => 'El servidor tuvo un problema ($statusCode). Intenta de nuevo.',
+    _ => 'El servidor rechazó la operación ($statusCode).',
+  };
 
   @override
   String toString() => 'Error HTTP $statusCode: $body';

@@ -115,7 +115,9 @@ void main() {
     await tester.enterText(_campo('Importe (Bs)'), '30.123');
     await tester.tap(find.text('Guardar gasto'));
     await tester.pump(const Duration(milliseconds: 800));
-    expect(find.text('Usa hasta 2 decimales'), findsOneWidget);
+    // El campo no admite un tercer decimal: el texto se rechaza entero y la
+    // validacion pide el importe.
+    expect(find.text('Escribe el importe'), findsOneWidget);
     expect(enviado, isNull);
     await tester.enterText(_campo('Importe (Bs)'), '30.50');
     await tester.tap(find.text('Guardar gasto'));

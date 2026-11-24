@@ -90,7 +90,7 @@ void main() {
         expect(enviado, isNull);
         await tester.enterText(_campo('Parte en efectivo'), '20');
         await tester.pump();
-        expect(find.text('Parte por QR: BOB 30.00'), findsOneWidget);
+        expect(find.text('Parte por QR: BOB 30,00'), findsOneWidget);
       }
       await tester.ensureVisible(confirmar);
       await tester.tap(confirmar);
