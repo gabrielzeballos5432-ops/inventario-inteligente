@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/config/api_config.dart';
 import '../../core/utils/validaciones.dart';
-import 'boton_seguro.dart';
+import 'botones_dialogo.dart';
 
 /// Abre el dialogo para ver o cambiar la URL del backend sin recompilar.
 /// Devuelve true si el usuario guardo un nuevo servidor.
@@ -145,23 +145,31 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
                 ],
               ),
             ],
+            const SizedBox(height: 16),
+            // Row + Expanded, igual que BotonesDialogo: a lo ancho sin pedir
+            // un ancho infinito dentro del IntrinsicWidth del AlertDialog.
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _ocupado ? null : _probar,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 50),
+                    ),
+                    icon: const Icon(Icons.wifi_tethering),
+                    label: const Text('Probar conexión'),
+                  ),
+                ),
+              ],
+            ),
+            BotonesDialogo(
+              textoConfirmar: 'Guardar',
+              onCancelar: () => Navigator.of(context).pop(false),
+              onConfirmar: _guardar,
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _ocupado ? null : _probar,
-          child: const Text('Probar'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: _guardar,
-          child: const Text('Guardar'),
-        ),
-      ],
     );
   }
 }

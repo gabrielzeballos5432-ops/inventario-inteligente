@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../core/providers/auth_provider.dart';
@@ -21,6 +22,12 @@ class InventarioApp extends StatelessWidget {
       theme: buildTemaClaro(),
       darkTheme: buildTemaNoche(),
       themeMode: modo,
+      // Toda la app esta en castellano: sin esto los textos de Flutter
+      // (calendario "Select date", "Cancel", "OK", copiar/pegar) salian en
+      // ingles.
+      locale: const Locale('es'),
+      supportedLocales: const [Locale('es')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       builder: (context, child) =>
           ServidorGuard(child: child ?? const SizedBox.shrink()),
       home: Consumer<AuthProvider>(

@@ -11,6 +11,7 @@ import '../../../core/models/categoria_gasto.dart';
 import 'categorias_gasto_dialog.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../shared/widgets/botones_dialogo.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../core/utils/mensaje_error.dart';
 import '../../../core/utils/validaciones.dart';
@@ -244,30 +245,24 @@ class _ClienteDialogState extends State<_ClienteDialog> {
                 ),
                 validator: (v) => Validaciones.correo(v, obligatorio: false),
               ),
+              BotonesDialogo(
+                textoConfirmar: 'Guardar cliente',
+                onConfirmar: () {
+                  if (!_formKey.currentState!.validate()) return;
+                  Navigator.pop(
+                    context,
+                    _ClienteFormulario(
+                      _nombre.text.trim(),
+                      _telefono.text.trim(),
+                      _email.text.trim(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            Navigator.pop(
-              context,
-              _ClienteFormulario(
-                _nombre.text.trim(),
-                _telefono.text.trim(),
-                _email.text.trim(),
-              ),
-            );
-          },
-          child: const Text('Guardar cliente'),
-        ),
-      ],
     );
   }
 }
@@ -1303,13 +1298,17 @@ class _CompraDialogState extends State<_CompraDialog> {
         ),
       ],
     );
+    // 50 de alto como el resto de formularios (BotonesDialogo): con el
+    // tamaño por defecto quedaban chicos en la esquina del dialogo.
     final cancelar = OutlinedButton(
       onPressed: _guardando ? null : () => Navigator.of(context).pop(),
+      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50)),
       child: const Text('Cancelar'),
     );
     final registrar = BotonSeguro(
       onPressed: _guardando || _leyendo ? null : _guardar,
       icon: const Icon(Icons.check),
+      style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
       child: const Text('Registrar'),
     );
     return Container(
@@ -1343,9 +1342,9 @@ class _CompraDialogState extends State<_CompraDialog> {
             Row(
               children: [
                 Expanded(child: resumen),
-                cancelar,
-                const SizedBox(width: 8),
-                registrar,
+                SizedBox(width: 160, child: cancelar),
+                const SizedBox(width: 12),
+                SizedBox(width: 220, child: registrar),
               ],
             ),
         ],
@@ -1512,21 +1511,17 @@ class _MonedasDialogState extends State<_MonedasDialog> {
                 ],
               ),
             ),
+            BotonesDialogo(
+              ocupado: _guardando,
+              textoCancelar: 'Agregar moneda',
+              iconoCancelar: const Icon(Icons.add),
+              onCancelar: _crear,
+              textoConfirmar: 'Listo',
+              onConfirmar: () => Navigator.pop(context, _cambio),
+            ),
           ],
         ),
       ),
-      actions: [
-        BotonSeguro(
-          variante: VarianteBoton.text,
-          onPressed: _guardando ? null : _crear,
-          icon: const Icon(Icons.add),
-          child: const Text('Agregar moneda'),
-        ),
-        BotonSeguro(
-          onPressed: _guardando ? null : () => Navigator.pop(context, _cambio),
-          child: const Text('Listo'),
-        ),
-      ],
     );
   }
 }
@@ -1629,34 +1624,28 @@ class _MonedaDialogState extends State<_MonedaDialog> {
                   if (value != null) setState(() => _decimales = value);
                 },
               ),
+              BotonesDialogo(
+                textoConfirmar: 'Guardar',
+                onConfirmar: () {
+                  if (!_formKey.currentState!.validate()) return;
+                  Navigator.pop(
+                    context,
+                    _MonedaFormulario(
+                      codigo: _codigo.text.trim().toUpperCase(),
+                      nombre: _nombre.text.trim(),
+                      simbolo: _simbolo.text.trim().isEmpty
+                          ? null
+                          : _simbolo.text.trim(),
+                      pais: _pais.text.trim().isEmpty ? null : _pais.text.trim(),
+                      decimales: _decimales,
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            Navigator.pop(
-              context,
-              _MonedaFormulario(
-                codigo: _codigo.text.trim().toUpperCase(),
-                nombre: _nombre.text.trim(),
-                simbolo: _simbolo.text.trim().isEmpty
-                    ? null
-                    : _simbolo.text.trim(),
-                pais: _pais.text.trim().isEmpty ? null : _pais.text.trim(),
-                decimales: _decimales,
-              ),
-            );
-          },
-          child: const Text('Guardar'),
-        ),
-      ],
     );
   }
 }
@@ -2209,18 +2198,15 @@ class _TarifasVendedorDialogState extends State<_TarifasVendedorDialog> {
                   validator: (valor) =>
                       _validarNumero(valor, permitirCero: true),
                 ),
+                BotonesDialogo(
+                  textoConfirmar: 'Guardar tarifas',
+                  onConfirmar: _guardar,
+                ),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(onPressed: _guardar, child: const Text('Guardar tarifas')),
-      ],
     );
   }
 }
@@ -2266,6 +2252,7 @@ class _LiquidacionDialogState extends State<_LiquidacionDialog> {
   Future<void> _elegirFecha(bool inicio) async {
     final fecha = await showDatePicker(
       context: context,
+      builder: selectorFechaSinAnchoMinimo,
       initialDate: inicio ? _inicio : _fin,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
@@ -2323,27 +2310,21 @@ class _LiquidacionDialogState extends State<_LiquidacionDialog> {
               icon: const Icon(Icons.calendar_month),
             ),
           ),
+          BotonesDialogo(
+            textoConfirmar: 'Calcular',
+            onConfirmar: _usuarioId == null || _fin.isBefore(_inicio)
+                ? null
+                : () => Navigator.pop(
+                    context,
+                    _LiquidacionFormulario(
+                      usuarioId: _usuarioId!,
+                      fechaInicio: _iso(_inicio),
+                      fechaFin: _iso(_fin),
+                    ),
+                  ),
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: _usuarioId == null || _fin.isBefore(_inicio)
-              ? null
-              : () => Navigator.pop(
-                  context,
-                  _LiquidacionFormulario(
-                    usuarioId: _usuarioId!,
-                    fechaInicio: _iso(_inicio),
-                    fechaFin: _iso(_fin),
-                  ),
-                ),
-          child: const Text('Calcular'),
-        ),
-      ],
     );
   }
 }
@@ -2621,6 +2602,7 @@ class _BonoDialogState extends State<_BonoDialog> {
                   _liquidacionId = null;
                 }),
               ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<int?>(
                 // Ocupa el ancho del campo: un nombre largo se corta con
                 // … en vez de desbordar la fila en el telefono.
@@ -2653,6 +2635,7 @@ class _BonoDialogState extends State<_BonoDialog> {
                 ],
                 onChanged: (value) => setState(() => _liquidacionId = value),
               ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 // Ocupa el ancho del campo: un nombre largo se corta con
                 // … en vez de desbordar la fila en el telefono.
@@ -2681,6 +2664,7 @@ class _BonoDialogState extends State<_BonoDialog> {
                   });
                 },
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 inputFormatters: FormatoNumero.decimal(decimales: 2),
                 controller: _monto,
@@ -2693,6 +2677,7 @@ class _BonoDialogState extends State<_BonoDialog> {
                 ),
                 validator: (v) => Validaciones.monto(v, maximo: 999999999999.99),
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _descripcion,
                 maxLength: 250,
@@ -2700,34 +2685,29 @@ class _BonoDialogState extends State<_BonoDialog> {
                   labelText: 'Detalle (opcional)',
                 ),
               ),
+              BotonesDialogo(
+                textoConfirmar: 'Guardar bono',
+                onConfirmar: () {
+                  if (!_formKey.currentState!.validate() ||
+                      _usuarioId == null) {
+                    return;
+                  }
+                  Navigator.pop(
+                    context,
+                    _BonoFormulario(
+                      usuarioId: _usuarioId!,
+                      liquidacionId: _liquidacionId,
+                      tipo: _tipo,
+                      descripcion: _descripcion.text,
+                      monto: Validaciones.leerNumero(_monto.text)!,
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (!_formKey.currentState!.validate() || _usuarioId == null) {
-              return;
-            }
-            Navigator.pop(
-              context,
-              _BonoFormulario(
-                usuarioId: _usuarioId!,
-                liquidacionId: _liquidacionId,
-                tipo: _tipo,
-                descripcion: _descripcion.text,
-                monto: Validaciones.leerNumero(_monto.text)!,
-              ),
-            );
-          },
-          child: const Text('Guardar bono'),
-        ),
-      ],
     );
   }
 }
@@ -3375,6 +3355,7 @@ class _GastoDialogState extends State<_GastoDialog> {
     final ahora = DateTime.now();
     final fecha = await showDatePicker(
       context: context,
+      builder: selectorFechaSinAnchoMinimo,
       initialDate: ahora,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
@@ -3412,12 +3393,14 @@ class _GastoDialogState extends State<_GastoDialog> {
                   validator: (value) =>
                       value == null ? 'Selecciona una categoría' : null,
                 ),
+                if (_categoria != null) const SizedBox(height: 6),
                 if (_categoria != null)
                   Text(
                     '${CategoriaGasto.periodos[_categoria!.periodicidad]} · '
                     'Importe ${_categoria!.tipoImporte == 'fijo' ? 'fijo sugerido (editable)' : 'variable'}. '
                     'No se generan gastos automáticamente.',
                   ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _concepto,
                   maxLength: 200,
@@ -3438,6 +3421,7 @@ class _GastoDialogState extends State<_GastoDialog> {
                   ),
                   validator: (v) => Validaciones.monto(v, etiqueta: 'importe'),
                 ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _documento,
                   maxLength: 100,
@@ -3445,6 +3429,7 @@ class _GastoDialogState extends State<_GastoDialog> {
                     labelText: 'N.º de factura/recibo (opcional)',
                   ),
                 ),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Expanded(
@@ -3476,34 +3461,28 @@ class _GastoDialogState extends State<_GastoDialog> {
                     ),
                   ],
                 ),
+                BotonesDialogo(
+                  textoConfirmar: 'Guardar gasto',
+                  onConfirmar: () {
+                    if (!_formKey.currentState!.validate()) return;
+                    Navigator.pop(
+                      context,
+                      _GastoFormulario(
+                        categoriaId: _categoria!.id,
+                        concepto: _concepto.text.trim(),
+                        monto: Validaciones.leerNumero(_monto.text)!,
+                        numeroDocumento: _documento.text,
+                        periodoDesde: _desde.text.isEmpty ? null : _desde.text,
+                        periodoHasta: _hasta.text.isEmpty ? null : _hasta.text,
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            Navigator.pop(
-              context,
-              _GastoFormulario(
-                categoriaId: _categoria!.id,
-                concepto: _concepto.text.trim(),
-                monto: Validaciones.leerNumero(_monto.text)!,
-                numeroDocumento: _documento.text,
-                periodoDesde: _desde.text.isEmpty ? null : _desde.text,
-                periodoHasta: _hasta.text.isEmpty ? null : _hasta.text,
-              ),
-            );
-          },
-          child: const Text('Guardar gasto'),
-        ),
-      ],
     );
   }
 }
@@ -3579,6 +3558,7 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Saldo pendiente: $moneda ${FormatoNumero.monto(restante)}'),
+            const SizedBox(height: 12),
             TextFormField(
               inputFormatters: FormatoNumero.decimal(decimales: 2),
               controller: _monto,
@@ -3673,49 +3653,43 @@ class _PagoGastoDialogState extends State<_PagoGastoDialog> {
                   labelText: 'Referencia QR (opcional)',
                 ),
               ),
+            BotonesDialogo(
+              textoConfirmar: 'Registrar pago',
+              onConfirmar: () {
+                if (!_formKey.currentState!.validate()) return;
+                final total = double.parse(_monto.text.trim().replaceAll(',', '.'));
+                final efectivo = mixto
+                    ? double.parse(_efectivo.text.trim().replaceAll(',', '.'))
+                    : 0.0;
+                if (!_pagoEfectivo && !_pagoQr) {
+                  _mensaje(context, 'Selecciona Efectivo, QR o ambos.');
+                  return;
+                }
+                Navigator.pop(
+                  context,
+                  _PagoFormulario([
+                    if (_pagoEfectivo)
+                      {
+                        'metodo_pago': 'efectivo',
+                        'monto': (mixto ? efectivo : total).toStringAsFixed(2),
+                        'desde_caja': widget.cajaAbierta && _desdeCaja,
+                      },
+                    if (_pagoQr)
+                      {
+                        'metodo_pago': 'qr',
+                        'monto': (mixto ? total - efectivo : total).toStringAsFixed(
+                          2,
+                        ),
+                        if (_referencia.text.trim().isNotEmpty)
+                          'referencia': _referencia.text.trim(),
+                      },
+                  ]),
+                );
+              },
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            final total = double.parse(_monto.text.trim().replaceAll(',', '.'));
-            final efectivo = mixto
-                ? double.parse(_efectivo.text.trim().replaceAll(',', '.'))
-                : 0.0;
-            if (!_pagoEfectivo && !_pagoQr) {
-              _mensaje(context, 'Selecciona Efectivo, QR o ambos.');
-              return;
-            }
-            Navigator.pop(
-              context,
-              _PagoFormulario([
-                if (_pagoEfectivo)
-                  {
-                    'metodo_pago': 'efectivo',
-                    'monto': (mixto ? efectivo : total).toStringAsFixed(2),
-                    'desde_caja': widget.cajaAbierta && _desdeCaja,
-                  },
-                if (_pagoQr)
-                  {
-                    'metodo_pago': 'qr',
-                    'monto': (mixto ? total - efectivo : total).toStringAsFixed(
-                      2,
-                    ),
-                    if (_referencia.text.trim().isNotEmpty)
-                      'referencia': _referencia.text.trim(),
-                  },
-              ]),
-            );
-          },
-          child: const Text('Registrar pago'),
-        ),
-      ],
     );
   }
 }
@@ -3752,6 +3726,7 @@ class _ReporteTabState extends State<_ReporteTab> {
     final fecha = inicio ? _inicio : _fin;
     final seleccion = await showDatePicker(
       context: context,
+      builder: selectorFechaSinAnchoMinimo,
       initialDate: fecha,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
@@ -4116,32 +4091,31 @@ Future<String?> _pedirMotivo(BuildContext context, String titulo) async {
       // dialogo; ahora va en el propio campo.
       content: Form(
         key: formKey,
-        child: TextFormField(
-          controller: controller,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          maxLength: 250,
-          validator: Validaciones.motivo,
-          decoration: const InputDecoration(
-            labelText: 'Motivo',
-            errorMaxLines: 2,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: controller,
+              autofocus: true,
+              minLines: 2,
+              maxLines: 4,
+              maxLength: 250,
+              validator: Validaciones.motivo,
+              decoration: const InputDecoration(
+                labelText: 'Motivo',
+                errorMaxLines: 2,
+              ),
+            ),
+            BotonesDialogo(
+              textoConfirmar: 'Confirmar',
+              onConfirmar: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.pop(context, controller.text.trim());
+              },
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (!formKey.currentState!.validate()) return;
-            Navigator.pop(context, controller.text.trim());
-          },
-          child: const Text('Confirmar'),
-        ),
-      ],
     ),
   );
   // En el siguiente frame: la animacion de cierre aun usa el controlador.

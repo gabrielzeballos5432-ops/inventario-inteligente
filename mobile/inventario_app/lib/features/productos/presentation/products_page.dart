@@ -20,6 +20,7 @@ import '../../../shared/widgets/section_card.dart';
 import 'barcode_scanner_page.dart';
 import 'movimiento_dialog.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../shared/widgets/botones_dialogo.dart';
 import '../../../core/utils/mensaje_error.dart';
 import '../../../core/utils/formato_numero.dart';
 
@@ -356,32 +357,31 @@ return ListView(
         title: const Text('Configurar stock mínimo'),
         content: Form(
           key: formKey,
-          child: TextFormField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            validator: Validaciones.stockMinimo,
-            decoration: const InputDecoration(
-              labelText: 'Stock mínimo',
-              helperText: '0 desactiva la alerta para este producto',
-              helperMaxLines: 2,
-              errorMaxLines: 2,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: Validaciones.stockMinimo,
+                decoration: const InputDecoration(
+                  labelText: 'Stock mínimo',
+                  helperText: '0 desactiva la alerta para este producto',
+                  helperMaxLines: 2,
+                  errorMaxLines: 2,
+                ),
+              ),
+              BotonesDialogo(
+                textoConfirmar: 'Guardar',
+                onConfirmar: () {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.of(context).pop(int.tryParse(controller.text) ?? 0);
+                },
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          BotonSeguro(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.of(context).pop(int.tryParse(controller.text) ?? 0);
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
     if (nuevo != null) {
@@ -855,18 +855,195 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // En telefono el dialogo toma casi todo el ancho disponible (los campos
-    // compactos de escritorio lo achatan); en escritorio se limita a 480
-    // para que no se estire de mas. Con < 600 de ventana los selectores de
-    // marca y proveedor van apilados: en media fila sus textos se cortan.
-    final angosto = MediaQuery.of(context).size.width < 600;
+    // Telefono: una columna. Escritorio (>= 900 px): el dialogo pasa de 480 a
+    // 820 px y los campos van en pares; antes eran 12 campos en una franja de
+    // 370 px con los botones fuera de la vista. Con < 600 de ventana marca y
+    // proveedor van apilados: en media fila sus textos se cortan.
+    final anchoVentana = MediaQuery.of(context).size.width;
+    final angosto = anchoVentana < 600;
+    final ancho = anchoVentana >= 900;
+    const espacio = SizedBox(height: 12);
+    Widget par(Widget a, Widget b) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: a),
+        const SizedBox(width: 12),
+        Expanded(child: b),
+      ],
+    );
+    final codigo = TextFormField(
+      controller: _codigoController,
+      textCapitalization: TextCapitalization.characters,
+      // Mismos topes que las columnas: por encima la base
+      // rechazaba el guardado con un error del servidor.
+      maxLength: 50,
+      validator: (v) => (v ?? '').trim().contains(' ')
+          ? 'El código no puede tener espacios'
+          : null,
+      decoration: const InputDecoration(
+        errorMaxLines: 2,
+        labelText: 'Código (opcional)',
+        helperText: 'Código propio de la tienda, se usa en ventas.',
+        helperMaxLines: 2,
+      ),
+    );
+    final nombre = TextFormField(
+      controller: _nombreController,
+      maxLength: 200,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: const InputDecoration(
+        labelText: 'Nombre',
+        errorMaxLines: 2,
+      ),
+      validator: Validaciones.nombreProducto,
+    );
+    final descripcion = TextFormField(
+      controller: _descripcionController,
+      maxLength: 500,
+      minLines: 1,
+      maxLines: 3,
+      decoration: const InputDecoration(labelText: 'Descripcion'),
+    );
+    final codigoBarras = TextFormField(
+      controller: _codigoBarrasController,
+      keyboardType: TextInputType.number,
+      maxLength: 50,
+      validator: (v) => (v ?? '').trim().contains(' ')
+          ? 'El código de barras no puede tener espacios'
+          : null,
+      decoration: InputDecoration(
+        labelText: 'Código de barras',
+        helperText: 'Opcional. Escanea la etiqueta para no escribirlo.',
+        helperMaxLines: 2,
+        suffixIcon: IconButton(
+          tooltip: 'Escanear código de barras',
+          icon: const Icon(Icons.qr_code_scanner),
+          onPressed: _saving ? null : _escanearEnElFormulario,
+        ),
+      ),
+    );
+    final precioCompra = TextFormField(
+      inputFormatters: FormatoNumero.decimal(decimales: 2),
+      controller: _precioCompraController,
+      keyboardType:
+          const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        labelText: 'Precio compra (Bs.)',
+        errorMaxLines: 2,
+      ),
+      validator: (v) =>
+          Validaciones.precio(v, etiqueta: 'precio de compra'),
+    );
+    final precioVenta = TextFormField(
+      inputFormatters: FormatoNumero.decimal(decimales: 2),
+      controller: _precioVentaController,
+      keyboardType:
+          const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        labelText: 'Precio venta (Bs.)',
+        errorMaxLines: 2,
+      ),
+      validator: (v) =>
+          Validaciones.precio(v, etiqueta: 'precio de venta'),
+    );
+    final precioMayor = TextFormField(
+      inputFormatters: FormatoNumero.decimal(decimales: 2),
+      controller: _precioMayorController,
+      keyboardType:
+          const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        labelText: 'Precio por mayor (Bs.) (opcional)',
+        errorMaxLines: 2,
+      ),
+      validator: (v) => (v == null || v.trim().isEmpty)
+          ? null
+          : Validaciones.precio(v, etiqueta: 'precio por mayor'),
+    );
+    final stockMinimo = TextFormField(
+      controller: _stockMinimoController,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: const InputDecoration(
+        labelText: 'Stock mínimo',
+        helperText: 'Se avisa cuando el stock cae por debajo de este valor',
+        errorMaxLines: 2,
+      ),
+      validator: Validaciones.stockMinimo,
+    );
+    final cantidadInicial = TextFormField(
+      controller: _cantidadInicialController,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: InputDecoration(
+        labelText: 'Cantidad inicial',
+        hintText: '0',
+        helperText: 'Se registra como entrada en '
+            '${SucursalController.instance.activa?.nombre ?? 'la sucursal activa'}.',
+        helperMaxLines: 2,
+        errorMaxLines: 2,
+      ),
+      validator: Validaciones.cantidadInicial,
+    );
+    final categoria = FutureBuilder<List<Categoria>>(
+      future: _futureCategorias,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'Categoria',
+              errorText: 'No se pudieron cargar las categorías',
+            ),
+            child: Text('Sin conexión con el servidor'),
+          );
+        }
+        final categorias =
+            snapshot.data ?? const <Categoria>[];
+        // Si la categoria del producto no esta en la lista
+        // cargada (aun no llego la peticion, o la categoria esta
+        // desactivada), pasar ese valor a DropdownButtonFormField
+        // dispara un _AssertionError y Flutter reemplaza el
+        // widget por un ErrorWidget rojo. Se cae a null para que
+        // muestre "Sin categoria" en vez de romperse.
+        final idsDisponibles =
+            categorias.map((c) => c.id).toSet();
+        final valorValido = (_categoriaId != null &&
+                idsDisponibles.contains(_categoriaId))
+            ? _categoriaId
+            : null;
+
+        return DropdownButtonFormField<int?>(
+          // Ocupa el ancho del campo: un nombre largo se corta con
+          // … en vez de desbordar la fila en el telefono.
+          isExpanded: true,
+          value: valorValido,
+          items: [
+            const DropdownMenuItem<int?>(
+              value: null,
+              child: Text('Sin categoría'),
+            ),
+            ...categorias.map(
+              (c) => DropdownMenuItem<int?>(
+                value: c.id,
+                child: Text(c.nombre),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => _categoriaId = v),
+          decoration: const InputDecoration(labelText: 'Categoria'),
+        );
+      },
+    );
     return AlertDialog(
       // Mismo insetPadding que el dialogo de movimiento: el default de 40 a
       // cada lado dejaba el modal angosto y partia los textos largos.
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEditing ? 'Editar producto' : 'Registrar producto'),
       content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        // AlertDialog toma el ancho de su contenido: con solo un maximo se
+        // quedaba en el minimo del tema (440) y las ayudas salian cortadas.
+        constraints: ancho
+            ? const BoxConstraints.tightFor(width: 820)
+            : const BoxConstraints(maxWidth: 480),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -878,192 +1055,46 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextFormField(
-                  controller: _codigoController,
-                  textCapitalization: TextCapitalization.characters,
-                  // Mismos topes que las columnas: por encima la base
-                  // rechazaba el guardado con un error del servidor.
-                  maxLength: 50,
-                  validator: (v) => (v ?? '').trim().contains(' ')
-                      ? 'El código no puede tener espacios'
-                      : null,
-                  decoration: const InputDecoration(
-                    errorMaxLines: 2,
-                    labelText: 'Código (opcional)',
-                    helperText: 'Código propio de la tienda, se usa en ventas.',
-                    helperMaxLines: 2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _nombreController,
-                  maxLength: 200,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre',
-                    errorMaxLines: 2,
-                  ),
-                  validator: Validaciones.nombreProducto,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _descripcionController,
-                  maxLength: 500,
-                  minLines: 1,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Descripcion'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _codigoBarrasController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 50,
-                  validator: (v) => (v ?? '').trim().contains(' ')
-                      ? 'El código de barras no puede tener espacios'
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: 'Código de barras',
-                    helperText: 'Opcional. Escanea la etiqueta para no escribirlo.',
-                    helperMaxLines: 2,
-                    suffixIcon: IconButton(
-                      tooltip: 'Escanear código de barras',
-                      icon: const Icon(Icons.qr_code_scanner),
-                      onPressed: _saving ? null : _escanearEnElFormulario,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  inputFormatters: FormatoNumero.decimal(decimales: 2),
-                  controller: _precioCompraController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Precio compra (Bs.)',
-                    errorMaxLines: 2,
-                  ),
-                  validator: (v) =>
-                      Validaciones.precio(v, etiqueta: 'precio de compra'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  inputFormatters: FormatoNumero.decimal(decimales: 2),
-                  controller: _precioVentaController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Precio venta (Bs.)',
-                    errorMaxLines: 2,
-                  ),
-                  validator: (v) =>
-                      Validaciones.precio(v, etiqueta: 'precio de venta'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  inputFormatters: FormatoNumero.decimal(decimales: 2),
-                  controller: _precioMayorController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Precio por mayor (Bs.) (opcional)',
-                    errorMaxLines: 2,
-                  ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? null
-                      : Validaciones.precio(v, etiqueta: 'precio por mayor'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _stockMinimoController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Stock mínimo',
-                    helperText: 'Se avisa cuando el stock cae por debajo de este valor',
-                    errorMaxLines: 2,
-                  ),
-                  validator: Validaciones.stockMinimo,
-                ),
-                if (!_isEditing) ...[
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _cantidadInicialController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      labelText: 'Cantidad inicial',
-                      hintText: '0',
-                      helperText: 'Se registra como entrada en '
-                          '${SucursalController.instance.activa?.nombre ?? 'la sucursal activa'}.',
-                      helperMaxLines: 2,
-                      errorMaxLines: 2,
-                    ),
-                    validator: Validaciones.cantidadInicial,
-                  ),
-                ],
-                const SizedBox(height: 12),
-                FutureBuilder<List<Categoria>>(
-                  future: _futureCategorias,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return const InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Categoria',
-                          errorText: 'No se pudieron cargar las categorías',
-                        ),
-                        child: Text('Sin conexión con el servidor'),
-                      );
-                    }
-                    final categorias =
-                        snapshot.data ?? const <Categoria>[];
-                    // Si la categoria del producto no esta en la lista
-                    // cargada (aun no llego la peticion, o la categoria esta
-                    // desactivada), pasar ese valor a DropdownButtonFormField
-                    // dispara un _AssertionError y Flutter reemplaza el
-                    // widget por un ErrorWidget rojo. Se cae a null para que
-                    // muestre "Sin categoria" en vez de romperse.
-                    final idsDisponibles =
-                        categorias.map((c) => c.id).toSet();
-                    final valorValido = (_categoriaId != null &&
-                            idsDisponibles.contains(_categoriaId))
-                        ? _categoriaId
-                        : null;
-
-                    return DropdownButtonFormField<int?>(
-                      // Ocupa el ancho del campo: un nombre largo se corta con
-                      // … en vez de desbordar la fila en el telefono.
-                      isExpanded: true,
-                      value: valorValido,
-                      items: [
-                        const DropdownMenuItem<int?>(
-                          value: null,
-                          child: Text('Sin categoría'),
-                        ),
-                        ...categorias.map(
-                          (c) => DropdownMenuItem<int?>(
-                            value: c.id,
-                            child: Text(c.nombre),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _categoriaId = v),
-                      decoration: const InputDecoration(labelText: 'Categoria'),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                if (angosto) ...[
-                  _selectorMarca(),
-                  const SizedBox(height: 12),
-                  _selectorProveedor(),
+                if (ancho) ...[
+                  par(codigo, codigoBarras),
+                  espacio,
+                  nombre,
+                  espacio,
+                  descripcion,
+                  espacio,
+                  par(precioCompra, precioVenta),
+                  espacio,
+                  par(precioMayor, stockMinimo),
+                  espacio,
+                  if (_isEditing) categoria else par(cantidadInicial, categoria),
+                  espacio,
+                  par(_selectorMarca(), _selectorProveedor()),
                 ] else ...[
-                  Row(
-                    children: [
-                      Expanded(child: _selectorMarca()),
-                      const SizedBox(width: 12),
-                      Expanded(child: _selectorProveedor()),
-                    ],
-                  ),
+                  codigo,
+                  espacio,
+                  nombre,
+                  espacio,
+                  descripcion,
+                  espacio,
+                  codigoBarras,
+                  espacio,
+                  precioCompra,
+                  espacio,
+                  precioVenta,
+                  espacio,
+                  precioMayor,
+                  espacio,
+                  stockMinimo,
+                  if (!_isEditing) ...[espacio, cantidadInicial],
+                  espacio,
+                  categoria,
+                  espacio,
+                  if (angosto) ...[
+                    _selectorMarca(),
+                    espacio,
+                    _selectorProveedor(),
+                  ] else
+                    par(_selectorMarca(), _selectorProveedor()),
                 ],
                 if (_error != null) ...[
                   const SizedBox(height: 8),
@@ -1300,35 +1331,34 @@ class _CategoriasPageState extends State<CategoriasPage> {
         title: const Text('Renombrar categoría'),
         content: Form(
           key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            maxLength: 100,
-            validator: Validaciones.nombreSinNumeros,
-            decoration: const InputDecoration(
-              labelText: 'Nombre',
-              errorMaxLines: 2,
-            ),
-            onFieldSubmitted: (v) {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(ctx).pop(v.trim());
-              }
-            },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: controller,
+                autofocus: true,
+                maxLength: 100,
+                validator: Validaciones.nombreSinNumeros,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre',
+                  errorMaxLines: 2,
+                ),
+                onFieldSubmitted: (v) {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.of(ctx).pop(v.trim());
+                  }
+                },
+              ),
+              BotonesDialogo(
+                textoConfirmar: 'Guardar',
+                onConfirmar: () {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.of(ctx).pop(controller.text.trim());
+                },
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          BotonSeguro(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.of(ctx).pop(controller.text.trim());
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
     // Se libera en el siguiente frame: tras el pop todavia queda un frame de
@@ -1445,17 +1475,31 @@ class _CategoriasPageState extends State<CategoriasPage> {
       builder: (ctx) => AlertDialog(
         scrollable: true,
         title: const Text('Registrar categoría'),
-        content: Form(key: formKey, child: TextFormField(
-          controller: _nombreController,
-          autofocus: true,
-          maxLength: 100,
-          validator: Validaciones.nombreSinNumeros,
-          decoration: const InputDecoration(labelText: 'Nombre', errorMaxLines: 2),
-        )),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          BotonSeguro(onPressed: () { if (formKey.currentState!.validate()) Navigator.pop(ctx, true); }, child: const Text('Registrar')),
-        ],
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nombreController,
+                autofocus: true,
+                maxLength: 100,
+                validator: Validaciones.nombreSinNumeros,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre',
+                  errorMaxLines: 2,
+                ),
+              ),
+              BotonesDialogo(
+                textoConfirmar: 'Registrar',
+                onCancelar: () => Navigator.pop(ctx, false),
+                onConfirmar: () {
+                  if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
     if (crear == true) await _crear();

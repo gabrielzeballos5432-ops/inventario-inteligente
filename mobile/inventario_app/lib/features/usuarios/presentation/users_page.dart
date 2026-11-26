@@ -10,6 +10,7 @@ import '../../../core/session/session_controller.dart';
 import '../../../core/utils/validaciones.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../shared/widgets/botones_dialogo.dart';
 
 /// Estado del listado de roles dentro del panel de usuarios. Distingue
 /// cargando, fallo y listo para no habilitar el alta de usuarios con una
@@ -764,26 +765,22 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                     style: TextStyle(color: context.paleta.negativo),
                   ),
                 ],
+                BotonesDialogo(
+                  ocupado: _saving,
+                  onCancelar: () => Navigator.of(context).pop(false),
+                  onConfirmar: _save,
+                  iconoConfirmar: Icon(
+                    _saving ? Icons.hourglass_top : Icons.save_outlined,
+                  ),
+                  textoConfirmar: _saving
+                      ? 'Guardando...'
+                      : (_isEditing ? 'Actualizar' : 'Registrar'),
+                ),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: _saving ? null : _save,
-          icon: Icon(_saving ? Icons.hourglass_top : Icons.save_outlined),
-          child: Text(
-            _saving
-                ? 'Guardando...'
-                : (_isEditing ? 'Actualizar' : 'Registrar'),
-          ),
-        ),
-      ],
     );
   }
 }

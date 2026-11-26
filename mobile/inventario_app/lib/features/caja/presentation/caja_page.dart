@@ -6,6 +6,7 @@ import '../../../core/providers/sucursal_controller.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../shared/widgets/botones_dialogo.dart';
 import '../../../core/utils/mensaje_error.dart';
 import '../../../core/utils/validaciones.dart';
 import '../../../core/utils/formato_numero.dart';
@@ -311,7 +312,8 @@ class _DialogoMontoState extends State<_DialogoMonto> {
               validator: (texto) =>
                   Validaciones.monto(texto, permitirCero: widget.permitirCero),
             ),
-            if (widget.pedirNota)
+            if (widget.pedirNota) ...[
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _nota,
                 maxLength: 250,
@@ -319,26 +321,21 @@ class _DialogoMontoState extends State<_DialogoMonto> {
                   labelText: 'Observación del cierre (opcional)',
                 ),
               ),
+            ],
+            BotonesDialogo(
+              textoConfirmar: widget.titulo,
+              onConfirmar: () {
+                if (_formKey.currentState!.validate()) {
+                  Navigator.pop(context, (
+                    monto: Validaciones.leerNumero(_monto.text)!,
+                    nota: widget.pedirNota ? _nota.text.trim() : null,
+                  ));
+                }
+              },
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        BotonSeguro(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Navigator.pop(context, (
-                monto: Validaciones.leerNumero(_monto.text)!,
-                nota: widget.pedirNota ? _nota.text.trim() : null,
-              ));
-            }
-          },
-          child: Text(widget.titulo),
-        ),
-      ],
     );
   }
 }

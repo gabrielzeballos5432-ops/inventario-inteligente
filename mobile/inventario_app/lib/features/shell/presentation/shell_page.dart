@@ -211,7 +211,18 @@ class _ShellPageState extends State<ShellPage> {
                                             ? sucursalActiva
                                             : null,
                                       ),
-                                      child: _pagina(destino, auth.isAdmin),
+                                      // Cada seccion con su ancho: las listas
+                                      // (categorias, marcas...) a 960 px
+                                      // centradas en vez de filas de 1200 px.
+                                      child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: destino.anchoMaximo,
+                                          ),
+                                          child: _pagina(destino, auth.isAdmin),
+                                        ),
+                                      ),
                                     )
                                   : const SizedBox.shrink(),
                             ),

@@ -1,5 +1,27 @@
 import 'package:flutter/material.dart';
 
+/// Ancho minimo de todo dialogo (`dialogTheme.constraints`).
+///
+/// Sin el, `AlertDialog` se encoge al ancho de su contenido: en escritorio
+/// los formularios quedaban en una columna de 280 px. En el telefono el
+/// minimo se recorta solo al ancho disponible.
+const double anchoMinimoDialogo = 440;
+
+/// `builder` para `showDatePicker`: el selector de fecha tambien es un
+/// `Dialog` y con [anchoMinimoDialogo] el calendario se estiraba. Le devuelve
+/// el minimo por defecto de Flutter (280).
+Widget selectorFechaSinAnchoMinimo(BuildContext context, Widget? child) {
+  final tema = Theme.of(context);
+  return Theme(
+    data: tema.copyWith(
+      dialogTheme: tema.dialogTheme.copyWith(
+        constraints: const BoxConstraints(minWidth: 280),
+      ),
+    ),
+    child: child!,
+  );
+}
+
 /// Paleta de marca de la aplicacion: morado medio oscuro como color principal,
 /// con negro al fondo, plomo en las superficies y blanco para el texto.
 ///
@@ -280,6 +302,11 @@ ThemeData _buildTema(Brightness brightness, ColorScheme scheme, AppPaleta p) {
       // El inset por defecto (40 dp) deja el formulario en una columna
       // angosta en el telefono; con 12 dp aprovecha casi todo el ancho.
       insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+      // Sin minimo, AlertDialog se encoge a su contenido y en escritorio los
+      // formularios quedaban en 280 px. En el telefono se recorta solo al
+      // ancho disponible. Los selectores de fecha restauran el ancho propio
+      // con `selectorFechaSinAnchoMinimo` (se estiraban).
+      constraints: const BoxConstraints(minWidth: anchoMinimoDialogo),
       titleTextStyle: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w700,

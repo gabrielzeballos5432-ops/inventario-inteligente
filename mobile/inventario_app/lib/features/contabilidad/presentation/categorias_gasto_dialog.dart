@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/categoria_gasto.dart';
 import '../../../core/services/operaciones_service.dart';
 import '../../../shared/widgets/boton_seguro.dart';
+import '../../../shared/widgets/botones_dialogo.dart';
 import '../../../core/utils/mensaje_error.dart';
 import '../../../core/utils/formato_numero.dart';
 
@@ -163,19 +164,16 @@ class _CategoriasGastoDialogState extends State<CategoriasGastoDialog> {
                 ],
               ),
             ),
+          BotonesDialogo(
+            textoCancelar: 'Añadir categoría',
+            iconoCancelar: const Icon(Icons.add),
+            onCancelar: _cargando ? null : () => _editar(),
+            textoConfirmar: 'Listo',
+            onConfirmar: () => Navigator.pop(context),
+          ),
         ],
       ),
     ),
-    actions: [
-      BotonSeguro(
-        onPressed: _cargando ? null : () => _editar(),
-        child: const Text('Añadir categoría'),
-      ),
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Listo'),
-      ),
-    ],
   );
 }
 
@@ -266,6 +264,7 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
                   ? 'Escribe el nombre'
                   : null,
             ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _periodicidad,
               isExpanded: true,
@@ -281,6 +280,7 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
                   ? null
                   : (valor) => setState(() => _periodicidad = valor!),
             ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               // Ocupa el ancho del campo: un nombre largo se corta con
               // … en vez de desbordar la fila en el telefono.
@@ -295,7 +295,8 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
                   ? null
                   : (valor) => setState(() => _tipo = valor!),
             ),
-            if (_tipo == 'fijo')
+            if (_tipo == 'fijo') ...[
+              const SizedBox(height: 12),
               TextFormField(
                 inputFormatters: FormatoNumero.decimal(decimales: 2),
                 controller: _monto,
@@ -314,6 +315,7 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
                       : 'Usa un monto mayor a 0 con hasta 2 decimales';
                 },
               ),
+            ],
             if (widget.categoria != null)
               SwitchListTile(
                 title: const Text('Activa'),
@@ -323,19 +325,14 @@ class _CategoriaGastoFormularioState extends State<_CategoriaGastoFormulario> {
                     : (valor) => setState(() => _activo = valor),
               ),
             if (_error != null) Text(_error!),
+            BotonesDialogo(
+              ocupado: _guardando,
+              onConfirmar: _guardar,
+              textoConfirmar: _guardando ? 'Guardando…' : 'Guardar categoría',
+            ),
           ],
         ),
       ),
     ),
-    actions: [
-      TextButton(
-        onPressed: _guardando ? null : () => Navigator.pop(context),
-        child: const Text('Cancelar'),
-      ),
-      BotonSeguro(
-        onPressed: _guardando ? null : _guardar,
-        child: Text(_guardando ? 'Guardando…' : 'Guardar categoría'),
-      ),
-    ],
   );
 }
